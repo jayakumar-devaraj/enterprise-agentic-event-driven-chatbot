@@ -1,0 +1,32 @@
+{"text": "My name is John Smith and I live in Chicago.", "entities": [{"type": "PERSON", "value": "John Smith"}, {"type": "LOCATION", "value": "Chicago"}]}
+{"text": "Please send the invoice to Maria Garcia in Houston.", "entities": [{"type": "PERSON", "value": "Maria Garcia"}, {"type": "LOCATION", "value": "Houston"}]}
+{"text": "Robert Johnson called from Denver about his bill.", "entities": [{"type": "PERSON", "value": "Robert Johnson"}, {"type": "LOCATION", "value": "Denver"}]}
+{"text": "Can Emily Chen get a refund? She moved to Seattle last month.", "entities": [{"type": "PERSON", "value": "Emily Chen"}, {"type": "LOCATION", "value": "Seattle"}]}
+{"text": "The router at David Brown's office in Boston keeps dropping.", "entities": [{"type": "PERSON", "value": "David Brown"}, {"type": "LOCATION", "value": "Boston"}]}
+{"text": "Hi, this is Sarah Williams writing from Atlanta, Georgia.", "entities": [{"type": "PERSON", "value": "Sarah Williams"}, {"type": "LOCATION", "value": "Atlanta"}, {"type": "LOCATION", "value": "Georgia"}]}
+{"text": "Michael Davis says the app crashes since he arrived in Phoenix.", "entities": [{"type": "PERSON", "value": "Michael Davis"}, {"type": "LOCATION", "value": "Phoenix"}]}
+{"text": "Jennifer Martinez wants her account moved to the Miami branch.", "entities": [{"type": "PERSON", "value": "Jennifer Martinez"}, {"type": "LOCATION", "value": "Miami"}]}
+{"text": "Ship the replacement to William Taylor, Portland, Oregon.", "entities": [{"type": "PERSON", "value": "William Taylor"}, {"type": "LOCATION", "value": "Portland"}, {"type": "LOCATION", "value": "Oregon"}]}
+{"text": "Our customer Linda Anderson in Dallas was double charged.", "entities": [{"type": "PERSON", "value": "Linda Anderson"}, {"type": "LOCATION", "value": "Dallas"}]}
+{"text": "James Wilson travels to London next week and needs roaming.", "entities": [{"type": "PERSON", "value": "James Wilson"}, {"type": "LOCATION", "value": "London"}]}
+{"text": "Patricia Thomas from Toronto cannot log in.", "entities": [{"type": "PERSON", "value": "Patricia Thomas"}, {"type": "LOCATION", "value": "Toronto"}]}
+{"text": "I am Daniel Moore and my internet in Austin is slow.", "entities": [{"type": "PERSON", "value": "Daniel Moore"}, {"type": "LOCATION", "value": "Austin"}]}
+{"text": "Elizabeth Jackson asked whether the Paris office can see her invoices.", "entities": [{"type": "PERSON", "value": "Elizabeth Jackson"}, {"type": "LOCATION", "value": "Paris"}]}
+{"text": "Christopher White lives in San Francisco and pays annually.", "entities": [{"type": "PERSON", "value": "Christopher White"}, {"type": "LOCATION", "value": "San Francisco"}]}
+{"text": "Barbara Harris from Nashville reported a billing error.", "entities": [{"type": "PERSON", "value": "Barbara Harris"}, {"type": "LOCATION", "value": "Nashville"}]}
+{"text": "Contact Matthew Clark at the Berlin site about the outage.", "entities": [{"type": "PERSON", "value": "Matthew Clark"}, {"type": "LOCATION", "value": "Berlin"}]}
+{"text": "Susan Lewis just relocated from Detroit to Minneapolis.", "entities": [{"type": "PERSON", "value": "Susan Lewis"}, {"type": "LOCATION", "value": "Detroit"}, {"type": "LOCATION", "value": "Minneapolis"}]}
+{"text": "Anthony Robinson in Philadelphia needs a new modem.", "entities": [{"type": "PERSON", "value": "Anthony Robinson"}, {"type": "LOCATION", "value": "Philadelphia"}]}
+{"text": "Karen Walker wrote that her card was charged twice in Las Vegas.", "entities": [{"type": "PERSON", "value": "Karen Walker"}, {"type": "LOCATION", "value": "Las Vegas"}]}
+{"text": "Mark Young from Sydney wants to cancel his plan.", "entities": [{"type": "PERSON", "value": "Mark Young"}, {"type": "LOCATION", "value": "Sydney"}]}
+{"text": "Nancy Allen says the Wi-Fi in her San Diego apartment fails nightly.", "entities": [{"type": "PERSON", "value": "Nancy Allen"}, {"type": "LOCATION", "value": "San Diego"}]}
+{"text": "Steven King is visiting Tokyo and asked about international fees.", "entities": [{"type": "PERSON", "value": "Steven King"}, {"type": "LOCATION", "value": "Tokyo"}]}
+{"text": "Lisa Wright in Baltimore was billed after cancelling.", "entities": [{"type": "PERSON", "value": "Lisa Wright"}, {"type": "LOCATION", "value": "Baltimore"}]}
+{"text": "Please escalate the ticket for Paul Scott, Columbus, Ohio.", "entities": [{"type": "PERSON", "value": "Paul Scott"}, {"type": "LOCATION", "value": "Columbus"}, {"type": "LOCATION", "value": "Ohio"}]}
+{"text": "Betty Green from Dublin cannot reset her password.", "entities": [{"type": "PERSON", "value": "Betty Green"}, {"type": "LOCATION", "value": "Dublin"}]}
+{"text": "Kevin Adams moved his business to Salt Lake City.", "entities": [{"type": "PERSON", "value": "Kevin Adams"}, {"type": "LOCATION", "value": "Salt Lake City"}]}
+{"text": "Dorothy Baker asked why the Charlotte store charged a late fee.", "entities": [{"type": "PERSON", "value": "Dorothy Baker"}, {"type": "LOCATION", "value": "Charlotte"}]}
+{"text": "Brian Nelson reports that the VPN fails whenever he is in Madrid.", "entities": [{"type": "PERSON", "value": "Brian Nelson"}, {"type": "LOCATION", "value": "Madrid"}]}
+{"text": "Sandra Carter in Kansas City wants paper statements again.", "entities": [{"type": "PERSON", "value": "Sandra Carter"}, {"type": "LOCATION", "value": "Kansas City"}]}
+{"text": "George Mitchell from Vancouver needs help configuring email.", "entities": [{"type": "PERSON", "value": "George Mitchell"}, {"type": "LOCATION", "value": "Vancouver"}]}
+{"text": "Ashley Perez, who lives in New Orleans, disputes a charge.", "entities": [{"type": "PERSON", "value": "Ashley Perez"}, {"type": "LOCATION", "value": "New Orleans"}]}
