@@ -1,0 +1,45 @@
+"""Settings validation, including the dedupe-lease formula (A5 unit part, SPEC.md §5)."""
+
+import pytest
+from chat_common.settings import Settings
+from pydantic import ValidationError
+
+
+def test_defaults_satisfy_lease_formula() -> None:
+    """Shipped defaults: 200 > 60*3 + 4*2 = 188."""
+    assert Settings().dedupe_lease_s == 200
+
+
+def test_lease_below_formula_fails_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A lease that could expire mid-processing is rejected at construction."""
+    monkeypatch.setenv("DEDUPE_LEASE_S", "188")
+    with pytest.raises(ValidationError, match="DEDUPE_LEASE_S=188 must exceed"):
+        Settings()
+
+
+def test_lease_formula_tracks_retry_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raising retries without raising the lease fails; raising both passes."""
+    monkeypatch.setenv("MAX_RETRIES", "5")
+    with pytest.raises(ValidationError):
+        Settings()
+    monkeypatch.setenv("DEDUPE_LEASE_S", "500")
+    assert Settings().max_retries == 5
+
+
+def test_cors_wildcard_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No wildcard CORS."""
+    monkeypatch.setenv("CORS_ORIGINS", "http://a.test, *")
+    with pytest.raises(ValueError, match="must not contain"):
+        _ = Settings().cors_origin_list
+
+
+def test_cors_list_parsing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Comma-separated origins are trimmed."""
+    monkeypatch.setenv("CORS_ORIGINS", " http://a.test ,http://b.test")
+    assert Settings().cors_origin_list == ["http://a.test", "http://b.test"]
+
+
+def test_secrets_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Secret values never appear in repr (and so never in logs)."""
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-very-secret")
+    assert "sk-very-secret" not in repr(Settings())
