@@ -119,3 +119,37 @@ Reply names exactly one bundle and changes nothing, so per Gate A it locks as-is
 Lean, spec-default**. E3 answers default to the Bundle 1 column: spaCy `en_core_web_sm`, Ollama
 `qwen2.5:0.5b`, Redis checkpointer (spike first, Postgres fallback), pytest + plain metric scripts,
 structlog, Python 3.14.5, TypeScript 7.0.2.
+
+## Round 2 — lead replies after lock (verbatim, received 10:36–10:38 CDT)
+
+> Guardrails - multi layer
+
+> Observability - LangFuse
+
+> Access control - basic auth
+
+> Human approval gate - Yes
+
+## Round 2 — agent response (10:39 CDT)
+
+These change the locked bundle's protected concerns, so per Gate A the result is echoed back and
+the stack is not re-locked until an explicit "yes"/"lock". Versions resolved live: langfuse (PyPI)
+5.0.2; `langfuse/langfuse` and `langfuse/langfuse-worker` images 4.63.0; `clickhouse/clickhouse-server`
+26.9.20. llm-guard 0.3.16 rejected: requires Python <3.13 and pulls PyTorch, violating the brief's
+no-PyTorch rule and the locked Python 3.14.5.
+
+- **Guardrails (multi-layer), no new dependency:** L1 schema/size (Pydantic strict, 413, 422,
+  `thread_id` regex) · L2 abuse (Redis per-thread rate limit, 429) · L3 PII (Presidio scrub before
+  Kafka) · L4 injection: structural (byte-identical system prompt, user text only in a delimited
+  user field) + detection (fastembed similarity against injection exemplars in a separate Qdrant
+  collection; a hit routes to a refusal node, flagged on the span and in logs, never silently dropped)
+  · L5 output (Presidio scrub of model output, token cap, system-prompt-echo check before XADD).
+- **Observability = LangFuse:** options (A) self-hosted LangFuse alongside OTel→Jaeger, (B) LangFuse
+  Cloud alongside Jaeger, (C) LangFuse replacing Jaeger. Recommended A. Awaiting choice.
+- **Access control = HTTP Basic:** gateway checks credentials from `AUTH_USERS` (stdlib scrypt hashes);
+  ownership binding `thread_owner:{thread_id}` SET NX on first POST, 403 on mismatch for POST and
+  stream; envelope carries `user_id`; 401 on missing/bad credentials. Frontend reads SSE via `fetch`
+  because `EventSource` cannot send an Authorization header.
+- **Human approval gate:** the brief's agent has no side-effecting action to gate. Options: (A) add a
+  billing "refund request" action gated by LangGraph `interrupt()` + `POST /approve`, (B) gate an
+  operator DLQ re-drive command. Recommended A. Awaiting choice.
