@@ -26,3 +26,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **Unexplained slow run (Task 9):** one local unit-suite run reported 2081 s (13:40–14:12 CDT); an
   immediate rerun took 13.5 s and no test exceeded 2.2 s. Cause not identified (host stall
   suspected); about 30 minutes of the budget were lost.
+- **Approval gate edge (Task 10):** sending a new chat message on a thread while a refund awaits
+  approval starts a new graph run and abandons the paused one; a later approve then gets
+  `ErrorEvent{approval_not_pending}` and no refund is applied (fails safe, but the user must ask
+  again). The refund rule is a keyword match on "refund(s)" in billing-routed text.

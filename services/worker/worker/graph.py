@@ -1,4 +1,4 @@
-"""LangGraph StateGraph: routing is the first node, then one intent node, then END."""
+"""LangGraph StateGraph: routing is the first node, then one intent node (or the refund gate)."""
 
 import logging
 import operator
@@ -6,9 +6,12 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from typing import Annotated, Any, TypedDict
 
+from chat_common.audit import AuditLog
 from chat_common.schemas import Envelope
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 
+from worker import approval
 from worker.consumer import TransientDependencyError
 from worker.guards import guarded_tokens
 from worker.llm import REFUSAL, Engine, Turn
@@ -29,6 +32,7 @@ class ChatState(TypedDict, total=False):
     intent: str
     route_score: float
     injection_score: float
+    decision: dict[str, Any]
 
 
 async def _single(text: str) -> Any:
@@ -41,6 +45,9 @@ def build_graph(
     engine: Engine,
     scrub: Callable[[str], Awaitable[str]],
     max_tokens: int,
+    *,
+    redis: Any = None,
+    refund_ttl_s: int = 86400,
 ) -> StateGraph:
     """Assemble the graph; the caller compiles it with a checkpointer."""
 
@@ -57,19 +64,60 @@ def build_graph(
             )
         return {"intent": intent, "route_score": r.score, "injection_score": r.injection_score}
 
-    async def respond(state: ChatState) -> dict[str, Any]:
-        """Stream the reply through the output guard; persist the user+assistant pair at once."""
+    def after_route(state: ChatState) -> str:
+        if approval.wants_refund(state["intent"], state["pending"]):
+            return "await_approval"
+        return state["intent"]
+
+    async def stream_reply(deltas: Any) -> str:
         writer = current_writer.get()
-        history = state.get("turns", [])
-        if state["intent"] == "refuse":
-            deltas = _single(REFUSAL)
-        else:
-            deltas = engine.stream(state["intent"], state["pending"], history)
         tokens: list[str] = []
         async for token in guarded_tokens(deltas, scrub, max_tokens):
             tokens.append(token)
             await writer.token(token)
-        reply = " ".join(tokens)
+        return " ".join(tokens)
+
+    async def respond(state: ChatState) -> dict[str, Any]:
+        """Stream the reply through the output guard; persist the user+assistant pair at once."""
+        if state["intent"] == "refuse":
+            deltas = _single(REFUSAL)
+        else:
+            deltas = engine.stream(state["intent"], state["pending"], state.get("turns", []))
+        reply = await stream_reply(deltas)
+        return {
+            "turns": [
+                {"role": "user", "text": state["pending"]},
+                {"role": "assistant", "text": reply},
+            ]
+        }
+
+    def await_approval(state: ChatState) -> dict[str, Any]:
+        """Pause before any side effect; resumed with {"approved": bool, "user_id": str}."""
+        decision = interrupt({"action": "refund_request", "message_id": state["message_id"]})
+        return {"decision": decision}
+
+    async def settle_refund(state: ChatState) -> dict[str, Any]:
+        """Apply (idempotently) or reject, audit it, and tell the user deterministically."""
+        decision = state["decision"]
+        thread_id, ref = decision["thread_id"], state["message_id"]
+        if decision["approved"]:
+            await approval.apply_refund(
+                redis,
+                thread_id=thread_id,
+                ref_message_id=ref,
+                user_id=decision["user_id"],
+                ttl_s=refund_ttl_s,
+            )
+            text = approval.APPROVED_TEXT
+        else:
+            await AuditLog(redis).record(
+                "refund_rejected",
+                actor=decision["user_id"],
+                thread_id=thread_id,
+                ref_message_id=ref,
+            )
+            text = approval.REJECTED_TEXT
+        reply = await stream_reply(_single(text))
         return {
             "turns": [
                 {"role": "user", "text": state["pending"]},
@@ -82,21 +130,63 @@ def build_graph(
     for name in ("billing", "tech_support", "general", "refuse"):
         builder.add_node(name, respond)
         builder.add_edge(name, END)
+    builder.add_node("await_approval", await_approval)
+    builder.add_node("settle_refund", settle_refund)
     builder.add_edge(START, "route")
-    builder.add_conditional_edges("route", lambda s: s["intent"])
+    builder.add_conditional_edges("route", after_route)
+    builder.add_edge("await_approval", "settle_refund")
+    builder.add_edge("settle_refund", END)
     return builder
 
 
-def make_processor(compiled: Any) -> Callable[[Envelope, StreamWriter], Awaitable[None]]:
+def make_processor(
+    compiled: Any, *, redis: Any = None, approval_ttl_s: int = 3600
+) -> Callable[[Envelope, StreamWriter], Awaitable[None]]:
     """Adapt a compiled graph to the worker's Processor signature."""
 
     async def process(env: Envelope, writer: StreamWriter) -> None:
+        config = {"configurable": {"thread_id": env.thread_id}}
         token = current_writer.set(writer)
         try:
-            await compiled.ainvoke(
-                {"pending": env.text, "message_id": str(env.message_id), "user_id": env.user_id},
-                {"configurable": {"thread_id": env.thread_id}},
-            )
+            if env.kind == "approval":
+                ref = str(env.ref_message_id)
+                snapshot = await compiled.aget_state(config)
+                if not snapshot.next or snapshot.values.get("message_id") != ref:
+                    await writer.error("approval_not_pending", "no refund is awaiting approval")
+                    return
+                await compiled.ainvoke(
+                    Command(
+                        resume={
+                            "approved": env.approved,
+                            "user_id": env.user_id,
+                            "thread_id": env.thread_id,
+                        }
+                    ),
+                    config,
+                )
+                await redis.delete(approval.pending_key(env.thread_id, ref))
+            else:
+                result = await compiled.ainvoke(
+                    {
+                        "pending": env.text,
+                        "message_id": str(env.message_id),
+                        "user_id": env.user_id,
+                    },
+                    config,
+                )
+                if result.get("__interrupt__"):
+                    mid = str(env.message_id)
+                    await redis.set(
+                        approval.pending_key(env.thread_id, mid), env.user_id, ex=approval_ttl_s
+                    )
+                    await AuditLog(redis).record(
+                        "refund_proposed",
+                        actor=env.user_id,
+                        thread_id=env.thread_id,
+                        message_id=mid,
+                    )
+                    await writer.approval_required("A refund request needs your approval.")
+                    return
         finally:
             current_writer.reset(token)
         await writer.done()

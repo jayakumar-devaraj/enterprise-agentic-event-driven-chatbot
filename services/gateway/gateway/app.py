@@ -11,7 +11,13 @@ from typing import Annotated, Any
 import redis.asyncio as aioredis
 from chat_common.audit import AuditLog
 from chat_common.logjson import configure_logging
-from chat_common.schemas import ChatAccepted, ChatRequest, Envelope, stream_key
+from chat_common.schemas import (
+    ApprovalRequest,
+    ChatAccepted,
+    ChatRequest,
+    Envelope,
+    stream_key,
+)
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, status
@@ -188,6 +194,30 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
             max_wait_s=deps.settings.stream_ttl_s,
         ):
             yield event
+
+    @app.post("/approve/{thread_id}/{message_id}", status_code=status.HTTP_202_ACCEPTED)
+    async def approve(
+        thread_id: Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
+        message_id: uuid.UUID,
+        body: ApprovalRequest,
+        user: Annotated[str, Depends(current_user)],
+        deps: Annotated[Deps, Depends(_deps)],
+    ) -> ChatAccepted:
+        """Owner's decision on a paused refund; 404 when nothing is awaiting approval."""
+        await require_owner(deps, thread_id, user)
+        if await deps.redis.get(f"pending_approval:{thread_id}:{message_id}") is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no pending approval for this message")
+        envelope = Envelope(
+            message_id=body.message_id,
+            thread_id=thread_id,
+            user_id=user,
+            text="",
+            trace_id=uuid.uuid4().hex,
+            kind="approval",
+            ref_message_id=message_id,
+            approved=body.approved,
+        )
+        return await enqueue(deps, envelope, user)
 
     @app.post("/chat", status_code=status.HTTP_202_ACCEPTED)
     async def chat(

@@ -66,14 +66,18 @@ async def run(settings: Settings) -> None:
     ttl = {"default_ttl": settings.checkpoint_ttl_min, "refresh_on_read": True}
     async with AsyncRedisSaver.from_conn_string(settings.redis_url, ttl=ttl) as saver:
         await saver.asetup()
-        graph = build_graph(router, make_engine(settings), scrubber.ascrub, settings.llm_max_tokens)
-        worker = Worker(
-            settings,
-            consumer=consumer,
-            dlq_producer=dlq,
+        graph = build_graph(
+            router,
+            make_engine(settings),
+            scrubber.ascrub,
+            settings.llm_max_tokens,
             redis=redis,
-            process=make_processor(graph.compile(checkpointer=saver)),
+            refund_ttl_s=settings.dedupe_ttl_s,
         )
+        process = make_processor(
+            graph.compile(checkpointer=saver), redis=redis, approval_ttl_s=settings.approval_ttl_s
+        )
+        worker = Worker(settings, consumer=consumer, dlq_producer=dlq, redis=redis, process=process)
         try:
             await worker.run(settings.kafka_topic, stop)
         finally:
