@@ -160,3 +160,20 @@ Agent: DeepEval 4.3.1 swaps in from Bundle 2; same language, so the bundle stays
 deps checked live: no PyTorch; it ships posthog telemetry, so it is dev-only (never in a runtime
 image) with telemetry opted out. Judge = the local Ollama model through the OpenAI-compatible URL;
 deterministic metrics (routing accuracy, PII recall, LOO threshold) stay plain pytest.
+
+## Round 3 — lead reply (verbatim)
+
+> E3 — per-library choices (answer any you want to change): 1. lg 2. llama3.2:1b 3. redis 4. deepeval 5. stdlib json 6. 3.13.13 7 which one you would recommend ?
+
+## Round 3 — agent response (10:40 CDT)
+
+Item 7 checked live: typescript latest 7.0.2, 6.x line 6.0.3, 5.x line 5.9.3. typescript-eslint 8.71.2
+declares peer `typescript >=4.8.4 <6.1.0`, so TS 7 would block type-aware linting; vite 8.3.4,
+@vitejs/plugin-react 6.1.2 and vitest 5.0.5 declare no TypeScript peer. Recommendation: **TypeScript
+6.0.3** (newest line the lint toolchain supports). Python 3.13.13: tokenizers ships a cp310-abi3
+manylinux wheel, so the earlier cp313 gap is not a blocker.
+
+Echoed bundle (not locked until "yes"): Python 3.13.13 · spaCy `en_core_web_lg` 3.8.0 · Ollama
+`llama3.2:1b` · Redis checkpointer (langgraph-checkpoint-redis 0.5.2) · DeepEval 4.3.1 (dev-only) ·
+stdlib `logging` + JSON formatter (structlog dropped) · TypeScript 6.0.3 · multi-layer guardrails ·
+HTTP Basic + thread ownership · LangFuse option and approval-gate option still awaiting choice.
