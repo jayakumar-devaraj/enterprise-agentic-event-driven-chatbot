@@ -93,13 +93,59 @@ services:
       timeout: 5s
       retries: 20
 
-  # React chat window (Vite dev server). /api is proxied to the gateway, which runs on the host
-  # (`uv run uvicorn gateway.app:create_app --factory --port 8000`) until service images exist.
+  # One-shot: loads the Qdrant collections and calibrates thresholds; fails loudly.
+  seed:
+    build:
+      context: ..
+      dockerfile: services/seed/Dockerfile
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: "no"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+    env_file:
+      - path: ../.env
+        required: false
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Stateless: scale freely (`--scale gateway=2`); each replica gets a host port from the range.
+  gateway:
+    build:
+      context: ..
+      dockerfile: services/gateway/Dockerfile
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      # Exported in the shell: `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"`.
+      AUTH_USERS: ${AUTH_USERS:-}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${GATEWAY_HOST_PORTS:-8000-8003}:8000"
+    restart: unless-stopped
+
+  # React chat window (Vite dev server). /api is proxied to the gateway service.
   frontend:
     build: ../frontend
     environment:
-      GATEWAY_URL: ${GATEWAY_URL:-http://host.docker.internal:8000}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:8000}
+    depends_on:
+      gateway:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-5173}:5173"
