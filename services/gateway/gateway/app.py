@@ -1,0 +1,185 @@
+"""FastAPI gateway: auth, input guardrails L1–L3, idempotent enqueue (SPEC.md §2–§4)."""
+
+import logging
+import time
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import Annotated, Any
+
+import redis.asyncio as aioredis
+from chat_common.audit import AuditLog
+from chat_common.logjson import configure_logging
+from chat_common.schemas import ChatAccepted, ChatRequest, Envelope
+from chat_common.scrubber import get_scrubber
+from chat_common.settings import Settings
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from redis.exceptions import RedisError
+
+from gateway import auth
+from gateway.producer import DependencyUnavailable, EnvelopeSink, KafkaEnvelopeProducer
+
+log = logging.getLogger("gateway")
+_basic = HTTPBasic(auto_error=False)
+
+
+@dataclass
+class Deps:
+    """Process-wide collaborators, injectable for tests."""
+
+    settings: Settings
+    redis: Any  # redis.asyncio.Redis (decode_responses=True) or a test double
+    producer: EnvelopeSink
+    scrub: Callable[[str], Awaitable[str]]
+    users: dict[str, str]
+
+    @property
+    def audit(self) -> AuditLog:
+        """Audit writer on the same Redis."""
+        return AuditLog(self.redis)
+
+
+def _deps(request: Request) -> Deps:
+    """Fetch the Deps bundle attached at startup."""
+    return request.app.state.deps
+
+
+async def current_user(
+    creds: Annotated[HTTPBasicCredentials | None, Depends(_basic)],
+    deps: Annotated[Deps, Depends(_deps)],
+) -> str:
+    """401 unless the Basic credentials match AUTH_USERS."""
+    if creds is None or not auth.verify(deps.users, creds.username, creds.password):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "invalid credentials", {"WWW-Authenticate": "Basic"}
+        )
+    return creds.username
+
+
+async def bind_owner(deps: Deps, thread_id: str, user: str) -> None:
+    """First caller owns the thread; anyone else gets 403 (SPEC.md §3)."""
+    key = auth.owner_key(thread_id)
+    ttl = deps.settings.checkpoint_ttl_min * 60
+    await deps.redis.set(key, user, nx=True, ex=ttl)
+    if await deps.redis.get(key) != user:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "thread belongs to another user")
+
+
+async def require_owner(deps: Deps, thread_id: str, user: str) -> None:
+    """403 unless `user` already owns `thread_id` (stream and approve endpoints)."""
+    if await deps.redis.get(auth.owner_key(thread_id)) != user:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "thread belongs to another user")
+
+
+async def enforce_rate_limit(deps: Deps, thread_id: str) -> None:
+    """Fixed one-minute window per thread (guardrail L2)."""
+    key = f"ratelimit:{thread_id}:{int(time.time() // 60)}"
+    count = await deps.redis.incr(key)
+    if count == 1:
+        await deps.redis.expire(key, 60)
+    if count > deps.settings.rate_limit_per_min:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate limit exceeded")
+
+
+async def enqueue(deps: Deps, envelope: Envelope, user: str) -> ChatAccepted:
+    """Idempotent on message_id: a repeat returns the same 202 body without producing again."""
+    accepted = ChatAccepted(
+        message_id=envelope.message_id,
+        thread_id=envelope.thread_id,
+        stream_url=f"/stream/{envelope.thread_id}/{envelope.message_id}",
+    )
+    key = f"accepted:{envelope.message_id}"
+    first = await deps.redis.set(key, envelope.thread_id, nx=True, ex=deps.settings.dedupe_ttl_s)
+    if not first:
+        if await deps.redis.get(key) != envelope.thread_id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "message_id already used on another thread"
+            )
+        return accepted
+    try:
+        await deps.producer.send(envelope)
+    except DependencyUnavailable:
+        await deps.redis.delete(key)  # let the client's retry produce it
+        raise
+    await deps.audit.record(
+        f"{envelope.kind}_accepted",
+        actor=user,
+        thread_id=envelope.thread_id,
+        message_id=str(envelope.message_id),
+    )
+    return accepted
+
+
+def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> FastAPI:
+    """Build the app; production wiring unless a test supplies `deps_factory`."""
+
+    async def _production_deps() -> Deps:
+        settings = Settings()
+        configure_logging(settings.log_level)
+        scrubber = get_scrubber(settings.spacy_model)
+        return Deps(
+            settings=settings,
+            redis=aioredis.from_url(settings.redis_url, decode_responses=True),
+            producer=KafkaEnvelopeProducer(settings.kafka_bootstrap_servers, settings.kafka_topic),
+            scrub=scrubber.ascrub,
+            users=auth.parse_users(settings.auth_users.get_secret_value()),
+        )
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        deps = await (deps_factory or _production_deps)()
+        app.state.deps = deps
+        yield
+        await deps.producer.close()
+        await deps.redis.aclose()
+
+    app = FastAPI(title="chat-gateway", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=Settings().cors_origin_list,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
+    )
+
+    @app.exception_handler(DependencyUnavailable)
+    async def _dep_unavailable(_: Request, exc: DependencyUnavailable) -> JSONResponse:
+        log.error("dependency unavailable", extra={"error": str(exc)})
+        return JSONResponse({"detail": "dependency unavailable"}, status_code=503)
+
+    @app.exception_handler(RedisError)
+    async def _redis_unavailable(_: Request, exc: RedisError) -> JSONResponse:
+        log.error("redis unavailable", extra={"error": str(exc)})
+        return JSONResponse({"detail": "dependency unavailable"}, status_code=503)
+
+    @app.get("/healthz")
+    async def healthz(deps: Annotated[Deps, Depends(_deps)]) -> dict[str, str]:
+        """200 when Redis answers; RedisError maps to 503."""
+        await deps.redis.ping()
+        return {"status": "ok"}
+
+    @app.post("/chat", status_code=status.HTTP_202_ACCEPTED)
+    async def chat(
+        body: ChatRequest,
+        user: Annotated[str, Depends(current_user)],
+        deps: Annotated[Deps, Depends(_deps)],
+    ) -> ChatAccepted:
+        """Validate, bind ownership, rate-limit, scrub, enqueue; 202 with the stream URL."""
+        if len(body.message) > deps.settings.max_message_chars:
+            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "message too long")
+        await bind_owner(deps, body.thread_id, user)
+        await enforce_rate_limit(deps, body.thread_id)
+        scrubbed = await deps.scrub(body.message)  # L3: raw text never leaves this process
+        envelope = Envelope(
+            message_id=body.message_id,
+            thread_id=body.thread_id,
+            user_id=user,
+            text=scrubbed,
+            trace_id=uuid.uuid4().hex,
+        )
+        return await enqueue(deps, envelope, user)
+
+    return app
