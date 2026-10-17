@@ -153,3 +153,10 @@ no-PyTorch rule and the locked Python 3.14.5.
 - **Human approval gate:** the brief's agent has no side-effecting action to gate. Options: (A) add a
   billing "refund request" action gated by LangGraph `interrupt()` + `POST /approve`, (B) gate an
   operator DLQ re-drive command. Recommended A. Awaiting choice.
+
+> Eval : DeepEval
+
+Agent: DeepEval 4.3.1 swaps in from Bundle 2; same language, so the bundle stays consistent. Core
+deps checked live: no PyTorch; it ships posthog telemetry, so it is dev-only (never in a runtime
+image) with telemetry opted out. Judge = the local Ollama model through the OpenAI-compatible URL;
+deterministic metrics (routing accuracy, PII recall, LOO threshold) stay plain pytest.
