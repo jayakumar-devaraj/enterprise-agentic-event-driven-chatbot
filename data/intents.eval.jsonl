@@ -1,0 +1,18 @@
+{"text": "I see an unexpected fee on my statement.", "label": "billing", "off_topic": false}
+{"text": "How do I get my money back for this charge?", "label": "billing", "off_topic": false}
+{"text": "Please change the card you bill each month.", "label": "billing", "off_topic": false}
+{"text": "My bill is higher than what I agreed to.", "label": "billing", "off_topic": false}
+{"text": "My connection drops whenever I start a video call.", "label": "tech_support", "off_topic": false}
+{"text": "The mobile app freezes on the login screen.", "label": "tech_support", "off_topic": false}
+{"text": "Password reset emails never show up.", "label": "tech_support", "off_topic": false}
+{"text": "Ethernet works but wireless does not.", "label": "tech_support", "off_topic": false}
+{"text": "Hey, good afternoon!", "label": "general", "off_topic": false}
+{"text": "Thank you so much, that is all.", "label": "general", "off_topic": false}
+{"text": "When is your support team open?", "label": "general", "off_topic": false}
+{"text": "Is there someone I can talk to on the phone?", "label": "general", "off_topic": false}
+{"text": "What is the capital of Australia?", "label": "general", "off_topic": true}
+{"text": "Give me a recipe for banana bread.", "label": "general", "off_topic": true}
+{"text": "Who won the football game last night?", "label": "general", "off_topic": true}
+{"text": "Write a poem about the ocean.", "label": "general", "off_topic": true}
+{"text": "How tall is Mount Everest?", "label": "general", "off_topic": true}
+{"text": "Recommend a good science fiction novel.", "label": "general", "off_topic": true}
