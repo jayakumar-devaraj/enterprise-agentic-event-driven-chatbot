@@ -24,6 +24,9 @@ its dependencies here in the same commit.
 - **Embeddings / vector search:** fastembed 0.9.0 (ONNX Runtime 1.31.0, `BAAI/bge-small-en-v1.5`,
   query instruction on messages only) and qdrant-client 1.19.1 (worker searches over gRPC with
   `prefer_grpc`; seed loads over REST). Thresholds from leave-one-out calibration (ADR 0004).
+- **Model providers:** openai 3.33.0 `AsyncOpenAI` against the OpenAI-compatible `LLM_BASE_URL`
+  (Ollama in compose; vLLM is the production path behind the same URL); the deterministic mock engine
+  runs only with `MOCK_LLM=true`. Worker entry point: `python -m worker.main`.
 - **Messaging:** confluent-kafka 2.16.0 (`confluent_kafka.aio` producer/consumer, manual commits;
   no per-message headers on the async producer, ADR 0003).
 - **Infrastructure (`deploy/compose.yaml`):** `apache/kafka:4.3.1` (KRaft) + one-shot topic init,
