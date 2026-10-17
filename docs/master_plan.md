@@ -146,7 +146,7 @@ reserve under Phase 2.5 item 5.
 | QDRANT_COLLECTION / QDRANT_INJECTION_COLLECTION | intents / injection_patterns |
 | EMBED_MODEL | BAAI/bge-small-en-v1.5 |
 | SPACY_MODEL | en_core_web_lg |
-| ROUTE_THRESHOLD / INJECTION_THRESHOLD | set by leave-one-out in Task 5, recorded in an ADR |
+| ROUTE_THRESHOLD / INJECTION_THRESHOLD | 0.5821 / 0.6113 (leave-one-out, ADR 0004) |
 | LLM_BASE_URL | http://ollama:11434/v1 |
 | LLM_MODEL / LLM_MAX_TOKENS | llama3.2:1b / 256 |
 | MOCK_LLM | true (CI/tests) |

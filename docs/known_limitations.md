@@ -19,3 +19,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   (`123-45-6789`, `987-65-4320`, `078-05-1120`); `123-45-6789` passes through unscrubbed, and
   `078-05-1120` is caught only as `PHONE_NUMBER`.
 - **Scrubber false positive (Task 3):** a sentence-initial "Email" was tagged `PERSON` and replaced.
+- **Injection-detection false positive (Task 5):** with `INJECTION_THRESHOLD=0.6113` (ADR 0004) the
+  benign eval sentence "How do I get my money back for this charge?" scores 0.658 and would be
+  routed to the refusal node. Detection is heuristic; structural prompt separation remains the
+  primary defence. Not tuned away.

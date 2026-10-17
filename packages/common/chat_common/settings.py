@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     qdrant_collection: str = "intents"
     qdrant_injection_collection: str = "injection_patterns"
     embed_model: str = "BAAI/bge-small-en-v1.5"
-    route_threshold: float = 0.0
-    injection_threshold: float = 1.0
+    route_threshold: float = 0.5821  # ADR 0004
+    injection_threshold: float = 0.6113  # ADR 0004
 
     spacy_model: str = "en_core_web_lg"
 
