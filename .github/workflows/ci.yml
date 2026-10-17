@@ -20,3 +20,39 @@ jobs:
           uv run ruff format --check .
       - name: Unit tests
         run: uv run pytest -q
+
+  integration:
+    # Real Kafka, Redis, Qdrant and Jaeger from deploy/compose.yaml (verification rung 2).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+      - name: Sync
+        run: uv sync --locked
+      - name: Start infrastructure
+        run: |
+          docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
+          docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
+      - name: Seed Qdrant
+        env:
+          QDRANT_URL: http://127.0.0.1:16333
+        run: uv run python -m seed.main
+      - name: Integration tests
+        run: uv run pytest -m integration -v
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose.yaml logs --tail 100
+
+  frontend:
+    runs-on: ubuntu-latest
+    container: node:24.22.0-slim
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
