@@ -22,3 +22,43 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | fix kafka CPU | config: Kafka TCP healthcheck, kafka-init readiness wait; verified CPU samples + 18 integration tests | fix-kafka-healthcheck-cpu | #15 |
 | 14 React chat window | code: frontend app + Dockerfile, compose service; tests: A8 (5 Vitest) | task-14-react-chat-window | #16 |
 | H1 CI integration + frontend | config: CI jobs integration (compose) and frontend; verified run 39065303808 | hardening/ci-integration | #17 |
+| wrapup | docs: README sections, demo script, summary, coverage report, limitations, this narrative | wrapup | #18 |
+
+## Orchestration narrative
+
+Single agent throughout: Claude Code, model `claude-opus-5-5`, one session, 2026-10-17 10:20–17:40
+CDT. The lead (Jayakumar Devaraj) made every gate decision; the agent proposed, implemented,
+verified and recorded. Commits carry no AI trailers by rule (CLAUDE.md §5); authorship evidence is
+this file and `docs/design_dialogue.md`.
+
+**Design (10:20–10:58).** Preflight found no git repo; the lead supplied the remote and confirmed
+the author identity, then the prompt was committed verbatim (`13f2d01`). Step A proposed three
+stack bundles with versions resolved live from PyPI, npm, Docker Hub and the Ollama registry
+(`docs/design_dialogue.md` Round 1). The lead locked Bundle 1 (`cc71797`), then reopened it with
+multi-layer guardrails, LangFuse, Basic auth and a human approval gate (Round 2, `cb1f6c1`),
+DeepEval (`254b87e`), and library changes incl. Python 3.13.13 and `en_core_web_lg` (Round 3,
+`2334e9a`); final lock in Round 4 (`7ee8466`). Step B produced the roadmap and fit check; the plan
+did not fit, so non-protected tasks were cut and the deadline extended (row 0, PR #1, `e321a28`).
+At the lead's request the agent added HLD/LLD and ADRs 0001/0005–0007 (row 0b, PR #2, `b6ea716`),
+then React and Qdrant-gRPC design updates (row 0c, PR #4, `649c97d`).
+
+**Development (10:58–15:05).** One branch and PR per task, each merged only after its tests ran:
+workspace + CI + SPEC (row 1, PR #3); schemas/settings/audit with a real-Redis test (row 2, PR #5);
+Presidio scrubber + A1b recall report (row 3, PR #6); compose stack and the two pre-declared spikes,
+where (a) passed and (b) triggered the header fallback recorded in ADR 0003 (row 4, PR #7); seed,
+leave-one-out thresholds and A2, including a disclosed calibration fix (ADR 0004, row 5, PR #8);
+gateway + A1 (row 6, PR #9); worker consumer + A4/A5 (row 7, PR #10); LangGraph pipeline + A6/A7
+(row 8, PR #11); SSE + A3 (row 9, PR #12); approval gate (row 10, PR #13); OTel → Jaeger + LangFuse
+with a functional report (row 11, PR #14, `docs/reports/e2e-observability.md`); React chat window +
+A8 (row 14, PR #16). A lead-reported CPU issue was traced to the Kafka healthcheck spawning a JVM
+every 5 s and fixed (PR #15, `f11fdfa`).
+
+**QA (throughout, then 15:05–17:40).** Unit tests used labeled test doubles; persistence,
+messaging, routing and approval paths were verified against real Kafka, Redis, Qdrant and Jaeger
+(rung 2), and process-level smoke runs covered `worker.main` and the gateway (rung 3). Failures were
+fixed and disclosed in PR bodies rather than hidden: the A2 calibration mismatch (PR #8), A4/A5
+harness timing and an IPv6 `localhost` stall (PR #10, two extra cycles approved by the lead), the
+mock delta spacing caught by A6 (PR #11), and the A8 stream-double timing (PR #16). Phase 2.5 added
+integration and frontend jobs to CI (row H1, PR #17, run 39065303808: all three jobs green) and
+measured 87 % coverage (`docs/reports/coverage.txt`). A ~1h50m CI wait ended Phase 2.5 early; wrap-up
+reran every documented command before merge (PR #18).

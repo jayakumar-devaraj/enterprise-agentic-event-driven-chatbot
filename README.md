@@ -2,8 +2,7 @@
 
 ## Tech stack
 
-Versions read from `pyproject.toml` / `uv.lock`. Only what is installed today is listed; each task adds
-its dependencies here in the same commit.
+Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
 
 - **Language / tooling:** Python 3.13.13 (`.python-version`), uv workspace (`packages/common`,
   `services/{gateway,worker,seed}`), build backend `uv_build` 0.13.x.
@@ -49,5 +48,61 @@ its dependencies here in the same commit.
   :5173, `/api` proxied to the gateway); tests with Vitest 5.0.5, @testing-library/react
   16.3.3 and jsdom 30.1.3. Built and tested in `node:24.22.0-slim` (Node 24 LTS);
   SSE is read with `fetch` so the Basic `Authorization` header can be sent.
-- **CI:** GitHub Actions (`actions/checkout` v7.0.1, `astral-sh/setup-uv` v10.3.0) running lint and
-  unit tests on every push and pull request.
+- **CI:** GitHub Actions (`actions/checkout` v7.0.1, `astral-sh/setup-uv` v10.3.0): lint + unit,
+  integration against the compose stack, and frontend type-check + Vitest on every push and PR.
+
+## Architecture
+
+`POST /chat` → gateway (Basic auth, thread ownership, validation, rate limit, Presidio scrub) →
+Kafka `chat-requests` keyed by `thread_id` → worker (dedupe lease → LangGraph: route by fastembed +
+Qdrant → billing / tech_support / general / refusal / refund approval gate → LLM or mock → output
+scrub) → Redis Stream `tokens:{thread}:{message}` → `GET /stream/...` SSE → React chat window.
+Diagrams and failure modes: `docs/architecture/HLD.md`, `docs/architecture/LLD.md`; contracts:
+`SPEC.md`.
+
+## Quickstart
+
+Prerequisites: Docker, uv, network access for first-time model downloads (spaCy, fastembed).
+
+```bash
+uv sync                                                    # Python 3.13.13 + all packages
+docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
+docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
+QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main
+
+# one terminal each (host endpoints; MOCK_LLM=true is the default)
+export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://127.0.0.1:16379/0   QDRANT_URL=http://127.0.0.1:16333 QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
+uv run python -m worker.main
+uv run uvicorn gateway.app:create_app --factory --host 0.0.0.0 --port 8000
+
+docker compose -f deploy/compose.yaml up -d --build frontend   # http://localhost:5173 (demo / demo-pw)
+```
+
+Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`,
+`LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` in the environment (never commit them).
+
+## Local development
+
+- Config: every key and default is in `.env.example`; settings come from the environment.
+- Real inference instead of the mock: `docker compose -f deploy/compose.yaml --profile llm up -d
+  --build ollama`, publish its port, set `MOCK_LLM=false` and `LLM_BASE_URL` (not verified in this
+  build, see `docs/known_limitations.md`).
+- Generate a user: `uv run python -m gateway.auth <user> <password>` → append to `AUTH_USERS`.
+
+## Testing
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+uv run pytest                      # unit tests (integration excluded by default)
+uv run pytest -m integration       # needs the compose stack + seed from Quickstart
+uv run pytest -m "integration or not integration" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
+```
+
+Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
+
+## Deployment / CI
+
+`.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), and frontend jobs on
+every push and pull request. Service container images for gateway/worker/seed are not built yet
+(cut; see `docs/known_limitations.md`).
