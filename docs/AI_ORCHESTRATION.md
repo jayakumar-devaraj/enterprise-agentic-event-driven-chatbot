@@ -21,3 +21,4 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | 11 observability | code: chat_common.tracing, gateway instrumentation, worker spans + LangFuse observer; tests: Jaeger integration; docs: e2e report (rung 3), ADR 0003 note | task-11-observability | #14 |
 | fix kafka CPU | config: Kafka TCP healthcheck, kafka-init readiness wait; verified CPU samples + 18 integration tests | fix-kafka-healthcheck-cpu | #15 |
 | 14 React chat window | code: frontend app + Dockerfile, compose service; tests: A8 (5 Vitest) | task-14-react-chat-window | #16 |
+| H1 CI integration + frontend | config: CI jobs integration (compose) and frontend; verified run 39065303808 | hardening/ci-integration | #17 |
