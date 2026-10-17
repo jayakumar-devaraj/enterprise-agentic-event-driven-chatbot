@@ -23,3 +23,6 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   benign eval sentence "How do I get my money back for this charge?" scores 0.658 and would be
   routed to the refusal node. Detection is heuristic; structural prompt separation remains the
   primary defence. Not tuned away.
+- **Unexplained slow run (Task 9):** one local unit-suite run reported 2081 s (13:40–14:12 CDT); an
+  immediate rerun took 13.5 s and no test exceeded 2.2 s. Cause not identified (host stall
+  suspected); about 30 minutes of the budget were lost.
