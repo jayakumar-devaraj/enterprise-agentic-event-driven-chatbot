@@ -46,7 +46,7 @@ from Tasks 4–5.
   Qdrant intents   Redis checkpoints   Redis streams    Redis stream audit:events
   + injection_     (langgraph-         dedupe, rate     (durable, queryable runtime
   patterns (seed)  checkpoint-redis)   limit, owners    audit trail)
- Traces: OTel SDK gateway → worker (envelope trace_id / Kafka header) → Jaeger v2 :16686
+ Traces: OTel SDK gateway → worker (envelope trace_id; no Kafka headers, ADR 0003) → Jaeger v2 :16686
          LangFuse Cloud (US) for LLM-level spans — scrubbed content only
 ```
 

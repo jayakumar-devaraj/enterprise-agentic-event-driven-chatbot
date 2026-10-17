@@ -1,6 +1,5 @@
 """AuditLog against a real Redis 8 (rung 2)."""
 
-import os
 import uuid
 
 import pytest
@@ -10,10 +9,9 @@ from chat_common.audit import AuditLog
 pytestmark = pytest.mark.integration
 
 
-async def test_audit_roundtrip_on_real_redis() -> None:
+async def test_audit_roundtrip_on_real_redis(redis_url: str) -> None:
     """Writes land in audit:events and read back newest first with decoded details."""
-    url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    client = aioredis.from_url(url, decode_responses=True)
+    client = aioredis.from_url(redis_url, decode_responses=True)
     thread = f"it-{uuid.uuid4().hex[:8]}"
     try:
         log = AuditLog(client)

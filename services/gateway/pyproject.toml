@@ -3,7 +3,10 @@ name = "gateway"
 version = "0.1.0"
 description = "HTTP gateway: auth, guardrails, enqueue, SSE relay."
 requires-python = ">=3.13,<3.14"
-dependencies = ["chat-common"]
+dependencies = [
+    "chat-common",
+    "confluent-kafka>=2.16.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14"]
