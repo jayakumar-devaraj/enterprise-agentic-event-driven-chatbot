@@ -1,0 +1,36 @@
+{"text": "Why was I charged twice this month?", "label": "billing"}
+{"text": "I want a refund for my last payment.", "label": "billing"}
+{"text": "How do I update the credit card on my account?", "label": "billing"}
+{"text": "My invoice amount looks wrong.", "label": "billing"}
+{"text": "Can I change my billing date?", "label": "billing"}
+{"text": "Please cancel my subscription and stop charging me.", "label": "billing"}
+{"text": "Where can I download my past invoices?", "label": "billing"}
+{"text": "I was billed after I cancelled my plan.", "label": "billing"}
+{"text": "What payment methods do you accept?", "label": "billing"}
+{"text": "Why did my monthly price go up?", "label": "billing"}
+{"text": "I need a receipt for my latest payment.", "label": "billing"}
+{"text": "Can I switch from monthly to annual billing?", "label": "billing"}
+{"text": "My internet keeps disconnecting every few minutes.", "label": "tech_support"}
+{"text": "The app crashes when I open it.", "label": "tech_support"}
+{"text": "I cannot log in even with the correct password.", "label": "tech_support"}
+{"text": "How do I reset my router?", "label": "tech_support"}
+{"text": "My Wi-Fi is very slow in the evening.", "label": "tech_support"}
+{"text": "I get an error code 503 when I load the dashboard.", "label": "tech_support"}
+{"text": "The VPN will not connect on my laptop.", "label": "tech_support"}
+{"text": "How do I configure email on my phone?", "label": "tech_support"}
+{"text": "My modem lights are blinking red.", "label": "tech_support"}
+{"text": "The website will not load in my browser.", "label": "tech_support"}
+{"text": "Two-factor authentication codes are not arriving.", "label": "tech_support"}
+{"text": "The software update failed to install.", "label": "tech_support"}
+{"text": "Hello there!", "label": "general"}
+{"text": "Hi, how are you today?", "label": "general"}
+{"text": "Thanks for your help.", "label": "general"}
+{"text": "What are your business hours?", "label": "general"}
+{"text": "How can I contact a human agent?", "label": "general"}
+{"text": "Where is your company headquartered?", "label": "general"}
+{"text": "Good morning.", "label": "general"}
+{"text": "Who am I chatting with?", "label": "general"}
+{"text": "Do you have a mobile app?", "label": "general"}
+{"text": "Goodbye, have a nice day.", "label": "general"}
+{"text": "What services does your company offer?", "label": "general"}
+{"text": "Can you tell me about your privacy policy?", "label": "general"}
