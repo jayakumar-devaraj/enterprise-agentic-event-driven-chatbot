@@ -158,8 +158,8 @@ State (`TypedDict`): `thread_id`, `message_id`, `user_id`, `turns: list[{role, t
 | `chat-requests.dlq` | 1 | `thread_id` (or null if unparseable) | `{reason, error, original (base64 if not JSON)}` |
 
 `Envelope = {message_id, thread_id, user_id, text, ts, trace_id, kind: "chat"|"approval",
-ref_message_id?, approved?}`. Trace context also travels as a per-message header when spike (b)
-confirms header support. Consumer: `enable.auto.commit=false`; commit after the durable outcome.
+ref_message_id?, approved?}`. Trace context travels only in `trace_id`: the async producer does not
+support per-message headers (spike b, ADR 0003). Consumer: `enable.auto.commit=false`; commit after the durable outcome.
 
 ## 8 · API status matrix
 

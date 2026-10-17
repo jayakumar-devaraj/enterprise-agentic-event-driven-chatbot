@@ -15,6 +15,14 @@ its dependencies here in the same commit.
 - **Persistence:** redis-py 8.1.0 (`redis.asyncio`; `audit:events` stream via `chat_common.audit`).
 - **Observability:** stdlib `logging` with `chat_common.logjson.JsonFormatter` (one JSON object per
   line, `trace_id`/`thread_id` as keys).
+- **Orchestration:** langgraph 1.2.16 with langgraph-checkpoint-redis 0.5.2 (`AsyncRedisSaver`;
+  checkpoint write/read on Redis 8 proven by spike a, ADR 0002).
+- **Messaging:** confluent-kafka 2.16.0 (`confluent_kafka.aio` producer/consumer, manual commits;
+  no per-message headers on the async producer, ADR 0003).
+- **Infrastructure (`deploy/compose.yaml`):** `apache/kafka:4.3.1` (KRaft) + one-shot topic init,
+  `redis:8.10.2`, `qdrant/qdrant:v1.19.2`, `cr.jaegertracing.io/jaegertracing/jaeger:2.22.0`,
+  `ollama/ollama:0.40.6` (profile `llm`, model baked in at build). Host ports bind to 127.0.0.1 on
+  19092 / 16379 / 16333 / 16334 / 16686 / 14317.
 - **Testing:** pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).

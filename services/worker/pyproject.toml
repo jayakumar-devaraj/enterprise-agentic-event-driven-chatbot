@@ -3,7 +3,12 @@ name = "worker"
 version = "0.1.0"
 description = "Kafka worker running the LangGraph pipeline."
 requires-python = ">=3.13,<3.14"
-dependencies = ["chat-common"]
+dependencies = [
+    "chat-common",
+    "confluent-kafka>=2.16.0",
+    "langgraph>=1.2.16",
+    "langgraph-checkpoint-redis>=0.5.2",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14"]
