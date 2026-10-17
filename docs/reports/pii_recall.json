@@ -1,0 +1,22 @@
+{
+  "sentences": 32,
+  "spacy_model": "en_core_web_lg",
+  "recall": {
+    "LOCATION": 1.0,
+    "PERSON": 1.0
+  },
+  "counts": {
+    "LOCATION": {
+      "labeled": 36,
+      "recalled": 36
+    },
+    "PERSON": {
+      "labeled": 32,
+      "recalled": 32
+    }
+  },
+  "scrub_latency_ms": {
+    "p50": 3.96,
+    "p95": 5.72
+  }
+}
