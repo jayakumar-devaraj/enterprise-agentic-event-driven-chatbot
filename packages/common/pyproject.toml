@@ -1,0 +1,14 @@
+[project]
+name = "chat-common"
+version = "0.1.0"
+description = "Shared schemas, settings, PII scrubber, logging and audit."
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "chat_common"
+module-root = ""

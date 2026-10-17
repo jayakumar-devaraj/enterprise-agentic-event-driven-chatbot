@@ -9,3 +9,5 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   exists (Tier 3, cut).
 - **LangFuse Cloud egress:** scrubbed prompts and outputs leave the machine to US LangFuse Cloud;
   runtime is no longer fully offline.
+- **Restored (10:58 CDT, lead):** React client + A8 (Task 14); deadline moved to 17:40 CDT. Node is
+  not installed on the build machine, so the frontend builds and tests inside `node:24.22.0-slim`.

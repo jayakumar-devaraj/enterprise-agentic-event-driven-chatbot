@@ -7,8 +7,8 @@ Design transcript: `docs/design_dialogue.md`.
 ## Window
 
 - Start 10:20 CDT 2026-10-17. Deadline extended by the lead from 15:20 to 16:40 (option R1), then to
-  **17:25 CDT** (7 h 05 min) to add Task 0b.
-- Reserve = max(30 min, 15 % × 425 min) = 64 min. Phase 3 floor = max(20 min, 10 % × 425 min) = 43 min.
+  17:25 to add Task 0b, then to **17:40 CDT** (7 h 20 min) to restore Task 14 (React client).
+- Reserve = max(30 min, 15 % × 440 min) = 66 min. Phase 3 floor = max(20 min, 10 % × 440 min) = 44 min.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ langgraph-checkpoint-redis 0.5.2; `qdrant/qdrant:v1.19.2` + qdrant-client 1.19.1
 (`BAAI/bge-small-en-v1.5`); presidio 2.2.364 + spaCy 3.8.16 `en_core_web_lg` 3.8.0; langgraph 1.2.16;
 openai 3.33.0 → `ollama/ollama:0.40.6` `llama3.2:1b`; pydantic 2.14.1; pydantic-settings 2.16.0;
 OpenTelemetry 1.45.1 → Jaeger 2.22.0; langfuse 5.0.2; stdlib JSON logging; pytest 9.1.1;
-pytest-asyncio 1.4.0; pytest-cov 7.1.0; ruff 0.17.1; DeepEval 4.3.1 (dev-only). Frontend (cut):
+pytest-asyncio 1.4.0; pytest-cov 7.1.0; ruff 0.17.1; DeepEval 4.3.1 (dev-only). Frontend:
 Node 24.22.0, React 19.3.1, TypeScript 6.0.3, Vite 8.3.4, Vitest 5.0.5.
 
 ## Layout (binding)
@@ -96,13 +96,14 @@ frontend/  docs/{adr,specs,prompts}/  SPEC.md  pyproject.toml (uv workspace; dev
 | 9 | Redis token stream + SSE (Last-Event-ID, owner check) + A3 | 25 | |
 | 10 | Human approval gate: refund action, `interrupt()`, `POST /approve`, audit + tests | 35 | Approval gate |
 | 11 | OTel → Jaeger + LangFuse Cloud spans | 30 | Observability |
+| 14 | React + TypeScript chat window (fetch-based SSE with Basic auth, error + approval states), built/tested in `node:24.22.0-slim` + A8 | 30 | |
 
-Σ = 335 min (incl. 0b).
+Σ = 365 min (incl. 0b and restored 14).
 
 ### Cut at Step B (recorded in `docs/known_limitations.md`)
 
 Cut in this order because they are not protected concerns and the plan did not fit: Tier 3 (Caddy
-TLS + A11), Task 15 (A10 scale test), Task 14 (React client + A8), Task 13 (DeepEval + A9 real
+TLS + A11), Task 15 (A10 scale test), Task 13 (DeepEval + A9 real
 Ollama), Task 12 (service images + full-compose e2e + A4 Qdrant-stop). Candidates to restore from
 reserve under Phase 2.5 item 5.
 
@@ -118,7 +119,8 @@ reserve under Phase 2.5 item 5.
 | A5 idempotency | 7 |
 | A6 memory | 8 |
 | A7 injection | 8 |
-| A8 frontend · A9 Ollama · A10 scale · A11 latency | cut (14, 13, 15, Tier 3) |
+| A8 frontend | 14 (restored by the lead) |
+| A9 Ollama · A10 scale · A11 latency | cut (13, 15, Tier 3) |
 | Tier 0 spikes, ADRs | 4 (0001–0003), 5 (threshold) |
 | Tier 2 OTel → Jaeger | 11 |
 | Rubric 1a design doc | 0 (this file) + ADRs |

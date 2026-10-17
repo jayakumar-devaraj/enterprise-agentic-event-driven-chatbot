@@ -167,12 +167,22 @@ model output, and user turns.
 > else. Fill every `<placeholder>`; delete any block that does not apply. Do not leave a placeholder
 > in a committed file — an agent will read it as a fact.
 
-`<repo-name>` — `<one sentence: what it is and what it does, in the terms the code uses>`.
+`enterprise-agentic-event-driven-chatbot` — an event-driven chatbot: the gateway authenticates,
+scrubs PII and enqueues `POST /chat` to Kafka; workers route intent with local embeddings + Qdrant,
+run a LangGraph pipeline against an OpenAI-compatible LLM, and stream tokens back through Redis
+Streams over SSE.
 
 | Component | What it is | Note |
 |---|---|---|
-| `<name>` | `<technology / role>` | `<the one thing about it that is easy to get wrong>` |
-| `<name>` | `<technology / role>` | `<...>` |
+| `packages/common` (`chat_common`) | Schemas, settings, PII scrubber, JSON logging, audit writer | Schemas are defined only here; never redefine a model in a service |
+| `services/gateway` | FastAPI + uvicorn, stateless | Raw user text must be scrubbed before anything leaves the process |
+| `services/worker` | Kafka consumer running the LangGraph `StateGraph` | Commit offsets only after the stream event or DLQ record is durable |
+| `services/seed` | One-shot Qdrant loader + leave-one-out threshold calibration | Eval data is never loaded into Qdrant |
+| Kafka 4 (KRaft) | `chat-requests` keyed by `thread_id`, `chat-requests.dlq` | Partition count bounds worker replicas; changing it remaps keys |
+| Redis 8 | Token streams, checkpoints, dedupe leases, rate limits, owners, refunds, `audit:events` | Dedupe `processing` must never block redelivery past its lease |
+| Qdrant | `intents`, `injection_patterns` (384-dim cosine) | Query and passage prefixes differ for bge-small |
+| Ollama / mock | OpenAI-compatible inference; `MOCK_LLM=true` selects the mock | Mock only when `MOCK_LLM=true`; never a metered endpoint |
+| Jaeger v2 + LangFuse Cloud | OTel infra traces + LLM-level traces | Only scrubbed text may reach either |
 
 **AI/LLM engineering standards.** Fixed across this build — not stack-conditional like the rest of
 §9:
@@ -198,24 +208,36 @@ model output, and user turns.
 **Invariants a well-meaning change breaks** — each is here because the plausible cleanup silently
 destroys it:
 
-- **`<invariant, stated as a rule>`.** `<why the obvious refactor violates it>`.
-- **`<invariant>`.** `<why>`.
-- **`<startup / failure-mode rule from SPEC.md>`.** Never add a fallback that degrades silently.
+- **CPU-bound scrubbing and embedding run off the event loop (`asyncio.to_thread`).** Inlining them
+  "for simplicity" blocks every concurrent request on that replica.
+- **User text never enters the system prompt; it sits in the delimited `<user_message>` field.**
+  Interpolating it into the system prompt reads cleaner and is exactly the injection vector A7 guards.
+- **The refund action is decided by a deterministic rule and applied only after `POST /approve`.**
+  Letting the model decide, or applying before approval, removes the human gate.
+- **Settings validation fails startup when `DEDUPE_LEASE_S` violates the formula in SPEC §5; infra
+  faults surface as `ErrorEvent` + DLQ, never as silent success.** Never add a fallback that
+  degrades silently.
 
-**Run and test.** `<the exact commands — bring-up, run, test, lint — in the order a new session needs
-them>`. `<how integration tests that need a real dependency are marked or selected>`.
+**Run and test.** `uv sync` → `uv run ruff check . && uv run ruff format --check .` →
+`uv run pytest` (unit only; `addopts` excludes integration). Real-service tests are marked
+`@pytest.mark.integration` and run with `uv run pytest -m integration` after
+`docker compose -f deploy/compose.yaml up -d --wait` (compose file arrives in Task 4).
 
-**Verification rung 2 here means** (§2): `<the real dependencies to test against, by name, and which
-parts of the code require them>`.
+**Verification rung 2 here means** (§2): the real Kafka, Redis and Qdrant from `deploy/compose.yaml`.
+Required for the gateway producer, worker consumer/dedupe/DLQ, Redis checkpointer, token streams and
+SSE, routing against Qdrant, and the approval gate.
 
-**Contracts:** [`SPEC.md`](SPEC.md) — `<the sections most easily broken>`. **Rationale:**
-`<docs paths>`. `<Which branch carries ADRs and design docs, if not main>`. When code and a document
-disagree, the code is right and the document is the bug.
+**Contracts:** [`SPEC.md`](SPEC.md) — §5 idempotency, §6 token stream resume semantics, §3 ownership.
+**Rationale:** `docs/adr/`, `docs/architecture/HLD.md`, `docs/architecture/LLD.md`,
+`docs/master_plan.md`. ADRs and design docs live on `main`. When code and a document disagree, the
+code is right and the document is the bug.
 
-**Toolchain standard.** `<language + version>`, managed by `<tool>`: `<run / sync / lock commands>`.
-Keep the lockfile committed; never hand-edit it. `<Any optional dependency group that must never
-enter runtime, and why>`.
+**Toolchain standard.** Python 3.13.13 (`.python-version`), managed by uv: `uv sync`, `uv add <pkg>`
+(writes a `>=` floor at the resolved version), `uv lock`; `uv.lock` holds the exact pins. Keep the
+lockfile committed; never hand-edit it. The `dev` dependency group (pytest, ruff, DeepEval) must
+never enter a runtime image: DeepEval ships telemetry and test tooling has no place in production.
 
 **Open risk** — *delete this block in the same commit that resolves it; a resolved risk left standing
-here is misinformation.* `<the one unverified assumption the design depends on, and what happens if
-it fails>`.
+here is misinformation.* `langgraph-checkpoint-redis` 0.5.2 has not yet been shown to write and read
+a checkpoint on `redis:8.10.2` (spike a, Task 4). If it fails, the checkpointer moves to Postgres per
+the pre-declared fallback, adding a stateful service.

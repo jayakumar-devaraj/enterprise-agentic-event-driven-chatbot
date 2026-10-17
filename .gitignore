@@ -4,3 +4,8 @@
 *.key
 credentials.json
 !.env.example
+__pycache__/
+.venv/
+.coverage
+node_modules/
+dist/
