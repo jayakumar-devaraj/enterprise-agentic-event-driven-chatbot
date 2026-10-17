@@ -1,0 +1,56 @@
+"""Per-message Redis Stream writer (ADR 0005): seq from 0, bounded, expiring."""
+
+from typing import Any
+from uuid import UUID
+
+from chat_common.schemas import (
+    ApprovalRequiredEvent,
+    DoneEvent,
+    ErrorEvent,
+    TokenEvent,
+    stream_key,
+)
+
+
+class StreamWriter:
+    """Appends typed events for one message; `seq` counts events written by this writer."""
+
+    def __init__(
+        self, redis: Any, thread_id: str, message_id: UUID | str, *, maxlen: int, ttl_s: int
+    ) -> None:
+        """Bind to `tokens:{thread_id}:{message_id}`."""
+        self._redis = redis
+        self.key = stream_key(thread_id, message_id)
+        self._maxlen = maxlen
+        self._ttl_s = ttl_s
+        self.seq = 0
+
+    async def reset(self) -> None:
+        """Drop events from an attempt that never finished (lease expired after a crash)."""
+        await self._redis.delete(self.key)
+        self.seq = 0
+
+    async def _add(self, event: TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent) -> str:
+        """XADD one event as JSON under field `data`, then refresh the TTL."""
+        entry_id = await self._redis.xadd(
+            self.key, {"data": event.model_dump_json()}, maxlen=self._maxlen, approximate=True
+        )
+        await self._redis.expire(self.key, self._ttl_s)
+        self.seq += 1
+        return str(entry_id)
+
+    async def token(self, token: str) -> str:
+        """Append a TokenEvent."""
+        return await self._add(TokenEvent(seq=self.seq, token=token))
+
+    async def done(self) -> str:
+        """Append the terminal DoneEvent."""
+        return await self._add(DoneEvent(seq=self.seq))
+
+    async def error(self, code: str, detail: str) -> str:
+        """Append the terminal ErrorEvent."""
+        return await self._add(ErrorEvent(seq=self.seq, code=code, detail=detail))
+
+    async def approval_required(self, detail: str) -> str:
+        """Append the terminal ApprovalRequiredEvent."""
+        return await self._add(ApprovalRequiredEvent(seq=self.seq, detail=detail))

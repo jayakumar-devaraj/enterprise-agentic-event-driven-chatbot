@@ -29,7 +29,8 @@ its dependencies here in the same commit.
 - **Infrastructure (`deploy/compose.yaml`):** `apache/kafka:4.3.1` (KRaft) + one-shot topic init,
   `redis:8.10.2`, `qdrant/qdrant:v1.19.2`, `cr.jaegertracing.io/jaegertracing/jaeger:2.22.0`,
   `ollama/ollama:0.40.6` (profile `llm`, model baked in at build). Host ports bind to 127.0.0.1 on
-  19092 / 16379 / 16333 / 16334 / 16686 / 14317.
+  19092 / 16379 / 16333 / 16334 / 16686 / 14317; Kafka advertises `127.0.0.1` (not `localhost`) to
+  avoid IPv6-first resolution delays.
 - **Testing:** httpx 0.28.1 (`ASGITransport` for in-process API tests), pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).

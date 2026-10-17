@@ -4,9 +4,9 @@ import os
 
 import pytest
 
-KAFKA = os.getenv("IT_KAFKA_BOOTSTRAP", "localhost:19092")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:16379/0")
-QDRANT_URL = os.getenv("IT_QDRANT_URL", "http://localhost:16333")
+KAFKA = os.getenv("IT_KAFKA_BOOTSTRAP", "127.0.0.1:19092")
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:16379/0")
+QDRANT_URL = os.getenv("IT_QDRANT_URL", "http://127.0.0.1:16333")
 QDRANT_GRPC_PORT = int(os.getenv("IT_QDRANT_GRPC_PORT", "16334"))
 
 
