@@ -15,8 +15,10 @@ instructions take precedence over the brief and changed several of these.
 | Human approval gate | — | Refund-request action gated by `interrupt()`; adds `POST /approve`, 404, `ApprovalRequiredEvent`, envelope fields `user_id`, `kind`, `ref_message_id`, `approved` | Rounds 2, 4 |
 | Guardrails | Presidio + delimited prompt | Five layers incl. injection detection collection `injection_patterns` | Round 2 |
 | Eval | — | DeepEval (dev-only) | Round 2 |
-| Deadline | Tier marks within 5 h | 7 h 05 min window ending 17:25 CDT | Gate B, later go |
-| Cuts | Tiers 1–3 | Tier 3, A8, A9, A10, service images/e2e cut | Step B |
+| Qdrant transport | REST :6333 | Worker searches over gRPC :6334 (`prefer_grpc`); REST kept for seed and healthcheck | Chat, 11:07 CDT |
+| React client | Tier 2 | Restored after the Step B cut; deadline 17:40 CDT | Chat, 10:58 CDT |
+| Deadline | Tier marks within 5 h | 7 h 20 min window ending 17:40 CDT | Gate B, later go |
+| Cuts | Tiers 1–3 | Tier 3, A9, A10, service images/e2e cut (A8 restored) | Step B |
 
 ## Consequences
 - Runtime is no longer fully offline: scrubbed text egresses to LangFuse Cloud.
