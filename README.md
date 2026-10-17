@@ -83,7 +83,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 
 ## Local development
 
-- Full stack in containers (Task 12 images; gateway on 127.0.0.1:8000–8003):
+- Full stack in containers (Task 12 images; gateway on a host port from 127.0.0.1:8000–8003, see
+  `docker compose -f deploy/compose.yaml port gateway 8000`; the chat UI at :5173 proxies to it):
   `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"` then
   `docker compose -f deploy/compose.yaml up -d --build --wait`. On Windows Git Bash also export
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.

@@ -62,3 +62,6 @@ mock delta spacing caught by A6 (PR #11), and the A8 stream-double timing (PR #1
 integration and frontend jobs to CI (row H1, PR #17, run 39065303808: all three jobs green) and
 measured 87 % coverage (`docs/reports/coverage.txt`). A ~1h50m CI wait ended Phase 2.5 early; wrap-up
 reran every documented command before merge (PR #18).
+| 12 service images (WIP push) | code: gateway/worker/seed Dockerfiles, compose services; merged as PR #20 by another session before e2e verification | task-12-service-images | #20 |
+| compose resource caps | config: memory/CPU caps, Kafka heap; authored and merged in another session after Docker Desktop crashed (not this session's work) | (other session) | #19 |
+| 12 verification | docs: `docs/reports/e2e-containers.md` (containerized e2e verified after the fact) | task-12-verification | see PR |
