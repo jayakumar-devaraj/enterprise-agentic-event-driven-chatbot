@@ -13,7 +13,8 @@ set per-message headers; if not, trace context travels only in the envelope's `t
   `await consumer.commit(message=..., asynchronous=False)` after the durable outcome.
 - **Headers:** `AIOProducer.produce(headers=...)` raises `NotImplementedError: Headers are not
   supported in AIOProducer batch mode`. Applying the pre-declared fallback, W3C trace context travels
-  only in `Envelope.trace_id`; the worker rebuilds the parent span context from it (Task 11).
+  only in `Envelope.trace_id`, which carries the full W3C `traceparent` string; the worker
+  continues the trace from it (`chat_common.tracing`, verified in `docs/reports/e2e-observability.md`).
 
 Evidence (`tests/integration/test_spike_kafka_aio.py`, real Kafka 4.3.1):
 ```

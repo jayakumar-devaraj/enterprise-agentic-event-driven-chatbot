@@ -20,11 +20,13 @@ from chat_common.schemas import (
 )
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
+from chat_common.tracing import current_traceparent, setup_tracing
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.sse import EventSourceResponse, ServerSentEvent
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from redis.exceptions import RedisError
 
 from gateway import auth
@@ -128,6 +130,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
     async def _production_deps() -> Deps:
         settings = Settings()
         configure_logging(settings.log_level)
+        setup_tracing("gateway", settings.otel_exporter_otlp_endpoint)
         scrubber = get_scrubber(settings.spacy_model)
         return Deps(
             settings=settings,
@@ -146,6 +149,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         await deps.redis.aclose()
 
     app = FastAPI(title="chat-gateway", lifespan=lifespan)
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=Settings().cors_origin_list,
@@ -212,7 +216,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
             thread_id=thread_id,
             user_id=user,
             text="",
-            trace_id=uuid.uuid4().hex,
+            trace_id=current_traceparent() or uuid.uuid4().hex,
             kind="approval",
             ref_message_id=message_id,
             approved=body.approved,
@@ -236,7 +240,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
             thread_id=body.thread_id,
             user_id=user,
             text=scrubbed,
-            trace_id=uuid.uuid4().hex,
+            trace_id=current_traceparent() or uuid.uuid4().hex,  # ADR 0003: context rides here
         )
         return await enqueue(deps, envelope, user)
 

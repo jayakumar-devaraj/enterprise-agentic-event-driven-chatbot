@@ -19,7 +19,12 @@ its dependencies here in the same commit.
   `en_core_web_lg` 3.8.0 (`chat_common.scrubber`; typed placeholders such as `<EMAIL_ADDRESS>`,
   `ascrub` runs off the event loop).
 - **Persistence:** redis-py 8.1.0 (`redis.asyncio`; `audit:events` stream via `chat_common.audit`).
-- **Observability:** stdlib `logging` with `chat_common.logjson.JsonFormatter` (one JSON object per
+- **Observability (traces):** opentelemetry-sdk 1.45.1 + OTLP/gRPC exporter 1.45.1 →
+  Jaeger v2 (`chat_common.tracing`; gateway auto-instrumented by
+  opentelemetry-instrumentation-fastapi 0.66b1; trace context crosses Kafka as the W3C `traceparent`
+  in `Envelope.trace_id`); langfuse 5.0.2 sends one scrubbed `generation` per reply to LangFuse
+  Cloud, linked by trace id (`worker.observability`, disabled when keys are absent).
+- **Observability (logs):** stdlib `logging` with `chat_common.logjson.JsonFormatter` (one JSON object per
   line, `trace_id`/`thread_id` as keys).
 - **Orchestration:** langgraph 1.2.16 with langgraph-checkpoint-redis 0.5.2 (`AsyncRedisSaver`;
   checkpoint write/read on Redis 8 proven by spike a, ADR 0002).

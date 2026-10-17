@@ -1,12 +1,14 @@
 """Worker process entry point: `python -m worker.main`."""
 
 import asyncio
+import logging
 import signal
 
 import redis.asyncio as aioredis
 from chat_common.logjson import configure_logging
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
+from chat_common.tracing import setup_tracing
 from confluent_kafka.aio import AIOConsumer, AIOProducer
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from qdrant_client import AsyncQdrantClient
@@ -15,7 +17,19 @@ from worker.consumer import Worker
 from worker.embedding import get_embedder
 from worker.graph import build_graph, make_processor
 from worker.llm import Engine, MockEngine, OpenAICompatEngine
+from worker.observability import LangfuseObserver, LLMObserver, NullObserver
 from worker.router import Router
+
+
+def make_observer(settings: Settings) -> LLMObserver:
+    """LangFuse when both keys are set; otherwise a no-op (logged once)."""
+    pk, sk = settings.langfuse_public_key, settings.langfuse_secret_key
+    if pk is None or sk is None:
+        logging.getLogger("worker").warning("LangFuse keys not set; LLM traces disabled")
+        return NullObserver()
+    return LangfuseObserver(
+        pk.get_secret_value(), sk.get_secret_value(), settings.langfuse_base_url
+    )
 
 
 def make_engine(settings: Settings) -> Engine:
@@ -32,6 +46,7 @@ def make_engine(settings: Settings) -> Engine:
 
 async def run(settings: Settings) -> None:
     """Wire everything and consume until SIGTERM/SIGINT."""
+    setup_tracing("worker", settings.otel_exporter_otlp_endpoint)
     scrubber = get_scrubber(settings.spacy_model)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     qdrant = AsyncQdrantClient(
@@ -73,6 +88,8 @@ async def run(settings: Settings) -> None:
             settings.llm_max_tokens,
             redis=redis,
             refund_ttl_s=settings.dedupe_ttl_s,
+            observer=make_observer(settings),
+            model="mock" if settings.mock_llm else settings.llm_model,
         )
         process = make_processor(
             graph.compile(checkpointer=saver), redis=redis, approval_ttl_s=settings.approval_ttl_s
