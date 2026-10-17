@@ -23,12 +23,15 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     ports:
       - "127.0.0.1:${KAFKA_HOST_PORT:-19092}:19092"
+    # A TCP probe, not a Kafka CLI tool: each CLI call starts a JVM (~2 CPU-seconds), which at a
+    # 5 s interval kept the container near 200 % CPU while idle. kafka-init below performs the real
+    # broker round trip once, before topics are created.
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
-      interval: 5s
-      timeout: 10s
+      test: ["CMD-SHELL", "nc -z localhost 9092"]
+      interval: 10s
+      timeout: 3s
       retries: 30
-      start_period: 10s
+      start_period: 15s
 
   kafka-init:
     image: apache/kafka:4.3.1
@@ -39,6 +42,10 @@ services:
     command:
       - |
         set -e
+        for i in $(seq 1 30); do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1 && break
+          sleep 2
+        done
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
           --topic ${KAFKA_TOPIC:-chat-requests} --partitions ${KAFKA_PARTITIONS:-4} --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
