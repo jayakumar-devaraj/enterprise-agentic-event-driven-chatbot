@@ -8,18 +8,22 @@ from typing import Annotated, Any, TypedDict
 
 from chat_common.audit import AuditLog
 from chat_common.schemas import Envelope
+from chat_common.tracing import context_from_traceparent
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
+from opentelemetry import trace
 
 from worker import approval
 from worker.consumer import TransientDependencyError
 from worker.guards import guarded_tokens
 from worker.llm import REFUSAL, Engine, Turn
+from worker.observability import LLMObserver, NullObserver
 from worker.router import Router
 from worker.streams import StreamWriter
 
 log = logging.getLogger("worker.graph")
 current_writer: ContextVar[StreamWriter] = ContextVar("current_writer")
+tracer = trace.get_tracer("worker")
 
 
 class ChatState(TypedDict, total=False):
@@ -48,14 +52,27 @@ def build_graph(
     *,
     redis: Any = None,
     refund_ttl_s: int = 86400,
+    observer: LLMObserver | None = None,
+    model: str = "mock",
 ) -> StateGraph:
     """Assemble the graph; the caller compiles it with a checkpointer."""
 
+    llm_observer: LLMObserver = observer or NullObserver()
+
     async def route(state: ChatState) -> dict[str, Any]:
-        try:
-            r = await router.route(state["pending"])
-        except Exception as exc:  # Qdrant/embedding faults are retried by the worker
-            raise TransientDependencyError(f"route: {exc}") from exc
+        with tracer.start_as_current_span("route") as span:
+            try:
+                r = await router.route(state["pending"])
+            except Exception as exc:  # Qdrant/embedding faults are retried by the worker
+                raise TransientDependencyError(f"route: {exc}") from exc
+            span.set_attributes(
+                {
+                    "route.intent": r.intent,
+                    "route.score": r.score,
+                    "route.injection": r.injection,
+                    "route.injection_score": r.injection_score,
+                }
+            )
         intent = "refuse" if r.injection else r.intent
         if r.injection:
             log.warning(
@@ -83,7 +100,20 @@ def build_graph(
             deltas = _single(REFUSAL)
         else:
             deltas = engine.stream(state["intent"], state["pending"], state.get("turns", []))
-        reply = await stream_reply(deltas)
+        with tracer.start_as_current_span("respond") as span:
+            span.set_attributes({"intent": state["intent"], "engine": engine.name})
+            reply = await stream_reply(deltas)
+            llm_observer.record(
+                trace_id=format(span.get_span_context().trace_id, "032x"),
+                intent=state["intent"],
+                engine="refusal" if state["intent"] == "refuse" else engine.name,
+                model=model,
+                input={
+                    "user_message": state["pending"],
+                    "history_turns": len(state.get("turns", [])),
+                },
+                output=reply,
+            )
         return {
             "turns": [
                 {"role": "user", "text": state["pending"]},
@@ -145,6 +175,14 @@ def make_processor(
     """Adapt a compiled graph to the worker's Processor signature."""
 
     async def process(env: Envelope, writer: StreamWriter) -> None:
+        parent = context_from_traceparent(env.trace_id) if env.trace_id.startswith("00-") else None
+        with tracer.start_as_current_span("worker.process", context=parent) as span:
+            span.set_attributes(
+                {"thread_id": env.thread_id, "message_id": str(env.message_id), "kind": env.kind}
+            )
+            await _process(env, writer)
+
+    async def _process(env: Envelope, writer: StreamWriter) -> None:
         config = {"configurable": {"thread_id": env.thread_id}}
         token = current_writer.set(writer)
         try:

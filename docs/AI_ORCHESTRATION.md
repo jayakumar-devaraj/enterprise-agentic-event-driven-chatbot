@@ -18,3 +18,4 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | 8 LangGraph pipeline | code: worker graph/llm/guards/main; tests: 5 unit + A6, A7×2 integration (real Redis checkpointer); process smoke | task-8-langgraph-graph | #11 |
 | 9 token stream + SSE | code: gateway sse relay + stream endpoint; tests: A3 + owner/422 integration (real Redis, real graph) | task-9-token-stream-sse | #12 |
 | 10 approval gate | code: worker approval/graph interrupt, gateway /approve; tests: 1 unit + 3 integration (real Redis) | task-10-approval-gate | #13 |
+| 11 observability | code: chat_common.tracing, gateway instrumentation, worker spans + LangFuse observer; tests: Jaeger integration; docs: e2e report (rung 3), ADR 0003 note | task-11-observability | #14 |
