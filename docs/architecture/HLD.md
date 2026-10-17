@@ -23,7 +23,9 @@ logs and traces.
 
 ```mermaid
 flowchart LR
-  user([End user / browser / curl]) -- "HTTP + Basic auth" --> sys[Event-driven chatbot]
+  user([End user]) --> ui[React chat window<br/>Vite :5173]
+  ui -- "HTTP REST + SSE, Basic auth" --> sys[Event-driven chatbot]
+  cli([curl / API clients]) -- "same HTTP API" --> sys
   approver([Thread owner approving refunds]) -- "POST /approve" --> sys
   sys -- "OTLP traces" --> jaeger[(Jaeger v2, local)]
   sys -- "LLM spans, scrubbed only" --> langfuse[(LangFuse Cloud US)]
@@ -37,6 +39,7 @@ External egress at runtime is LangFuse Cloud only (approved deviation, ADR 0006)
 
 ```mermaid
 flowchart TB
+  ui[React chat window - Vite :5173<br/>fetch POST + streamed SSE reader]
   subgraph edge[Gateway replicas - FastAPI/uvicorn :8000]
     auth[Basic auth + thread ownership]
     guard[Input guardrails L1-L3]
@@ -55,10 +58,12 @@ flowchart TB
     outg[Output guardrail L5]
   end
   redis[(Redis 8 :6379<br/>streams, checkpoints, dedupe,<br/>rate limit, owners, audit)]
-  qdrant[(Qdrant :6333<br/>intents, injection_patterns)]
+  qdrant[(Qdrant gRPC :6334, REST :6333<br/>intents, injection_patterns)]
   seed[[seed one-shot]]
   auth --> guard --> prod --> req --> dedupe --> graph --> llm --> outg
-  graph -- route --> qdrant
+  ui --> auth
+  sse -- SSE --> ui
+  graph -- "route (gRPC)" --> qdrant
   outg -- XADD tokens --> redis
   graph -- checkpoint --> redis
   sse -- XREAD --> redis
@@ -76,6 +81,7 @@ flowchart TB
 | Redis 8 | Token streams, LangGraph checkpoints, dedupe leases, rate-limit counters, thread owners, refunds, audit stream | All shared mutable state |
 | Qdrant | Intent exemplars and injection exemplars (384-dim cosine) | Seeded once |
 | Seed | Embeds and loads the seed files; fails loud | One-shot |
+| React chat window | Vite + React + TypeScript SPA: sends turns, renders tokens incrementally, shows error and approval-required states, approve/reject buttons | Credentials and thread id in memory only |
 | Ollama | Local CPU inference (`llama3.2:1b`); vLLM on GPU is the documented production path behind the same URL | Model cache |
 | Jaeger v2 / LangFuse | Infra traces / LLM-level traces | External to the request path |
 
@@ -85,6 +91,8 @@ flowchart TB
 |---|---|---|---|---|
 | Request handling | Async: 202 + Kafka + SSE | Synchronous call to the LLM | Removes 504s; absorbs bursts in the log | More moving parts; client must open a second connection |
 | Intent routing | Embedding top-1 + threshold | LLM classifier | $0, ~ms on CPU, deterministic, testable | Threshold must be calibrated; weaker on paraphrase far from exemplars |
+| Browser stream reader | `fetch` + `ReadableStream` SSE parser | `EventSource` | Must send the Basic `Authorization` header and `Last-Event-ID`; `EventSource` cannot set headers | A small hand-written SSE parser to test (A8) |
+| Worker → Qdrant transport | gRPC (:6334, `prefer_grpc`) | REST (:6333) | Lead choice; lower per-query overhead, typed protobuf | Deviation from the brief's REST (ADR 0006); REST stays for healthchecks and the seed |
 | Token transport | Redis Stream per message + SSE | WebSocket / Kafka per token | Replayable from 0 or `Last-Event-ID`; any gateway replica can serve | Redis memory per message (bounded by MAXLEN + TTL) — ADR 0005 |
 | Conversation memory | LangGraph checkpointer on Redis | Postgres checkpointer | One stateful store; Redis already required | Depends on spike (a); fallback Postgres — ADR 0002 |
 | Kafka client | confluent-kafka (librdkafka) | aiokafka | Brief-mandated; mature, fast | Async API surface must be verified — ADR 0003 |

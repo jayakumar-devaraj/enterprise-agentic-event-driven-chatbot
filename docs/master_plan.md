@@ -141,7 +141,8 @@ reserve under Phase 2.5 item 5.
 | KAFKA_TOPIC / KAFKA_DLQ_TOPIC | chat-requests / chat-requests.dlq |
 | KAFKA_CONSUMER_GROUP | chat-workers |
 | REDIS_URL | redis://redis:6379/0 |
-| QDRANT_URL | http://qdrant:6333 |
+| QDRANT_URL | http://qdrant:6333 (REST: seed, healthcheck) |
+| QDRANT_GRPC_PORT / QDRANT_PREFER_GRPC | 6334 / true (worker search) |
 | QDRANT_COLLECTION / QDRANT_INJECTION_COLLECTION | intents / injection_patterns |
 | EMBED_MODEL | BAAI/bge-small-en-v1.5 |
 | SPACY_MODEL | en_core_web_lg |

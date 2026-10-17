@@ -24,13 +24,17 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `worker.guards` | L4 injection check, L5 output guard |
 | `worker.approval` | Refund proposal, interrupt/resume, apply |
 | `seed.main` / `seed.calibrate` | Load collections; leave-one-out threshold calibration |
+| `frontend/src/api.ts` | `postChat`, `postApprove`, `streamMessage` (fetch + SSE parser, Basic header, `Last-Event-ID` resume) |
+| `frontend/src/useChat.ts` | Chat state machine hook (see §11) |
+| `frontend/src/ChatWindow.tsx` | Message list, incremental token rendering, input box, error banner, approve/reject panel |
+| `frontend/src/Login.tsx` | Username/password form; credentials held in React state only |
 
 ## 2 · Sequence: chat turn (happy path)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant C as Client
+  participant C as React chat window
   participant G as Gateway
   participant R as Redis
   participant K as Kafka
@@ -48,7 +52,7 @@ sequenceDiagram
   C->>G: GET /stream/{thread}/{msg} (Last-Event-ID optional)
   W->>K: poll
   W->>R: SET dedupe:{message_id} processing NX EX lease
-  W->>Q: embed(query prefix) → search injection_patterns, intents
+  W->>Q: embed(query prefix) → gRPC search injection_patterns, intents
   W->>L: chat.completions (system fixed, user text in delimited field)
   loop sentence-buffered chunks
     W->>W: L5 scrub chunk
@@ -186,3 +190,43 @@ The worker buffers model tokens until a sentence boundary (or 200 chars), runs t
 chunk off-loop, checks for a system-prompt echo, then XADDs the chunk's tokens. This trades a little
 time-to-first-token for the guarantee that unscrubbed output never reaches the stream, checkpoint,
 logs or traces. An entity split across a chunk boundary is a known residual risk.
+
+## 11 · React chat window
+
+Vite + React 19 + TypeScript 6 single-page app in `frontend/`, served on :5173 in development and as a
+compose service built from `node:24.22.0-slim`. The gateway's `CORS_ORIGINS` allowlists its origin.
+
+```mermaid
+stateDiagram-v2
+  [*] --> signed_out
+  signed_out --> idle: credentials entered (kept in memory)
+  idle --> sending: submit (new message_id = crypto.randomUUID())
+  sending --> streaming: 202 ChatAccepted
+  sending --> error: 401 / 403 / 413 / 422 / 429 / 503
+  streaming --> streaming: token event (append to the assistant bubble)
+  streaming --> idle: done event
+  streaming --> error: error event / network failure after one resume attempt
+  streaming --> awaiting_approval: approval_required event
+  awaiting_approval --> sending: Approve / Reject (POST /approve)
+  error --> idle: dismiss
+```
+
+- **Streaming:** `fetch(stream_url, {headers: {Authorization, Last-Event-ID?}})`, read
+  `response.body` with a `TextDecoder`, split on blank lines, parse `id:` / `event:` / `data:`. On
+  a dropped connection it retries once with the last seen `id` as `Last-Event-ID`; SPEC §6 makes
+  this gap- and duplicate-free.
+- **Incremental render:** tokens append to the current assistant message as they arrive; `seq` is
+  checked to be increasing and duplicates are ignored.
+- **Error state:** HTTP status or `ErrorEvent.code` maps to a readable banner; 401 returns to
+  sign-in.
+- **Approval:** `ApprovalRequiredEvent` shows Approve / Reject buttons; the click POSTs `/approve`
+  with a fresh `message_id` and streams the follow-up message.
+- **Tests (A8, Vitest + React Testing Library):** a stubbed `fetch` streams events; asserts tokens
+  appear incrementally, the error banner renders on `ErrorEvent`, and the approval panel appears on
+  `approval_required`.
+
+## 12 · Qdrant transport
+
+The worker uses `AsyncQdrantClient(host, grpc_port=6334, prefer_grpc=True)` for search (lead
+choice, ADR 0006). The seed service and compose healthcheck keep REST on :6333. Both ports are
+published only inside the compose network.
