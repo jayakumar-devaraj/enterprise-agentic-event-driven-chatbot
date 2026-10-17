@@ -44,5 +44,10 @@ its dependencies here in the same commit.
 - **Testing:** httpx 0.28.1 (`ASGITransport` for in-process API tests), pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).
+- **Frontend (`frontend/`, versions from `package.json`):** React 19.3.1 + react-dom 19.3.1,
+  TypeScript 6.0.3, Vite 8.3.4 with @vitejs/plugin-react 6.1.2 (dev server on
+  :5173, `/api` proxied to the gateway); tests with Vitest 5.0.5, @testing-library/react
+  16.3.3 and jsdom 30.1.3. Built and tested in `node:24.22.0-slim` (Node 24 LTS);
+  SSE is read with `fetch` so the Basic `Authorization` header can be sent.
 - **CI:** GitHub Actions (`actions/checkout` v7.0.1, `astral-sh/setup-uv` v10.3.0) running lint and
   unit tests on every push and pull request.

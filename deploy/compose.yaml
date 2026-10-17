@@ -92,3 +92,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # React chat window (Vite dev server). /api is proxied to the gateway, which runs on the host
+  # (`uv run uvicorn gateway.app:create_app --factory --port 8000`) until service images exist.
+  frontend:
+    build: ../frontend
+    environment:
+      GATEWAY_URL: ${GATEWAY_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-5173}:5173"
