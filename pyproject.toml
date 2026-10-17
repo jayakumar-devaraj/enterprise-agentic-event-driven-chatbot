@@ -34,8 +34,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-markers = ["integration: needs the real Kafka, Redis and Qdrant from deploy/compose.yaml"]
-addopts = "-m 'not integration'"
+markers = [
+    "integration: needs the real Kafka, Redis and Qdrant from deploy/compose.yaml",
+    "scale: needs the stack scaled to 2 gateways + 2 workers (A10)",
+]
+addopts = "-m 'not integration and not scale'"
 
 [tool.ruff]
 line-length = 100

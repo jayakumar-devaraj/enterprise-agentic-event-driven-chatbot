@@ -65,3 +65,4 @@ reran every documented command before merge (PR #18).
 | 12 service images (WIP push) | code: gateway/worker/seed Dockerfiles, compose services; merged as PR #20 by another session before e2e verification | task-12-service-images | #20 |
 | compose resource caps | config: memory/CPU caps, Kafka heap; authored and merged in another session after Docker Desktop crashed (not this session's work) | (other session) | #19 |
 | 12 verification | docs: `docs/reports/e2e-containers.md` (containerized e2e verified after the fact) | task-12-verification | see PR |
+| 15 A10 scale | tests: tests/load/test_scale_a10.py (marker `scale`); docs: docs/reports/a10-scale.md | task-15-scale-a10 | see PR |
