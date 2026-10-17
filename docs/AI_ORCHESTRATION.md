@@ -13,3 +13,4 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | 3 PII scrubber | code: scrubber; tests: 9 scrubber/harness unit; eval: A1b recall report; docs: limitations | task-3-pii-scrubber | #6 |
 | 4 compose infra + spikes | code: deploy/compose.yaml, ollama Dockerfile; tests: 3 spike/audit integration (real Kafka, Redis); docs: ADR 0002, 0003 | task-4-compose-infra-spikes | #7 |
 | 5 seed + routing | code: seed main/calibrate, worker embedding/router; data: seed/eval/injection; tests: 5 unit + A2 integration (real Qdrant gRPC); docs: ADR 0004 | task-5-seed-routing | #8 |
+| 6 gateway POST /chat | code: gateway app/auth/producer; tests: 12 unit (doubles) + A1 integration (real Kafka, Redis) | task-6-gateway-chat | #9 |
