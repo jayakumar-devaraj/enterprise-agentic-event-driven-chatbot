@@ -1,0 +1,33 @@
+Coverage at main c6c7ee6 (service code identical to the wrapup branch), measured 2026-10-17 ~16:58 CDT:
+$ uv run pytest -m "integration or not integration" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+Name                                      Stmts   Miss  Cover
+-------------------------------------------------------------
+packages\common\chat_common\__init__.py       0      0   100%
+packages\common\chat_common\audit.py         21      0   100%
+packages\common\chat_common\logjson.py       20      5    75%
+packages\common\chat_common\schemas.py       57      0   100%
+packages\common\chat_common\scrubber.py      23      0   100%
+packages\common\chat_common\settings.py      54      0   100%
+packages\common\chat_common\tracing.py       19      4    79%
+services\gateway\gateway\__init__.py          0      0   100%
+services\gateway\gateway\app.py             126      5    96%
+services\gateway\gateway\auth.py             27      1    96%
+services\gateway\gateway\producer.py         22      2    91%
+services\gateway\gateway\sse.py              26      3    88%
+services\seed\seed\__init__.py                0      0   100%
+services\seed\seed\calibrate.py              24      0   100%
+services\seed\seed\main.py                   52      7    87%
+services\worker\worker\__init__.py            0      0   100%
+services\worker\worker\approval.py           18      1    94%
+services\worker\worker\consumer.py          100      8    92%
+services\worker\worker\embedding.py          21      0   100%
+services\worker\worker\graph.py             118      2    98%
+services\worker\worker\guards.py             34      0   100%
+services\worker\worker\llm.py                43     11    74%
+services\worker\worker\main.py               60     60     0%
+services\worker\worker\observability.py      20      9    55%
+services\worker\worker\router.py             32      0   100%
+services\worker\worker\streams.py            26      0   100%
+-------------------------------------------------------------
+TOTAL                                       943    118    87%
+84 passed, 15 warnings in 74.02s (0:01:14)
