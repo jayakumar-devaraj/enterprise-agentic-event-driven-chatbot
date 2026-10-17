@@ -177,3 +177,17 @@ Echoed bundle (not locked until "yes"): Python 3.13.13 · spaCy `en_core_web_lg`
 `llama3.2:1b` · Redis checkpointer (langgraph-checkpoint-redis 0.5.2) · DeepEval 4.3.1 (dev-only) ·
 stdlib `logging` + JSON formatter (structlog dropped) · TypeScript 6.0.3 · multi-layer guardrails ·
 HTTP Basic + thread ownership · LangFuse option and approval-gate option still awaiting choice.
+
+## Round 4 — lead reply (verbatim)
+
+> B, A, yes
+
+## Lock (final, 10:43 CDT)
+
+Locked: Python 3.13.13 (uv) · FastAPI 0.143.3 + uvicorn 0.54.0 · confluent-kafka 2.16.0 / Kafka
+4.3.1 · Redis 8.10.2 + langgraph-checkpoint-redis 0.5.2 · Qdrant v1.19.2 · fastembed 0.9.0 ·
+Presidio 2.2.364 + spaCy `en_core_web_lg` 3.8.0 · langgraph 1.2.16 · openai 3.33.0 → Ollama 0.40.6
+`llama3.2:1b` · OTel 1.45.1 → Jaeger 2.22.0 **and LangFuse Cloud** (langfuse 5.0.2; keys supplied by
+the lead via `.env`, scrubbed content only leaves the machine) · stdlib JSON logging · DeepEval 4.3.1
+dev-only · TypeScript 6.0.3 frontend · guardrails L1–L5 · HTTP Basic + thread ownership · human
+approval gate = billing "refund request" paused by LangGraph `interrupt()` until `POST /approve`.
