@@ -6,11 +6,17 @@ Design transcript: `docs/design_dialogue.md`.
 
 ## Window
 
-- Start 10:20 CDT 2026-10-17. Deadline extended by the lead (option R1) from 15:20 to **16:40 CDT**
-  (6 h 20 min).
-- Reserve = max(30 min, 15 % × 380 min) = 57 min. Phase 3 floor = max(20 min, 10 % × 380 min) = 38 min.
+- Start 10:20 CDT 2026-10-17. Deadline extended by the lead from 15:20 to 16:40 (option R1), then to
+  **17:25 CDT** (7 h 05 min) to add Task 0b.
+- Reserve = max(30 min, 15 % × 425 min) = 64 min. Phase 3 floor = max(20 min, 10 % × 425 min) = 43 min.
 
 ## Architecture
+
+Full design: [`architecture/HLD.md`](architecture/HLD.md) (context, components, trade-offs,
+constraints, failure modes, scaling) and [`architecture/LLD.md`](architecture/LLD.md) (sequences,
+state machine, Redis keys, Kafka, status matrix). ADRs in [`adr/`](adr/): 0001 stack, 0005
+stream-per-message, 0006 approved deviations, 0007 guardrails and access control; 0002–0004 come
+from Tasks 4–5.
 
 ```
  Browser / curl  ── HTTP Basic ──┐
@@ -78,6 +84,7 @@ frontend/  docs/{adr,specs,prompts}/  SPEC.md  pyproject.toml (uv workspace; dev
 | # | Task | Est (min) | Protects |
 |---|---|---|---|
 | 0 | Persist plan | 5 | |
+| 0b | HLD, LLD, ADRs 0001/0005/0006/0007 | 25 | |
 | 1 | Workspace skeleton, README Tech Stack, `.gitattributes`, SPEC.md, `.env.example`, CI (lint+unit), CLAUDE.md §9 fill | 20 | |
 | 2 | common: schemas, settings (lease formula), JSON logging, audit-stream writer | 20 | audit trail |
 | 3 | common: Presidio `lg` scrubber (off-loop) + A1b recall/p95 report | 25 | Guardrails L3 |
@@ -90,7 +97,7 @@ frontend/  docs/{adr,specs,prompts}/  SPEC.md  pyproject.toml (uv workspace; dev
 | 10 | Human approval gate: refund action, `interrupt()`, `POST /approve`, audit + tests | 35 | Approval gate |
 | 11 | OTel → Jaeger + LangFuse Cloud spans | 30 | Observability |
 
-Σ = 310 min.
+Σ = 335 min (incl. 0b).
 
 ### Cut at Step B (recorded in `docs/known_limitations.md`)
 

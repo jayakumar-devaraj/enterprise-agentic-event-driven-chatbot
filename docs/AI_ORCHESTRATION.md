@@ -6,3 +6,4 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | task | generated (code/tests/docs) | branch | PR # |
 |---|---|---|---|
 | 0 persist plan | docs: master_plan, specs 1–11, design_dialogue, known_limitations, this log | plan/setup | #1 |
+| 0b design docs | docs: HLD, LLD, ADR 0001/0005/0006/0007, master_plan update | task-0b-design-docs | #2 |
