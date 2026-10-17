@@ -16,3 +16,4 @@ single session. Lead: Jayakumar Devaraj (gates and decisions).
 | 6 gateway POST /chat | code: gateway app/auth/producer; tests: 12 unit (doubles) + A1 integration (real Kafka, Redis) | task-6-gateway-chat | #9 |
 | 7 worker consumer | code: worker consumer/streams, compose IPv4 listener; tests: 5 unit (doubles) + A4, A5×2 integration (real Kafka, Redis) | task-7-worker-consumer | #10 |
 | 8 LangGraph pipeline | code: worker graph/llm/guards/main; tests: 5 unit + A6, A7×2 integration (real Redis checkpointer); process smoke | task-8-langgraph-graph | #11 |
+| 9 token stream + SSE | code: gateway sse relay + stream endpoint; tests: A3 + owner/422 integration (real Redis, real graph) | task-9-token-stream-sse | #12 |

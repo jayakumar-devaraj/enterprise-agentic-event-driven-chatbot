@@ -11,17 +11,19 @@ from typing import Annotated, Any
 import redis.asyncio as aioredis
 from chat_common.audit import AuditLog
 from chat_common.logjson import configure_logging
-from chat_common.schemas import ChatAccepted, ChatRequest, Envelope
+from chat_common.schemas import ChatAccepted, ChatRequest, Envelope, stream_key
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from redis.exceptions import RedisError
 
 from gateway import auth
 from gateway.producer import DependencyUnavailable, EnvelopeSink, KafkaEnvelopeProducer
+from gateway.sse import relay
 
 log = logging.getLogger("gateway")
 _basic = HTTPBasic(auto_error=False)
@@ -160,6 +162,32 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         """200 when Redis answers; RedisError maps to 503."""
         await deps.redis.ping()
         return {"status": "ok"}
+
+    async def stream_access(
+        thread_id: Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
+        message_id: uuid.UUID,
+        user: Annotated[str, Depends(current_user)],
+        deps: Annotated[Deps, Depends(_deps)],
+    ) -> str:
+        """Resolve auth, validation and ownership before the response starts streaming."""
+        await require_owner(deps, thread_id, user)
+        return stream_key(thread_id, message_id)
+
+    @app.get("/stream/{thread_id}/{message_id}", response_class=EventSourceResponse)
+    async def stream(
+        key: Annotated[str, Depends(stream_access)],
+        deps: Annotated[Deps, Depends(_deps)],
+        last_event_id: Annotated[str | None, Header()] = None,
+    ) -> AsyncIterator[ServerSentEvent]:
+        """Relay the message's events as SSE (SPEC.md §6)."""
+        async for event in relay(
+            deps.redis,
+            key,
+            last_event_id,
+            block_ms=deps.settings.stream_block_ms,
+            max_wait_s=deps.settings.stream_ttl_s,
+        ):
+            yield event
 
     @app.post("/chat", status_code=status.HTTP_202_ACCEPTED)
     async def chat(
