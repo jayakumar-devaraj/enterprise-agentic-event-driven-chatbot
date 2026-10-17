@@ -6,6 +6,8 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "chat-common",
     "confluent-kafka>=2.16.0",
+    "fastapi>=0.143.3",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [build-system]
