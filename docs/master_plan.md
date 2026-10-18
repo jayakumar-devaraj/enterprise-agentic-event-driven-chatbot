@@ -7,7 +7,8 @@ Design transcript: `docs/design_dialogue.md`.
 ## Window
 
 - Start 10:20 CDT 2026-10-17. Deadline extended by the lead from 15:20 to 16:40 (option R1), then to
-  17:25 to add Task 0b, then to **17:40 CDT** (7 h 20 min) to restore Task 14 (React client).
+  17:25 to add Task 0b, then to 17:40 to restore Task 14 (React client); after wrap-up the lead
+  extended to 19:30 and then **20:30 CDT** to build the cut items (Tasks 12, 13, 15, Tier 3).
 - Reserve = max(30 min, 15 % × 440 min) = 66 min. Phase 3 floor = max(20 min, 10 % × 440 min) = 44 min.
 
 ## Architecture
@@ -102,7 +103,10 @@ frontend/  docs/{adr,specs,prompts}/  SPEC.md  pyproject.toml (uv workspace; dev
 
 ### Cut at Step B (recorded in `docs/known_limitations.md`)
 
-Cut in this order because they are not protected concerns and the plan did not fit: Tier 3 (Caddy
+**Restored after wrap-up (lead, 17:07–19:20):** all of the items below were later built and verified —
+Task 12 (PRs #20/#21), A10 (#22), A9 (#23), Caddy TLS (#24), A11 (#25).
+
+Originally cut in this order because they are not protected concerns and the plan did not fit: Tier 3 (Caddy
 TLS + A11), Task 15 (A10 scale test), Task 13 (DeepEval + A9 real
 Ollama), Task 12 (service images + full-compose e2e + A4 Qdrant-stop). Candidates to restore from
 reserve under Phase 2.5 item 5.
@@ -115,12 +119,15 @@ reserve under Phase 2.5 item 5.
 | A1b PII recall + p95 | 3 |
 | A2 routing | 5 |
 | A3 streaming | 9 |
-| A4 failure | 7 (malformed); Qdrant-stop part cut with 12 |
+| A4 failure | 7 (malformed + dependency-failure path with doubles); live Qdrant-stop case not automated |
 | A5 idempotency | 7 |
 | A6 memory | 8 |
 | A7 injection | 8 |
 | A8 frontend | 14 (restored by the lead) |
-| A9 Ollama · A10 scale · A11 latency | cut (13, 15, Tier 3) |
+| A9 Ollama | 13 (`tests/load/test_ollama_a9.py`, `docs/reports/a9-ollama.md`) |
+| A10 scale | 15 (`tests/load/test_scale_a10.py`, `docs/reports/a10-scale.md`) |
+| A11 latency | Tier 3 (`tests/load/latency_a11.py`, `docs/reports/a11-latency.md`) |
+| Tier 3 TLS | `deploy/caddy/Caddyfile`, `docs/reports/tier3-caddy-tls.md` |
 | Tier 0 spikes, ADRs | 4 (0001–0003), 5 (threshold) |
 | Tier 2 OTel → Jaeger | 11 |
 | Rubric 1a design doc | 0 (this file) + ADRs |

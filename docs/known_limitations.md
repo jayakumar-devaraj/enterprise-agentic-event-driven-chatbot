@@ -30,18 +30,17 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   approval starts a new graph run and abandons the paused one; a later approve then gets
   `ErrorEvent{approval_not_pending}` and no refund is applied (fails safe, but the user must ask
   again). The refund rule is a keyword match on "refund(s)" in billing-routed text.
-- **Not built (cut, final state):** gateway/worker/seed container images and a one-command full
-  stack (Task 12; services run as host processes, the frontend runs in compose); A9 real Ollama
-  round trip (engine and compose profile exist, untested); A10 horizontal-scale test; Tier 3 Caddy
-  TLS and A11 latency report.
+- **Previously cut, now built (17:07–19:20):** container images + one-command stack (Task 12), A9,
+  A10, Caddy TLS and A11 — see the reports in `docs/reports/`. Still not automated: A4's live
+  "Qdrant stopped after startup" case (the dependency-failure path is covered with test doubles).
 - **Phase 2.5 cut short:** items 3–5 (extra criterion tests, plan/spec reconciliation, fixing
   limitations) were not done; time reached the Phase 3 floor after a CI wait of about 1h50m
   (15:05–16:55 CDT) while merging PR #17. `docs/master_plan.md` and `docs/specs/` were not
   reconciled line by line after the design changes recorded in ADRs 0002–0007.
 - **CLAUDE.md §9 "Open risk" still present:** spike (a) resolved it (ADR 0002), but deleting the
   block needs the lead's permission (asked, not yet answered).
-- **`worker.main` has no automated test** (0 % in `docs/reports/coverage.txt`); it was exercised by
-  the process smoke runs in PR #11 and `docs/reports/e2e-observability.md`.
+- **`worker.main` has no automated test** (0 % in `docs/reports/coverage.txt`); it is exercised by
+  the containerized runs (`docs/reports/e2e-containers.md`, A9, A10).
 - **Single-turn prompts to the real LLM** include only the last 6 history turns.
 - **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
   user's own, already scrubbed text) at the start of its reply. Harmless for privacy, poor UX; a
