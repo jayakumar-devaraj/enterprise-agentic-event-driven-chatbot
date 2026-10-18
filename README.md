@@ -117,8 +117,9 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):
   `MOCK_LLM=false docker compose -f deploy/compose.yaml --profile llm up -d --build --wait`.
 - Generate a user: `uv run python -m gateway.auth <user> <password>` → append to `AUTH_USERS`.
-- End-to-end demo (stack running): `uv run python scripts/end_to_end_demo.py "<question>" --base-url
-  http://127.0.0.1:<gateway port>` posts the question and prints the streamed reply.
+- End-to-end demo: `uv run python scripts/end_to_end_demo.py ["<question>"]` finds the compose
+  gateway (starting the stack with `docker compose up -d --wait` if it is down), posts the question
+  and prints the streamed reply; `--base-url` skips the stack check, `--debug` shows tracebacks.
 
 ## Testing
 
