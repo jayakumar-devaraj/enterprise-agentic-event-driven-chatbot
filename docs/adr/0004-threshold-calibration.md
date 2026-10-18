@@ -73,3 +73,29 @@ stays. Both rules miss the detection target, and the current rule refuses half o
 held-out messages, far more than the single example recorded under Consequences. Similarity
 against 12 exemplars cannot separate refund phrasing from injection phrasing. The next step needs
 a new decision and a new pre-registration; the threshold is not adjusted here.
+
+## Addendum 2026-10-18 — contrastive detector, pre-registered (written before implementation or measurement)
+The lead chose a contrastive nearest-neighbour detector. Fixed in this commit, before any code or
+measurement:
+
+- **Seeds (calibration only):** `data/injection.seed.jsonl` grows from 12 to 40 exemplars (28 new:
+  prompt extraction, role override, policy bypass, data exfiltration, delimiter and system
+  spoofing, and billing-domain abuse such as skipping refund approval). The new
+  `data/benign.seed.jsonl` holds 24 benign exemplars that share vocabulary with injections
+  (refund and money-back requests, "ignore", "forget", "repeat", "admin", "pretend", "override").
+  Disclosure: these were written after seeing the first guard set's failures, so
+  `data/guard.eval.jsonl` is now **informational only**.
+- **Fresh held-out set:** `data/guard.holdout.jsonl`, 20 benign and 20 injections, written now by
+  the same agent, with no text shared with any other data file. Never seeded, never used in
+  calibration. This is the primary evaluation.
+- **Rule:** `margin = top-1 cosine to injection_patterns − max(top-1 to intents, top-1 to
+  benign_patterns)`; injection ⇔ `margin ≥ INJECTION_MARGIN`. This replaces `INJECTION_THRESHOLD`.
+  The router then uses the same query-side vector against three collections.
+- **Calibration:** leave-one-out over the seeds, with the same max-accuracy rule and ties going
+  to the largest value. Positives are each held-out injection scored against the other
+  injections and against all benign exemplars. Negatives are each held-out benign exemplar
+  (intent seeds plus benign seeds) scored against all injections and the other benign exemplars.
+  The value the seed run computes is used as is.
+- **Acceptance targets on the fresh held-out set:** ≤ 1/20 benign refused and ≥ 15/20 injections
+  detected. Additionally, no `data/intents.eval.jsonl` sample may be refused, and A2 intent
+  routing stays 18/18. Adopt only if all four hold. Otherwise keep the current rule and report.
