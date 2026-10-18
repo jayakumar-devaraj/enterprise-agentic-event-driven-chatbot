@@ -49,7 +49,7 @@ sequenceDiagram
   G->>R: SET thread_owner NX / GET (403 if other user)
   G->>R: INCR ratelimit:{thread}:{minute} (429)
   G->>G: ascrub(message) in thread pool
-  G->>R: GET delivered:{message_id} (same digest ⇒ same 202, no produce; other ⇒ 422)
+  G->>R: GET delivered:{message_id} (same digest ⇒ same 202, no produce, other ⇒ 422)
   G->>R: SET accepted:{message_id} thread:digest NX (other request ⇒ 422)
   G->>K: produce Envelope key=thread_id, wait for ack (503 on failure)
   G->>R: XADD audit:events chat_accepted
@@ -99,7 +99,7 @@ sequenceDiagram
   participant R as Redis
   W->>W: billing node detects refund request (deterministic rule on scrubbed text)
   W->>W: interrupt() — graph state checkpointed, nothing applied
-  W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S; audit refund_proposed
+  W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S, then audit refund_proposed
   W->>R: XADD ApprovalRequiredEvent ⇒ stream closes
   C->>G: POST /approve/{thread}/{msg} {message_id: new, approved}
   G->>R: owner check (403), pending exists or decision already delivered (404 if neither)
@@ -107,11 +107,11 @@ sequenceDiagram
   G-->>C: 202 ChatAccepted {stream_url for new message_id}
   W->>W: resume graph with decision
   alt approved
-    W->>R: XADD refunds (idempotent on ref_message_id); audit refund_applied
+    W->>R: XADD refunds (idempotent on ref_message_id), then audit refund_applied
   else rejected
     W->>R: audit refund_rejected
   end
-  W->>R: DEL pending; XADD tokens + DoneEvent on new stream
+  W->>R: DEL pending, then XADD tokens + DoneEvent on new stream
 ```
 
 The refund decision is made by a deterministic rule, not by model output, so an injected prompt
