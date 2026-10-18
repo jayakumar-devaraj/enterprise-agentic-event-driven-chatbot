@@ -69,3 +69,14 @@ reran every documented command before merge (PR #18).
 | 13 A9 real Ollama | code: gateway Redis socket timeout fix + regression test, Ollama Dockerfile PID fix, worker MOCK_LLM env; tests: tests/load/test_ollama_a9.py (marker `llm`); docs: a9 report | task-13-ollama-a9 | see PR |
 | T3 Caddy TLS | config: deploy/caddy/Caddyfile, compose caddy service; docs: tier3 report | tier3-caddy-tls | see PR |
 | T3 A11 latency | tests: tests/load/latency_a11.py; docs: a11 report + json | tier3-latency-a11 | see PR |
+| reconcile + docs | docs: coverage re-measured (88 %), master plan/specs/limitations/summary/README reconciled | reconcile-docs | see PR |
+
+### Addendum — post-wrap-up extension (17:07–19:25 CDT)
+
+The lead asked to build the cut items and extended the deadline to 19:30, then 20:30. Task 12 images
+were pushed as unmerged WIP when Docker Desktop crashed (`05b749d`); another session capped compose
+resources (PR #19) and merged the WIP branch (PR #20). This session then verified it end to end in
+containers (PR #21, `docs/reports/e2e-containers.md`), added A10 (PR #22), A9 with a real Ollama
+round trip — which exposed and fixed an SSE relay bug where the gateway's Redis client timed out its
+own `XREAD BLOCK` (PR #23, regression test `tests/integration/test_stream_slow_first_event.py`) —
+Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this reconciliation.

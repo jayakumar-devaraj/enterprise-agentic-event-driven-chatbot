@@ -9,9 +9,10 @@ chat window. Refunds are never issued automatically: the customer must approve e
 request is traceable end to end (Jaeger locally, LangFuse Cloud for AI-level traces), and key
 actions are written to a durable audit log.
 
-**Evidence.** 66 unit tests, 18 integration tests against the real message broker, database and
-vector store, and 5 front-end tests, all passing locally and in GitHub Actions (CI run 39065303808);
-87 % code coverage (`docs/reports/coverage.txt`). Measured PII recall 100 % on a small, easy
+**Evidence.** 66 unit tests, 19 integration tests against the real message broker, database and
+vector store, and 5 front-end tests, all passing locally and in GitHub Actions; plus a scale test
+(2 gateways + 2 workers), a real local-LLM round trip, and HTTPS through a reverse proxy. 88 % code
+coverage (`docs/reports/coverage.txt`). The whole stack starts with one command. Measured PII recall 100 % on a small, easy
 32-sentence sample; this overstates real-world accuracy.
 
 **The most important trade-off.** Reliability over immediacy: the system answers "accepted" at once
@@ -20,11 +21,10 @@ crashes (work is retried or reprocessed, never lost or duplicated) and lets each
 independently, at the cost of more moving parts (Kafka, Redis, Qdrant) than a single web server.
 
 **Remaining work, in priority order.**
-1. Package the gateway, worker and seed as container images and run the full stack in one command
-   (today they run as local processes).
-2. Verify one real round trip through the local language model (built, not yet tested), and measure
-   latency under load.
-3. Prove horizontal scaling (two gateways and two workers) with an automated test.
-4. Add HTTPS: passwords currently travel unencrypted on the local network.
-5. Improve the injection detector (one legitimate refund question was flagged) and test PII
+1. Set latency targets: under 20 concurrent users the first word of a reply takes about 4.4 s
+   (median) with the test engine; the likely bottleneck (CPU-capped privacy scrubbing) is untested.
+2. Improve the injection detector (one legitimate refund question was flagged) and test PII
    detection on harder, real-world text before setting an accuracy target.
+3. Use a larger language model: the 1B model works but repeats the user's question in its reply.
+4. Add a deployment target (image registry, production hosting) and close the remaining plain-HTTP
+   development ports.

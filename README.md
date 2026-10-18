@@ -103,7 +103,10 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 uv run ruff check . && uv run ruff format --check .
 uv run pytest                      # unit tests (integration excluded by default)
 uv run pytest -m integration       # needs the compose stack + seed from Quickstart
-uv run pytest -m "integration or not integration" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+uv run pytest -m "not scale and not llm" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
+uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
+uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
 docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
 ```
 
@@ -112,5 +115,6 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 ## Deployment / CI
 
 `.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), and frontend jobs on
-every push and pull request. Service container images for gateway/worker/seed are not built yet
-(cut; see `docs/known_limitations.md`).
+every push and pull request. Gateway, worker and seed images build from `services/*/Dockerfile`
+(multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
+there is no registry push or production deployment target yet.
