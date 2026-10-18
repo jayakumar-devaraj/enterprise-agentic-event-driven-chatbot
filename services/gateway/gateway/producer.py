@@ -17,6 +17,8 @@ class EnvelopeSink(Protocol):
 
     async def send(self, envelope: Envelope) -> None: ...
 
+    async def ready(self) -> None: ...
+
     async def close(self) -> None: ...
 
 
@@ -47,6 +49,16 @@ class KafkaEnvelopeProducer:
                 await delivery
         except (KafkaException, TimeoutError) as exc:
             raise DependencyUnavailable(f"kafka: {exc}") from exc
+
+    async def ready(self) -> None:
+        """Raise DependencyUnavailable unless the broker answers and the topic exists."""
+        try:
+            metadata = await self._producer.list_topics(self._topic, timeout=self._timeout_s)
+        except KafkaException as exc:
+            raise DependencyUnavailable(f"kafka: {exc}") from exc
+        topic = metadata.topics.get(self._topic)
+        if topic is None or topic.error is not None:
+            raise DependencyUnavailable(f"kafka: topic {self._topic} unavailable")
 
     async def close(self) -> None:
         """Flush outstanding messages and release the client."""
