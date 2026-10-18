@@ -112,6 +112,12 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.
 
 - Config: every key and default is in `.env.example`; settings come from the environment.
+- State: Redis (AOF, `everysec`) and Kafka keep their data on the named volumes `redis-data` and
+  `kafka-data`; `down` keeps them, `down -v` deletes them (ADR 0008). Redis backup and restore:
+  `docker compose -f deploy/compose.yaml stop redis`, then
+  `docker run --rm -v chatbot_redis-data:/data:ro -v "$PWD":/backup redis:8.10.2 tar -C /data -cf /backup/redis.tar .`;
+  restore by extracting into an empty `chatbot_redis-data` volume (`tar -C /data -xf`) before
+  starting Redis again.
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.
@@ -130,7 +136,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 uv run ruff check . && uv run ruff format --check .
 uv run pytest                      # unit tests (integration excluded by default)
 uv run pytest -m integration       # needs the compose stack + seed from Quickstart
-uv run pytest -m "not scale and not llm" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+uv run pytest -m "not scale and not llm and not durability" --cov=chat_common --cov=gateway --cov=worker --cov=seed
+uv run pytest -m durability   # own compose project: SIGKILL, container replacement, backup/restore
 uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
 uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
@@ -141,7 +148,7 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 
 ## Deployment / CI
 
-`.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), and frontend jobs on
-every push and pull request. Gateway, worker and seed images build from `services/*/Dockerfile`
+`.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), durability (Redis
+and Kafka restart/replacement/restore), and frontend jobs on every push and pull request. Gateway, worker and seed images build from `services/*/Dockerfile`
 (multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
 there is no registry push or production deployment target yet.
