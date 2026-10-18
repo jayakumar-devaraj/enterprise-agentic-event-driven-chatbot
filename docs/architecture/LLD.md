@@ -12,22 +12,25 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `chat_common.scrubber` | Presidio analyzer/anonymizer; `scrub()` sync, `ascrub()` via `asyncio.to_thread` |
 | `chat_common.logjson` | stdlib `logging` JSON formatter carrying `trace_id`, `thread_id`, `message_id` |
 | `chat_common.audit` | `audit:events` writer and reader |
-| `gateway.app` | FastAPI app, routes, exception → status mapping |
+| `chat_common.tracing` | OpenTelemetry setup; W3C trace context carried in `Envelope.trace_id` (ADR 0003) |
+| `gateway.app` | FastAPI app, routes, exception → status mapping, owner binding, per-thread rate limit, idempotent enqueue |
 | `gateway.auth` | HTTP Basic verification (scrypt, called via `asyncio.to_thread`), thread ownership |
-| `gateway.ratelimit` | Per-thread fixed-window counter |
 | `gateway.producer` | confluent-kafka asyncio producer wrapper |
 | `gateway.sse` | Redis stream → SSE relay |
 | `worker.consumer` | Poll loop, dedupe lease, retries, DLQ, commit |
-| `worker.graph` | LangGraph `StateGraph` definition + checkpointer |
-| `worker.router` | Embedding + Qdrant top-1 + thresholds |
+| `worker.graph` | LangGraph `StateGraph` definition and the processor (replay idempotency, approval resume) |
+| `worker.streams` | Per-message Redis Stream writer |
+| `worker.embedding` | fastembed bge-small query/passage embeddings |
+| `worker.observability` | LangFuse LLM traces (no-op without keys) |
+| `worker.main` | Process wiring: clients, checkpointer, graph, consumer loop |
+| `worker.router` | Qdrant top-1 intent + contrastive injection margin (ADR 0004) |
 | `worker.llm` | OpenAI-compatible client and deterministic mock; prompt assembly |
-| `worker.guards` | L4 injection check, L5 output guard |
+| `worker.guards` | L5 output guard: scrub per sentence chunk, block prompt echoes, token cap |
 | `worker.approval` | Refund proposal, interrupt/resume, apply |
 | `seed.main` / `seed.calibrate` | Load collections; leave-one-out threshold calibration |
 | `frontend/src/api.ts` | `postChat`, `postApprove`, `streamMessage` (fetch + SSE parser, Basic header, `Last-Event-ID` resume) |
-| `frontend/src/useChat.ts` | Chat state machine hook (see §11) |
-| `frontend/src/ChatWindow.tsx` | Message list, incremental token rendering, input box, error banner, approve/reject panel |
-| `frontend/src/Login.tsx` | Username/password form; credentials held in React state only |
+| `frontend/src/ChatWindow.tsx` | Chat state machine (§11), message list, incremental token rendering, input box, error banner, approve/reject panel |
+| `frontend/src/App.tsx` | Username/password form; credentials held in React state only |
 
 ## 2 · Sequence: chat turn (happy path)
 
@@ -210,9 +213,10 @@ stateDiagram-v2
   [*] --> signed_out
   signed_out --> idle: credentials entered (kept in memory)
   idle --> sending: submit (new message_id = crypto.randomUUID())
+  sending --> sending: network failure / 503 (one retry, same message_id)
   sending --> streaming: 202 ChatAccepted
   sending --> error: 401 / 403 / 413 / 422 / 429 / 503
-  streaming --> streaming: token event (append to the assistant bubble)
+  streaming --> streaming: token event (append) / seq 0 after progress (clear: worker restarted)
   streaming --> idle: done event
   streaming --> error: error event / network failure after one resume attempt
   streaming --> awaiting_approval: approval_required event
@@ -226,10 +230,12 @@ stateDiagram-v2
   this gap- and duplicate-free.
 - **Incremental render:** tokens append to the current assistant message as they arrive; `seq` is
   checked to be increasing and duplicates are ignored.
-- **Error state:** HTTP status or `ErrorEvent.code` maps to a readable banner; 401 returns to
-  sign-in.
+- **Error state:** HTTP status or `ErrorEvent.code` maps to a readable banner (401 asks the user to
+  sign in again; it does not sign out).
 - **Approval:** `ApprovalRequiredEvent` shows Approve / Reject buttons; the click POSTs `/approve`
   with a fresh `message_id` and streams the follow-up message.
+- **Retry identity:** an uncertain POST (network failure or 503) is retried once with the same body,
+  so the same `message_id`; the gateway produces it or returns the original 202 (SPEC §2).
 - **Tests (A8, Vitest + React Testing Library):** a stubbed `fetch` streams events; asserts tokens
   appear incrementally, the error banner renders on `ErrorEvent`, and the approval panel appears on
   `approval_required`.
