@@ -82,3 +82,13 @@ own `XREAD BLOCK` (PR #23, regression test `tests/integration/test_stream_slow_f
 Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this reconciliation.
 | review findings | docs: A11 investigation (worker CPU bottleneck, AIOProducer 1 s buffer; reverted fix attempt) | fix-review-items | see PR |
 | echo fix | code: output guard drops echoed delimiter blocks; tests: 1 unit | fix-model-echo | see PR |
+| final consistency | docs: coverage re-measured at `c3b4f0f` (88 %, 86 passed), summary figures, PR-number mapping below | final-consistency | #29 |
+
+PR numbers for rows above that were written as "see PR" (appended, not edited, to keep this log
+append-only): 12 verification → #21 · 15 A10 scale → #22 · 13 A9 real Ollama → #23 · T3 Caddy TLS →
+#24 · T3 A11 latency → #25 · reconcile + docs → #26 · review findings → #27 · echo fix → #28.
+
+Addendum (19:22–20:30): review follow-up per the lead — latency investigated (worker CPU bottleneck,
+AIOProducer 1 s buffer; one fix attempt broke delivery and was reverted before commit, PR #27), the
+1B-model echo filtered in the output guard (PR #28); A4 live-Qdrant-stop automation, Caddy-only port
+exposure, and the injection false-positive decision remain open (`docs/known_limitations.md`).

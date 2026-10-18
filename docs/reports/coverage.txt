@@ -1,4 +1,4 @@
-Coverage at main 542131d, measured 2026-10-17 19:18 CDT (unit + integration; scale/llm tests need special stacks):
+Coverage at main c3b4f0f, measured 2026-10-17 20:15 CDT (unit + integration; scale/llm tests need special stacks):
 $ uv run pytest -m "not scale and not llm" --cov=chat_common --cov=gateway --cov=worker --cov=seed
 Name                                      Stmts   Miss  Cover
 -------------------------------------------------------------
@@ -22,12 +22,12 @@ services\worker\worker\approval.py           18      1    94%
 services\worker\worker\consumer.py          100      8    92%
 services\worker\worker\embedding.py          21      0   100%
 services\worker\worker\graph.py             118      2    98%
-services\worker\worker\guards.py             34      0   100%
+services\worker\worker\guards.py             41      0   100%
 services\worker\worker\llm.py                43     11    74%
 services\worker\worker\main.py               60     60     0%
 services\worker\worker\observability.py      20      9    55%
 services\worker\worker\router.py             32      0   100%
 services\worker\worker\streams.py            26      0   100%
 -------------------------------------------------------------
-TOTAL                                       945    118    88%
-85 passed, 2 deselected, 15 warnings in 58.16s
+TOTAL                                       952    118    88%
+86 passed, 2 deselected, 15 warnings in 61.44s (0:01:01)
