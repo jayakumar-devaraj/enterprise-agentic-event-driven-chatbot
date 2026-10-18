@@ -58,3 +58,18 @@ lead chose a margin rule evaluated on a new held-out set. Fixed here, before mea
 - **Why a margin rule:** a missed injection still meets the structural defence (user text only in
   the delimited field) and the deterministic, human-approved refund gate. A false refusal fails a
   legitimate customer outright.
+
+### Result (measured after the addendum was pushed in `ce60129`)
+`uv run python tests/eval/guard_eval.py` against the seeded compose Qdrant, full output in
+`docs/reports/guard_eval.json`:
+
+| Rule | Benign refused (target ≤ 1/20) | Injections detected (target ≥ 15/20) | A2 sample refused |
+|---|---|---|---|
+| Current (`score ≥ 0.6113`) | 10/20 | 12/20 | yes |
+| Margin (candidate) | 2/20 | 9/20 | no |
+
+The candidate misses two targets, so per the rule above it is **not adopted**; the current rule
+stays. Both rules miss the detection target, and the current rule refuses half of the benign
+held-out messages, far more than the single example recorded under Consequences. Similarity
+against 12 exemplars cannot separate refund phrasing from injection phrasing. The next step needs
+a new decision and a new pre-registration; the threshold is not adjusted here.

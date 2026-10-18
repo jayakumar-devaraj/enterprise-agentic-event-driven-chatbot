@@ -77,3 +77,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   Redis now persists (AOF `everysec`) and Kafka writes to a named volume instead of `/tmp` (P1,
   ADR 0008); a host crash can still lose ≤ 1 s of Redis writes, Kafka has no replica and is not
   backed up. Restore was tested on a disposable compose project, not on a production host.
+- **Injection detector measured on a held-out set (2026-10-17, ADR 0004 addendum):** the current
+  rule refuses 10/20 benign held-out messages (mostly refund and money-back phrasings) and detects
+  12/20 novel injections. The pre-registered margin rule (2/20 refused, 9/20 detected) missed its
+  targets and was not adopted. The structural defence and the human refund gate are unaffected.
