@@ -1,8 +1,9 @@
-"""Refusal evaluation (ADR 0004 addendum): current vs margin rule on the held-out guard set.
+"""Refusal evaluation (ADR 0004 addenda): the production Router's injection verdicts per dataset.
 
-Scores every sample in data/guard.eval.jsonl and data/intents.eval.jsonl with the production Router
-against the seeded Qdrant, then applies both rules to the same scores. Reports numbers only; the
-acceptance targets are fixed in ADR 0004.
+Routes every sample with the production Router against the seeded Qdrant and counts verdicts.
+`data/guard.holdout.jsonl` is the primary held-out set; `data/guard.eval.jsonl` is informational
+(seen before the seeds were written); `data/intents.eval.jsonl` must have no refusals. Reports
+numbers only; the acceptance targets are fixed in ADR 0004.
 Run (stack up and seeded): `uv run python tests/eval/guard_eval.py` → prints JSON and writes
 docs/reports/guard_eval.json.
 """
@@ -18,8 +19,11 @@ from worker.embedding import get_embedder
 from worker.router import Router
 
 ROOT = Path(__file__).resolve().parents[2]
-GUARD = ROOT / "data" / "guard.eval.jsonl"
-INTENTS = ROOT / "data" / "intents.eval.jsonl"
+DATASETS = {
+    "holdout": ROOT / "data" / "guard.holdout.jsonl",
+    "guard_eval_informational": ROOT / "data" / "guard.eval.jsonl",
+    "intents_eval": ROOT / "data" / "intents.eval.jsonl",
+}
 REPORT = ROOT / "docs" / "reports" / "guard_eval.json"
 
 
@@ -29,7 +33,7 @@ def _rows(path: Path) -> list[dict]:
 
 
 async def measure() -> dict[str, object]:
-    """Route every sample once; evaluate both rules on the recorded scores."""
+    """Route every sample once and summarise refusals per dataset."""
     settings = Settings(qdrant_url=os.getenv("QDRANT_URL", "http://127.0.0.1:16333"))
     qdrant = AsyncQdrantClient(
         url=settings.qdrant_url,
@@ -41,53 +45,38 @@ async def measure() -> dict[str, object]:
         qdrant,
         intents_collection=settings.qdrant_collection,
         injection_collection=settings.qdrant_injection_collection,
+        benign_collection=settings.qdrant_benign_collection,
         route_threshold=settings.route_threshold,
-        injection_threshold=settings.injection_threshold,
+        injection_margin=settings.injection_margin,
     )
-    t = settings.injection_threshold
-    rules = {
-        "current": lambda inj, top: inj >= t,
-        "margin": lambda inj, top: inj >= t and inj > top,
-    }
-    samples = [(r["text"], r["label"] == "injection") for r in _rows(GUARD)]
-    samples += [(r["text"], False) for r in _rows(INTENTS)]
+    report: dict[str, object] = {"injection_margin": settings.injection_margin}
     try:
-        scored = []
-        for text, is_injection in samples:
-            route = await router.route(text)
-            scored.append((text, is_injection, route.injection_score, route.score))
+        for name, path in DATASETS.items():
+            scored = []
+            for row in _rows(path):
+                route = await router.route(row["text"])
+                truth = row["label"] == "injection"
+                scored.append(
+                    (row["text"], truth, route.injection, round(route.injection_score, 4))
+                )
+            report[name] = {
+                "benign_refused": sum(1 for _, t, v, _ in scored if not t and v),
+                "benign_total": sum(1 for _, t, _, _ in scored if not t),
+                "injections_detected": sum(1 for _, t, v, _ in scored if t and v),
+                "injections_total": sum(1 for _, t, _, _ in scored if t),
+                "false_refusals": [x for x, t, v, _ in scored if not t and v],
+                "missed_injections": [x for x, t, v, _ in scored if t and not v],
+                "margins": [{"text": x, "injection": t, "margin": m} for x, t, _, m in scored],
+            }
     finally:
         await qdrant.close()
-
-    guard_n = len(_rows(GUARD))
-    report: dict[str, object] = {"injection_threshold": t, "rules": {}}
-    for name, rule in rules.items():
-        flagged = [(text, inj) for text, inj, s_inj, s_top in scored if rule(s_inj, s_top)]
-        guard = scored[:guard_n]
-        report["rules"][name] = {
-            "benign_refused": sum(1 for _, inj, si, st in guard if not inj and rule(si, st)),
-            "benign_total": sum(1 for _, inj, _, _ in guard if not inj),
-            "injections_detected": sum(1 for _, inj, si, st in guard if inj and rule(si, st)),
-            "injections_total": sum(1 for _, inj, _, _ in guard if inj),
-            "intent_eval_refused": [
-                t for t, _ in flagged if t in {s for s, *_ in scored[guard_n:]}
-            ],
-            "false_refusals": [text for text, inj in flagged if not inj],
-            "missed_injections": [text for text, inj, si, st in guard if inj and not rule(si, st)],
-        }
-    report["scores"] = [
-        {
-            "text": text,
-            "injection": inj,
-            "injection_score": round(si, 4),
-            "intent_score": round(st, 4),
-        }
-        for text, inj, si, st in scored
-    ]
     return report
 
 
 if __name__ == "__main__":
     result = asyncio.run(measure())
     REPORT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(result["rules"], indent=2))
+    summary = {
+        k: {f: v[f] for f in v if f != "margins"} for k, v in result.items() if isinstance(v, dict)
+    }
+    print(json.dumps(summary, indent=2))

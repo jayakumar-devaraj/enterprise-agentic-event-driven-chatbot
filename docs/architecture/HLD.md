@@ -58,7 +58,7 @@ flowchart TB
     outg[Output guardrail L5]
   end
   redis[(Redis 8 :6379<br/>streams, checkpoints, dedupe,<br/>rate limit, owners, audit)]
-  qdrant[(Qdrant gRPC :6334, REST :6333<br/>intents, injection_patterns)]
+  qdrant[(Qdrant gRPC :6334, REST :6333<br/>intents, injection_patterns,<br/>benign_patterns)]
   seed[[seed one-shot]]
   auth --> guard --> prod --> req --> dedupe --> graph --> llm --> outg
   ui --> auth

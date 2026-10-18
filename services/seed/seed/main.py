@@ -1,4 +1,4 @@
-"""One-shot seeding of the `intents` and `injection_patterns` collections; fails loudly."""
+"""One-shot seeding of `intents`, `injection_patterns` and `benign_patterns`; fails loudly."""
 
 import asyncio
 import json
@@ -52,35 +52,47 @@ async def load_collection(
 
 
 async def seed(settings: Settings, data_dir: Path = DATA_DIR) -> dict[str, float]:
-    """Load both collections and return the leave-one-out calibration report."""
+    """Load the three collections and return the leave-one-out calibration report."""
     embedder = get_embedder(settings.embed_model)
     intents = read_jsonl(data_dir / "intents.seed.jsonl")
     injections = read_jsonl(data_dir / "injection.seed.jsonl")
+    benign = read_jsonl(data_dir / "benign.seed.jsonl")
     qdrant = AsyncQdrantClient(url=settings.qdrant_url, timeout=30)
     try:
         intent_vecs = await load_collection(qdrant, embedder, settings.qdrant_collection, intents)
         inj_vecs = await load_collection(
             qdrant, embedder, settings.qdrant_injection_collection, injections
         )
+        benign_vecs = await load_collection(
+            qdrant, embedder, settings.qdrant_benign_collection, benign
+        )
     finally:
         await qdrant.close()
-    intent_q = np.asarray(
-        await asyncio.to_thread(embedder.embed_queries, [r["text"] for r in intents])
-    )
-    inj_q = np.asarray(
-        await asyncio.to_thread(embedder.embed_queries, [r["text"] for r in injections])
+
+    async def queries(rows: list[dict[str, str]]) -> np.ndarray:
+        return np.asarray(
+            await asyncio.to_thread(embedder.embed_queries, [r["text"] for r in rows])
+        )
+
+    intent_q, inj_q, benign_q = (
+        await queries(intents),
+        await queries(injections),
+        await queries(benign),
     )
     route_t, route_acc = calibrate.route_threshold(
         intent_q, intent_vecs, [r["label"] for r in intents]
     )
-    inj_t, inj_acc = calibrate.injection_threshold(inj_q, inj_vecs, intent_q)
+    margin, inj_acc = calibrate.injection_margin(
+        inj_q, inj_vecs, np.vstack([intent_q, benign_q]), np.vstack([intent_vecs, benign_vecs])
+    )
     report = {
         "route_threshold": route_t,
         "route_loo_accuracy": route_acc,
-        "injection_threshold": inj_t,
+        "injection_margin": margin,
         "injection_loo_accuracy": inj_acc,
         "intent_exemplars": len(intents),
         "injection_exemplars": len(injections),
+        "benign_exemplars": len(benign),
     }
     log.info("seeded", extra=report)
     return report

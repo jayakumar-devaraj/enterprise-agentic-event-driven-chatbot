@@ -180,7 +180,7 @@ Streams over SSE.
 | `services/seed` | One-shot Qdrant loader + leave-one-out threshold calibration | Eval data is never loaded into Qdrant |
 | Kafka 4 (KRaft) | `chat-requests` keyed by `thread_id`, `chat-requests.dlq` | Partition count bounds worker replicas; changing it remaps keys |
 | Redis 8 | Token streams, checkpoints, dedupe leases, rate limits, owners, refunds, `audit:events` | Dedupe `processing` must never block redelivery past its lease |
-| Qdrant | `intents`, `injection_patterns` (384-dim cosine) | Query and passage prefixes differ for bge-small |
+| Qdrant | `intents`, `injection_patterns`, `benign_patterns` (384-dim cosine) | Query and passage prefixes differ for bge-small |
 | Ollama / mock | OpenAI-compatible inference; `MOCK_LLM=true` selects the mock | Mock only when `MOCK_LLM=true`; never a metered endpoint |
 | Jaeger v2 + LangFuse Cloud | OTel infra traces + LLM-level traces | Only scrubbed text may reach either |
 

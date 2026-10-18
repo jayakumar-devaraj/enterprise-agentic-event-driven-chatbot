@@ -59,8 +59,9 @@ async def run(settings: Settings) -> None:
         qdrant,
         intents_collection=settings.qdrant_collection,
         injection_collection=settings.qdrant_injection_collection,
+        benign_collection=settings.qdrant_benign_collection,
         route_threshold=settings.route_threshold,
-        injection_threshold=settings.injection_threshold,
+        injection_margin=settings.injection_margin,
     )
     consumer = AIOConsumer(
         {

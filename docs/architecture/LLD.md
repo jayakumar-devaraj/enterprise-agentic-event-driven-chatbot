@@ -53,7 +53,7 @@ sequenceDiagram
   C->>G: GET /stream/{thread}/{msg} (Last-Event-ID optional)
   W->>K: poll
   W->>R: SET dedupe:{message_id} processing NX EX lease
-  W->>Q: embed(query prefix) → gRPC search injection_patterns, intents
+  W->>Q: embed(query prefix) → gRPC search injection_patterns, benign_patterns, intents
   W->>L: chat.completions (system fixed, user text in delimited field)
   loop sentence-buffered chunks
     W->>W: L5 scrub chunk
@@ -119,7 +119,7 @@ failed write never leaves a marker without its refund record. The marker never e
 ```mermaid
 stateDiagram-v2
   [*] --> route
-  route --> refuse: injection score ≥ INJECTION_THRESHOLD
+  route --> refuse: injection margin ≥ INJECTION_MARGIN
   route --> await_approval: intent=billing and "refund" in text
   route --> billing: intent=billing
   route --> tech_support: intent=tech_support

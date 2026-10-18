@@ -81,3 +81,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   rule refuses 10/20 benign held-out messages (mostly refund and money-back phrasings) and detects
   12/20 novel injections. The pre-registered margin rule (2/20 refused, 9/20 detected) missed its
   targets and was not adopted. The structural defence and the human refund gate are unaffected.
+- **Contrastive injection detector adopted below its targets (2026-10-18, ADR 0004/0006):** on the
+  fresh holdout it refuses 4/20 benign messages and detects 20/20 injections; it also refuses 3
+  off-topic `intents.eval` requests (no in-scope one). The seeds and holdout were written by the same
+  agent, so the holdout measures generalisation across phrasings by one author only. Supersedes the
+  Task 5 false-positive entry and the 2026-10-17 detector entry above.
