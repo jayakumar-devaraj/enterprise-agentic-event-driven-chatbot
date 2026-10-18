@@ -18,7 +18,7 @@ import redis.asyncio as aioredis
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
-from confluent_kafka import KafkaException, TopicPartition
+from confluent_kafka import KafkaError, KafkaException, TopicPartition
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.aio import AIOConsumer, AIOProducer
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
@@ -31,6 +31,11 @@ from worker.llm import MockEngine
 from worker.router import Router
 
 pytestmark = pytest.mark.durability
+_LOADING = {
+    KafkaError.NOT_COORDINATOR,
+    KafkaError.COORDINATOR_LOAD_IN_PROGRESS,
+    KafkaError.COORDINATOR_NOT_AVAILABLE,
+}
 
 COMPOSE = Path(__file__).resolve().parents[2] / "deploy" / "compose.yaml"
 PROJECT = "chatbot-dur"
@@ -130,7 +135,8 @@ async def _run_worker_until(topic: str, dlq: str, commits: int) -> None:
                     try:
                         (tp,) = await consumer.committed([TopicPartition(topic, 0)], timeout=5)
                     except KafkaException as exc:
-                        if not exc.args[0].retriable():
+                        # A fresh broker answers NOT_COORDINATOR while the group coordinator loads.
+                        if not exc.args[0].retriable() and exc.args[0].code() not in _LOADING:
                             raise
                         tp = None
                     if tp is not None and tp.offset >= commits:
