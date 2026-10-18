@@ -181,6 +181,21 @@ async def _events(env: Envelope) -> list[dict]:
         await redis.aclose()
 
 
+async def _wait_until_qdrant_serves() -> None:
+    """The compose healthcheck only opens a TCP port; wait until gRPC answers for the collection."""
+    qdrant = AsyncQdrantClient(url=QDRANT_URL, grpc_port=QDRANT_GRPC, prefer_grpc=True)
+    try:
+        async with asyncio.timeout(60):
+            while True:
+                try:
+                    await qdrant.count(SETTINGS.qdrant_collection, exact=True)
+                    return
+                except Exception:  # noqa: BLE001 — any failure here means "not serving yet"
+                    await asyncio.sleep(0.5)
+    finally:
+        await qdrant.close()
+
+
 def _env(thread: str, text: str) -> Envelope:
     """A chat envelope."""
     return Envelope(message_id=uuid.uuid4(), thread_id=thread, user_id="u", text=text, trace_id="t")
@@ -216,6 +231,7 @@ async def test_a4_qdrant_stopped_then_restarted(topics) -> None:
     finally:
         await redis.aclose()
 
+    await _wait_until_qdrant_serves()
     await _produce(req, after)
     await _run_worker_until(req, dlq, commits=2)
     events = await _events(after)
