@@ -89,3 +89,6 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   off-topic `intents.eval` requests (no in-scope one). The seeds and holdout were written by the same
   agent, so the holdout measures generalisation across phrasings by one author only. Supersedes the
   Task 5 false-positive entry and the 2026-10-17 detector entry above.
+- **A4 live Qdrant outage automated (2026-10-18):** `tests/durability/test_dependency_outage.py` stops
+  the real Qdrant container under the production worker, graph and router; supersedes the "not
+  automated" A4 entries above.
