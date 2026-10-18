@@ -99,7 +99,9 @@ A refund request proposed by the billing node is not applied until the thread ow
 accepted. A new chat on the thread while a refund is pending abandons it (audited as
 `refund_abandoned`); a later `/approve` for it returns 404. A refund is applied at most once per
 originating message: the marker, the `refunds` stream entry and the `refund_applied` audit entry
-are written together or not at all, and the marker never expires. Applying means appending a
+are written together or not at all (arguments and key types are checked before the first write), the
+marker holds the id of its `refunds` entry, a marker without that entry is an error rather than a
+success, and the marker never expires. Applying means appending a
 request to the Redis stream `refunds`; no payment processor is called. Proposals, decisions and
 applications are written to the Redis stream `audit:events`.
 

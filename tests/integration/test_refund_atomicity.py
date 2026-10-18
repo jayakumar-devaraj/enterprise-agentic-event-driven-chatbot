@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 import redis.asyncio as aioredis
 from conftest import REDIS_URL
-from redis.exceptions import ConnectionError
+from redis.exceptions import ConnectionError, ResponseError
 from worker import approval
 
 pytestmark = pytest.mark.integration
@@ -67,4 +67,45 @@ async def test_failed_write_then_retry_records_exactly_once(n: int, after: bool)
         assert await _state(redis, ref) == (True, 1, 1)
         assert await redis.ttl(f"refund_applied:{ref}") == -1
     finally:
+        await redis.aclose()
+
+
+async def _apply_to(redis: Any, marker: str, refunds: str, audit: str) -> int:
+    """Run the production script against disposable keys (never the application's streams)."""
+    args = (approval._flat({"ref_message_id": "r"}), approval._flat({"event": "e"}), 100)
+    return await redis.eval(approval._APPLY, 3, marker, refunds, audit, *args)
+
+
+@pytest.mark.parametrize("bad", [1, 2], ids=["refunds", "audit"])
+async def test_wrong_type_key_fails_before_any_write(bad: int) -> None:
+    """A key of the wrong type makes the script error out with nothing written, then retry works."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    keys = [f"probe:{uuid.uuid4().hex}:{name}" for name in ("marker", "refunds", "audit")]
+    try:
+        await redis.set(keys[bad], "not a stream")
+        with pytest.raises(ResponseError):
+            await _apply_to(redis, *keys)
+        assert await redis.exists(keys[0]) == 0
+        assert await redis.type(keys[3 - bad]) == "none"
+        await redis.delete(keys[bad])
+        assert await _apply_to(redis, *keys) == 1
+        assert await _apply_to(redis, *keys) == 0
+    finally:
+        await redis.delete(*keys)
+        await redis.aclose()
+
+
+async def test_marker_without_its_receipt_is_an_error_not_a_success() -> None:
+    """The marker names its refunds entry; a marker whose entry is missing never reports done."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    keys = [f"probe:{uuid.uuid4().hex}:{name}" for name in ("marker", "refunds", "audit")]
+    try:
+        assert await _apply_to(redis, *keys) == 1
+        receipt = await redis.get(keys[0])
+        assert [entry_id for entry_id, _ in await redis.xrange(keys[1])] == [receipt]
+        await redis.xdel(keys[1], receipt)
+        with pytest.raises(ResponseError):
+            await _apply_to(redis, *keys)
+    finally:
+        await redis.delete(*keys)
         await redis.aclose()

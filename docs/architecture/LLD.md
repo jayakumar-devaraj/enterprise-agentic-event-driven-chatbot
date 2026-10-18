@@ -114,9 +114,12 @@ sequenceDiagram
   W->>R: DEL pending; XADD tokens + DoneEvent on new stream
 ```
 
-The refund decision is made by a deterministic rule, not by model output, so an injected prompt
-cannot trigger or approve it. The apply step is one Lua script (`SET NX` marker, XADD `refunds`,
-XADD `audit:events`) that Redis runs atomically, so a redelivered approval never applies twice and a
+cannot trigger or approve it. The apply step is one Lua script that Redis runs in isolation. Redis
+does not roll back a script on a runtime error, so the script decodes its arguments and checks that
+`refunds` and `audit:events` are streams (or absent) before its first write. Then it appends to
+`refunds`, appends to `audit:events`, and finally sets the marker to the `refunds` entry id. A
+redelivered approval finds the marker and its entry and returns "already applied". A marker whose
+entry is missing raises an error instead. The marker never expires.
 failed write never leaves a marker without its refund record. The marker never expires.
 
 ## 5 · LangGraph state machine
@@ -156,7 +159,7 @@ the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this 
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |
 | `thread_owner:{thread_id}` | String (user) | gateway | none (outlives checkpoints, which refresh on read) | Access binding |
 | `pending_approval:{thread_id}:{message_id}` | String (user) | worker | `APPROVAL_TTL_S` | Approval window |
-| `refund_applied:{message_id}` | String | worker | none | Apply idempotency (written atomically with `refunds` and the audit entry) |
+| `refund_applied:{message_id}` | String (`refunds` entry id) | worker | none | Apply idempotency and receipt (written last by the same script as `refunds` and the audit entry) |
 | `refunds` | Stream | worker | none | The side effect being gated |
 | `audit:events` | Stream | gateway, worker | `MAXLEN ~ 100000` | Durable, queryable runtime audit trail |
 | checkpointer keys | JSON (library-managed) | worker | `CHECKPOINT_TTL_MIN` | Conversation memory per `thread_id` |
