@@ -90,6 +90,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.
 
 - Config: every key and default is in `.env.example`; settings come from the environment.
+- HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
+  https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
 - Real inference instead of the mock: `docker compose -f deploy/compose.yaml --profile llm up -d
   --build ollama`, publish its port, set `MOCK_LLM=false` and `LLM_BASE_URL` (not verified in this
   build, see `docs/known_limitations.md`).

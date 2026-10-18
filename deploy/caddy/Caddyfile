@@ -1,0 +1,21 @@
+# TLS + HTTP/2 in front of the stack, certificates from Caddy's internal (self-signed) CA.
+{
+	local_certs
+}
+
+localhost {
+	tls internal
+
+	# Gateway replicas, discovered via Docker DNS so `--scale gateway=N` is load-balanced.
+	handle_path /api/* {
+		reverse_proxy {
+			dynamic a gateway 8000
+			lb_policy round_robin
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy frontend:5173
+	}
+}

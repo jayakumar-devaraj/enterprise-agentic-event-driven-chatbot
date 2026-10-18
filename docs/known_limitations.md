@@ -46,3 +46,6 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
   user's own, already scrubbed text) at the start of its reply. Harmless for privacy, poor UX; a
   larger model or stripping echoed delimiters in the output guard would fix it.
+- **TLS (Tier 3, done 19:06):** Caddy now serves https://localhost:8443 with an internal CA. Basic
+  credentials are still cleartext on the direct dev ports (gateway 8000–8003, Vite 5173), which remain
+  published on 127.0.0.1 for development; browsers must trust Caddy's local CA or accept the warning.
