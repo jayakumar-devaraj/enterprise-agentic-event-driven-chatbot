@@ -1,5 +1,6 @@
 """FastAPI gateway: auth, input guardrails L1–L3, idempotent enqueue (SPEC.md §2–§4)."""
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -73,8 +74,10 @@ async def current_user(
     creds: Annotated[HTTPBasicCredentials | None, Depends(_basic)],
     deps: Annotated[Deps, Depends(_deps)],
 ) -> str:
-    """401 unless the Basic credentials match AUTH_USERS."""
-    if creds is None or not auth.verify(deps.users, creds.username, creds.password):
+    """401 unless the Basic credentials match AUTH_USERS; scrypt (~150 ms) runs off the loop."""
+    if creds is None or not await asyncio.to_thread(
+        auth.verify, deps.users, creds.username, creds.password
+    ):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "invalid credentials", {"WWW-Authenticate": "Basic"}
         )

@@ -106,7 +106,7 @@ flowchart TB
   compose network.
 - No PyTorch in any image (fastembed uses ONNX Runtime).
 - Single node for Kafka and Redis; no Kubernetes; the design must not block either.
-- CPU-bound work (Presidio, embeddings) runs off the event loop.
+- CPU-bound work (Presidio, embeddings, scrypt password checks) runs off the event loop.
 - Kafka offsets are committed only after a durable outcome (stream event or DLQ record).
 - User text never enters a system prompt; it travels in a delimited data field.
 

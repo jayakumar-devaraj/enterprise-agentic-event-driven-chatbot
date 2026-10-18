@@ -208,8 +208,9 @@ Streams over SSE.
 **Invariants a well-meaning change breaks** — each is here because the plausible cleanup silently
 destroys it:
 
-- **CPU-bound scrubbing and embedding run off the event loop (`asyncio.to_thread`).** Inlining them
-  "for simplicity" blocks every concurrent request on that replica.
+- **CPU-bound scrubbing, embedding and password hashing run off the event loop
+  (`asyncio.to_thread`).** Inlining them "for simplicity" blocks every concurrent request on that
+  replica.
 - **User text never enters the system prompt; it sits in the delimited `<user_message>` field.**
   Interpolating it into the system prompt reads cleaner and is exactly the injection vector A7 guards.
 - **The refund action is decided by a deterministic rule and applied only after `POST /approve`.**
