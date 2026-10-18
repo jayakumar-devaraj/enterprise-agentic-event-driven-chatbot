@@ -88,12 +88,15 @@ export function parseFrames(buffer: string): { frames: { id?: string; data: stri
 /**
  * Stream one message's events. On a dropped connection it resumes once with Last-Event-ID
  * (the server guarantees no gaps or duplicates); duplicate or out-of-order seq values are ignored.
+ * A seq 0 after progress means the worker restarted a crashed attempt (SPEC §6): `onRestart`
+ * discards the partial output and the new attempt is delivered from the start.
  */
 export async function streamMessage(
   fetchImpl: Fetch,
   auth: string,
   streamUrl: string,
   onEvent: (e: StreamEvent) => void,
+  onRestart: () => void = () => {},
 ): Promise<void> {
   let lastId: string | undefined;
   let nextSeq = 0;
@@ -115,6 +118,10 @@ export async function streamMessage(
         for (const frame of frames) {
           const event = JSON.parse(frame.data) as StreamEvent;
           lastId = frame.id ?? lastId;
+          if (event.seq === 0 && nextSeq > 0) {
+            nextSeq = 0;
+            onRestart();
+          }
           if (event.seq !== nextSeq) continue;
           nextSeq += 1;
           onEvent(event);

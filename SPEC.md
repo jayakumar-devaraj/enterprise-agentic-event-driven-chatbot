@@ -58,6 +58,12 @@ from config. SSE `id:` is the Redis entry id; the payload carries `seq`. Read fr
 `Last-Event-ID` (exclusive) when sent. Close after `done`, `error` or `approval_required`. A client
 disconnect stops the relay without error logs.
 
+Redelivery after a worker crash advances the conversation by one turn at most. A stream that already
+ends in a terminal event is kept unchanged and only the outcome is recorded. A reply already
+checkpointed is re-sent from the checkpoint, not regenerated. A partial attempt (tokens, no
+terminal event) is replaced: the new attempt starts again at `seq` 0, so a client that sees `seq` 0
+after later events discards what it has shown for that message.
+
 ## 7 · Failure path
 
 Infra fault (Qdrant / LLM / Redis) → bounded retries with backoff → `ErrorEvent{code:
@@ -85,7 +91,9 @@ output is scrubbed before it is checkpointed, streamed, logged or traced.
 ## 10 · Human approval gate
 
 A refund request proposed by the billing node is not applied until the thread owner approves it via
-`POST /approve`. Pending approvals expire after `APPROVAL_TTL_S`. A refund is applied at most once per
+`POST /approve`. Pending approvals expire after `APPROVAL_TTL_S`, checked when `/approve` is
+accepted. A new chat on the thread while a refund is pending abandons it (audited as
+`refund_abandoned`); a later `/approve` for it returns 404. A refund is applied at most once per
 originating message: the marker, the `refunds` stream entry and the `refund_applied` audit entry
 are written together or not at all, and the marker never expires. Applying means appending a
 request to the Redis stream `refunds`; no payment processor is called. Proposals, decisions and

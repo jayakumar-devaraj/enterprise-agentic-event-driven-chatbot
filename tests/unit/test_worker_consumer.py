@@ -163,3 +163,29 @@ async def test_no_retry_after_tokens_were_streamed() -> None:
     w, _, dlq, _ = _worker(partial)
     await w.handle(FakeMsg(_env().model_dump_json().encode()))
     assert len(attempts) == 1 and dlq.records[0]["reason"] == "dependency_unavailable"
+
+
+async def test_redelivery_after_streamed_done_keeps_stream_and_skips_processing() -> None:
+    """`done` was written but the worker died before marking dedupe: no rerun, stream kept."""
+    calls = []
+    w, consumer, dlq, redis = _worker(lambda e, wr: calls.append(e))
+    env = _env()
+    await _ok(env, StreamWriter(redis, "t1", env.message_id, maxlen=100, ttl_s=60))
+    before = list(redis.streams[f"tokens:t1:{env.message_id}"])
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    assert calls == [] and dlq.records == [] and len(consumer.commits) == 1
+    assert redis.streams[f"tokens:t1:{env.message_id}"] == before
+    assert await redis.get(f"dedupe:{env.message_id}") == "done"
+
+
+async def test_redelivery_after_streamed_dependency_error_still_reaches_dlq() -> None:
+    """The ErrorEvent was written but the DLQ record was not: write it, release, commit."""
+    calls = []
+    w, consumer, dlq, redis = _worker(lambda e, wr: calls.append(e))
+    env = _env()
+    writer = StreamWriter(redis, "t1", env.message_id, maxlen=100, ttl_s=60)
+    await writer.error("dependency_unavailable", "a dependency is unavailable; try again")
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    assert calls == [] and dlq.records[0]["reason"] == "dependency_unavailable"
+    assert await redis.get(f"dedupe:{env.message_id}") is None
+    assert len(consumer.commits) == 1

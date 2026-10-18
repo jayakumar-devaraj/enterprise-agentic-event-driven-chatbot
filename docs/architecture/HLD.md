@@ -121,7 +121,7 @@ flowchart TB
 | Burst on one thread | Redis counter | Rejected | 429 |
 | Malformed envelope in Kafka | Pydantic on consume | DLQ immediately, commit, no retry | — |
 | Qdrant / LLM / Redis fault in worker | Exception class + timeout | Bounded retries with backoff → `ErrorEvent{dependency_unavailable}` + DLQ → commit | SSE `error` event, stream closes |
-| Worker crash mid-message | Lease `processing` never reaches `done` | Offset uncommitted; lease expires; redelivered and reprocessed | Delayed answer, no duplicate `done` |
+| Worker crash mid-message | Lease `processing` never reaches `done` | Offset uncommitted; lease expires; redelivered. Terminal event already streamed ⇒ outcome recorded, stream kept; reply already checkpointed ⇒ re-sent; otherwise rerun from `seq` 0 | Delayed answer, one history turn, no duplicate `done` |
 | Duplicate delivery / repeated POST | Gateway `accepted`/`delivered` keys / worker `done` key | Same 202 body; worker skips and commits | One stream, one `done` |
 | Gateway interrupted between claim and broker ack | `delivered:{id}` absent | Client retries the same body (the React client does once); gateway produces again; worker dedupes | 202 only for acknowledged work |
 | Prompt injection | Injection-collection similarity ≥ threshold | Refusal node; flagged in span + log | Refusal text |
