@@ -5,8 +5,15 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 
 from worker.llm import SYSTEM_PROMPTS
 
-_BOUNDARY = re.compile(r"[.!?\n]\s*$")
+# A sentence ends at punctuation followed by whitespace, or at a newline: a dot inside "jane.doe",
+# "212.555" or "192.168" is not an end, so a streamed entity is never flushed in fragments. The
+# chunk is cut after the last such end; text after it waits for more deltas.
+_BOUNDARY = re.compile(r"[.!?]\s|\n")
 _MAX_CHUNK = 200
+_HARD_MAX = 1000
+# A forced cut falls only between two complete lowercase words, which no supported entity (digits,
+# capitalised names and places, emails, IPs) straddles.
+_SAFE_CUT = re.compile(r"(?<=[a-z]) (?=[a-z]+[\s,;:])")
 _MAX_OPEN_ECHO = 2000  # keep buffering while an echoed delimiter block is still open
 # Small models sometimes repeat the delimited prompt fields; drop them (and stray tags) from output.
 _ECHO_BLOCK = re.compile(r"<(user_message|history)>.*?</\1>", re.DOTALL)
@@ -14,6 +21,14 @@ _STRAY_TAG = re.compile(r"</?(user_message|history)>")
 _OPEN_ECHO = re.compile(r"<(user_message|history)>(?![\s\S]*</\1>)")
 _ECHO_PROBES = tuple(p[:40] for p in SYSTEM_PROMPTS.values())
 REDACTED = "[redacted]"
+
+
+def _forced_cut(buffer: str) -> int:
+    """Where to cut an over-long chunk: the last safe space; 0 means keep buffering."""
+    cuts = [m.start() for m in _SAFE_CUT.finditer(buffer)]
+    if cuts:
+        return cuts[-1]
+    return len(buffer) if len(buffer) >= _HARD_MAX else 0
 
 
 async def guarded_tokens(
@@ -47,10 +62,18 @@ async def guarded_tokens(
         buffer += delta
         if _OPEN_ECHO.search(buffer) and len(buffer) < _MAX_OPEN_ECHO:
             continue
-        if _BOUNDARY.search(buffer) or len(buffer) >= _MAX_CHUNK:
-            async for token in drain(buffer):
+        buffer = _ECHO_BLOCK.sub("", buffer)  # never cut inside an echoed block
+        ends = [m.end() for m in _BOUNDARY.finditer(buffer)]
+        if ends:
+            cut = ends[-1]
+        elif len(buffer) >= _MAX_CHUNK:
+            cut = _forced_cut(buffer)
+        else:
+            continue
+        if cut:
+            async for token in drain(buffer[:cut]):
                 yield token
-            buffer = ""
+            buffer = buffer[cut:]
             if done:
                 return
     if buffer.strip():

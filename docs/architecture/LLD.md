@@ -196,12 +196,15 @@ system prompt is byte-identical to the baseline and that injected text appears o
 
 ## 10 · Output guard and streaming
 
-The worker buffers model tokens until a sentence boundary (or 200 chars), runs the scrubber on that
-chunk off-loop, checks for a system-prompt echo, then XADDs the chunk's tokens. Echoed
-`<user_message>` / `<history>` blocks and stray delimiter tags are removed first; while such a block
-is still open the guard keeps buffering (up to 2000 chars) so a half-echoed block is never streamed. This trades a little
-time-to-first-token for the guarantee that unscrubbed output never reaches the stream, checkpoint,
-logs or traces. An entity split across a chunk boundary is a known residual risk.
+The worker buffers model deltas and cuts after the last sentence end, meaning `.`/`!`/`?` followed
+by whitespace, or a newline. A dot inside `jane.doe` or `192.168` is not a sentence end. Past 200
+chars without one, it cuts only at a space between two complete lowercase words, or at 1000 chars.
+Each chunk is scrubbed off-loop and checked for a system-prompt echo, then its tokens are XADDed.
+Echoed `<user_message>` / `<history>` blocks and stray delimiter tags are removed first, and cuts
+never fall inside an echoed block; while such a block is still open the guard keeps buffering (up
+to 2000 chars). This trades a little time-to-first-token for the guarantee that unscrubbed output
+never reaches the stream, checkpoint, logs or traces. Residual risk: an entity spanning a cut made
+at the 1000-char hard limit, or a lowercase multi-word entity at a forced cut.
 
 ## 11 · React chat window
 
