@@ -9,7 +9,7 @@ chat window. Refunds are never issued automatically: the customer must approve e
 request is traceable end to end (Jaeger locally, LangFuse Cloud for AI-level traces), and key
 actions are written to a durable audit log.
 
-**Evidence.** 66 unit tests, 19 integration tests against the real message broker, database and
+**Evidence.** 67 unit tests, 19 integration tests against the real message broker, database and
 vector store, and 5 front-end tests, all passing locally and in GitHub Actions; plus a scale test
 (2 gateways + 2 workers), a real local-LLM round trip, and HTTPS through a reverse proxy. 88 % code
 coverage (`docs/reports/coverage.txt`). The whole stack starts with one command. Measured PII recall 100 % on a small, easy
@@ -25,6 +25,7 @@ independently, at the cost of more moving parts (Kafka, Redis, Qdrant) than a si
    (median) with the test engine; the likely bottleneck (CPU-capped privacy scrubbing) is untested.
 2. Improve the injection detector (one legitimate refund question was flagged) and test PII
    detection on harder, real-world text before setting an accuracy target.
-3. Use a larger language model: the 1B model works but repeats the user's question in its reply.
+3. Re-check reply quality with the local model (an echo of the user's question is now filtered,
+   not yet re-tested against the model).
 4. Add a deployment target (image registry, production hosting) and close the remaining plain-HTTP
    development ports.
