@@ -84,6 +84,7 @@ Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this 
 | echo fix | code: output guard drops echoed delimiter blocks; tests: 1 unit | fix-model-echo | see PR |
 | final consistency | docs: coverage re-measured at `c3b4f0f` (88 %, 86 passed), summary figures, PR-number mapping below | final-consistency | #29 |
 | remove open risk | docs: CLAUDE.md §9 open-risk block deleted (lead approved, after the 20:30 stop); resolved by `tests/integration/test_spike_checkpointer.py`, PR #7 | remove-open-risk | see PR |
+| docs refresh (post-deadline) | docs: README project description; stale claims fixed in summary, HLD, LLD, ADR 0006/0007, master_plan, a11 report, limitations | docs-refresh | see PR |
 
 PR numbers for rows above that were written as "see PR" (appended, not edited, to keep this log
 append-only): 12 verification → #21 · 15 A10 scale → #22 · 13 A9 real Ollama → #23 · T3 Caddy TLS →
@@ -93,3 +94,10 @@ Addendum (19:22–20:30): review follow-up per the lead — latency investigated
 AIOProducer 1 s buffer; one fix attempt broke delivery and was reverted before commit, PR #27), the
 1B-model echo filtered in the output guard (PR #28); A4 live-Qdrant-stop automation, Caddy-only port
 exposure, and the injection false-positive decision remain open (`docs/known_limitations.md`).
+
+Addendum (after the 20:30 stop, lead-requested): corrections to the narrative header above. The
+build ran 10:20–20:17 CDT in Claude Code session `25d36d33-a0a9-4fd7-aea8-768129e95968`
+(model `claude-opus-5-5`); PRs #19 and #20 came from a second session whose ID was not recorded, so
+"single agent throughout, one session, 10:20–17:40" is superseded. The 87 % coverage figure in the
+QA paragraph was measured at PR #18; the current report is 88 % at `c3b4f0f` (PR #29). Remove open
+risk → #30. Work after 20:30 is outside the challenge snapshot `399e970`.

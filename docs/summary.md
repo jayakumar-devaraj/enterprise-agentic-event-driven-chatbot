@@ -22,7 +22,9 @@ independently, at the cost of more moving parts (Kafka, Redis, Qdrant) than a si
 
 **Remaining work, in priority order.**
 1. Set latency targets: under 20 concurrent users the first word of a reply takes about 4.4 s
-   (median) with the test engine; the likely bottleneck (CPU-capped privacy scrubbing) is untested.
+   (median) with the test engine. Measured cause: the workers run at their CPU limit, and the
+   message-queue client holds each request for up to 1 s; the next experiments are listed, no fix is
+   shipped yet.
 2. Improve the injection detector (one legitimate refund question was flagged) and test PII
    detection on harder, real-world text before setting an accuracy target.
 3. Re-check reply quality with the local model (an echo of the user's question is now filtered,

@@ -168,7 +168,7 @@ reserve under Phase 2.5 item 5.
 | APPROVAL_TTL_S | 3600 |
 | OTEL_EXPORTER_OTLP_ENDPOINT | http://jaeger:4317 |
 | LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY | labeled placeholders (real values only in `.env`) |
-| LANGFUSE_BASE_URL | https://us.cloud.langfuse.com (VERIFY: name read by langfuse 5.0.2) |
+| LANGFUSE_BASE_URL | https://us.cloud.langfuse.com (verified: ingestion observed, `docs/reports/e2e-observability.md`) |
 | LOG_LEVEL / HF_HUB_OFFLINE | INFO / 1 |
 
 ## Decisions at Gate B

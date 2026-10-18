@@ -19,10 +19,12 @@ not count.
   calibrated with leave-one-out (ADR 0004); a hit routes to a refusal node and is flagged in logs and
   spans, never silently dropped. The refund decision is a deterministic rule, not model output.
 - **L5 Output:** Presidio scrub of model output per sentence chunk, `LLM_MAX_TOKENS` cap,
-  system-prompt echo check, before anything is checkpointed, streamed, logged or traced.
+  system-prompt echo check and removal of echoed `<user_message>` / `<history>` blocks, before
+  anything is checkpointed, streamed, logged or traced.
 - llm-guard rejected (PyTorch, Python < 3.13).
 
 ## Consequences
 - Ownership is bound to the authenticated principal, so guessing a `thread_id` yields 403, not data.
 - Embedding-based injection detection is heuristic; structural separation is the primary defence.
-- Without TLS (cut), Basic credentials are exposed on the wire; documented in known limitations.
+- Basic credentials are protected on the wire only through the Caddy TLS entry point (:8443); the
+  direct dev ports are plain HTTP (documented in known limitations).

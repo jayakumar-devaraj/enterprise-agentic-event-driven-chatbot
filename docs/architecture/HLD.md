@@ -94,11 +94,11 @@ flowchart TB
 | Browser stream reader | `fetch` + `ReadableStream` SSE parser | `EventSource` | Must send the Basic `Authorization` header and `Last-Event-ID`; `EventSource` cannot set headers | A small hand-written SSE parser to test (A8) |
 | Worker → Qdrant transport | gRPC (:6334, `prefer_grpc`) | REST (:6333) | Lead choice; lower per-query overhead, typed protobuf | Deviation from the brief's REST (ADR 0006); REST stays for healthchecks and the seed |
 | Token transport | Redis Stream per message + SSE | WebSocket / Kafka per token | Replayable from 0 or `Last-Event-ID`; any gateway replica can serve | Redis memory per message (bounded by MAXLEN + TTL) — ADR 0005 |
-| Conversation memory | LangGraph checkpointer on Redis | Postgres checkpointer | One stateful store; Redis already required | Depends on spike (a); fallback Postgres — ADR 0002 |
-| Kafka client | confluent-kafka (librdkafka) | aiokafka | Brief-mandated; mature, fast | Async API surface must be verified — ADR 0003 |
+| Conversation memory | LangGraph checkpointer on Redis | Postgres checkpointer | One stateful store; Redis already required | Spike (a) passed on Redis 8.10.2, so the Postgres fallback was not needed — ADR 0002 |
+| Kafka client | confluent-kafka (librdkafka) | aiokafka | Brief-mandated; mature, fast | Async producer has no per-message headers, so trace context rides in the envelope (spike b) — ADR 0003 |
 | PII model | spaCy `en_core_web_lg` | `sm` / `md` | Better PERSON/LOCATION recall (lead choice) | 382 MB wheel; higher scrub latency, measured in A1b |
 | LLM traces | LangFuse Cloud | Self-hosted LangFuse | No extra containers (lead choice) | Scrubbed text leaves the machine — ADR 0006 |
-| Access control | HTTP Basic + owner binding in Redis | OAuth/OIDC | Minimal, no external IdP | Cleartext credentials without TLS (Tier 3 cut) — ADR 0007 |
+| Access control | HTTP Basic + owner binding in Redis | OAuth/OIDC | Minimal, no external IdP | TLS only through Caddy (:8443); the direct dev ports carry credentials in cleartext — ADR 0007 |
 
 ## 5 · Constraints
 
@@ -142,4 +142,5 @@ flowchart TB
 
 Five layers, detailed in ADR 0007: L1 authentication, ownership and schema/size validation; L2
 per-thread rate limit; L3 Presidio scrub before Kafka; L4 prompt-injection defence (structural
-separation + embedding detection); L5 output scrub, token cap and system-prompt echo check.
+separation + embedding detection); L5 output scrub, token cap, system-prompt echo check and removal of echoed `<user_message>` /
+`<history>` blocks.
