@@ -13,7 +13,7 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `chat_common.logjson` | stdlib `logging` JSON formatter carrying `trace_id`, `thread_id`, `message_id` |
 | `chat_common.audit` | `audit:events` writer and reader |
 | `gateway.app` | FastAPI app, routes, exception → status mapping |
-| `gateway.auth` | HTTP Basic verification (scrypt), thread ownership |
+| `gateway.auth` | HTTP Basic verification (scrypt, called via `asyncio.to_thread`), thread ownership |
 | `gateway.ratelimit` | Per-thread fixed-window counter |
 | `gateway.producer` | confluent-kafka asyncio producer wrapper |
 | `gateway.sse` | Redis stream → SSE relay |

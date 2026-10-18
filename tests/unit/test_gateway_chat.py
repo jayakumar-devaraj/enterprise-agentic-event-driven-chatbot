@@ -1,6 +1,7 @@
 """POST /chat status matrix (SPEC.md §2) with Redis and Kafka test doubles; real scrubber."""
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from uuid import uuid4
 
@@ -197,3 +198,26 @@ def test_parse_users_rejects_malformed() -> None:
     with pytest.raises(ValueError):
         auth.parse_users("REPLACE_ME_user:scrypt-hash")
     assert auth.parse_users(f"alice:{USERS['alice']}") == {"alice": USERS["alice"]}
+
+
+async def test_password_check_does_not_stall_the_event_loop(h) -> None:
+    """scrypt (~150 ms) runs off the loop, so other requests keep being served meanwhile."""
+    _, client = h
+    gaps: list[float] = []
+    stop = asyncio.Event()
+
+    async def ticker() -> None:
+        last = time.perf_counter()
+        while not stop.is_set():
+            await asyncio.sleep(0.005)
+            now = time.perf_counter()
+            gaps.append(now - last)
+            last = now
+
+    task = asyncio.create_task(ticker())
+    await asyncio.sleep(0.02)
+    r = await client.post("/chat", json=body(), auth=("alice", "wrong"))
+    stop.set()
+    await task
+    assert r.status_code == 401
+    assert max(gaps) < 0.08
