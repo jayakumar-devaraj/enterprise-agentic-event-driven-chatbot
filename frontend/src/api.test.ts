@@ -1,5 +1,5 @@
 // Uncertain-delivery retries reuse the original message_id, so the gateway can deduplicate them.
-import { postApprove, postChat } from "./api";
+import { postApprove, postChat, streamMessage, type StreamEvent } from "./api";
 
 const ACCEPTED = JSON.stringify({ message_id: "m1", thread_id: "t1", stream_url: "/stream/t1/m1" });
 
@@ -36,4 +36,30 @@ test("caller errors are not retried", async () => {
   const { fetchImpl, bodies } = scripted([422]);
   await expect(postChat(fetchImpl, "Basic x", "t1", "hello")).rejects.toMatchObject({ status: 422 });
   expect(bodies).toHaveLength(1);
+});
+
+test("a stream restarted at seq 0 discards the partial attempt", async () => {
+  const events = [
+    { type: "token", seq: 0, token: "half" },
+    { type: "token", seq: 1, token: "way" },
+    { type: "token", seq: 0, token: "full" },
+    { type: "token", seq: 1, token: "answer" },
+    { type: "done", seq: 2 },
+  ];
+  const body = events.map((e, i) => `id: ${i + 1}-0\ndata: ${JSON.stringify(e)}\n\n`).join("");
+  const fetchImpl = (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+  const seen: string[] = [];
+  let restarts = 0;
+  await streamMessage(
+    fetchImpl,
+    "Basic x",
+    "/stream/t1/m1",
+    (e: StreamEvent) => seen.push(e.type === "token" ? e.token : e.type),
+    () => {
+      restarts += 1;
+      seen.length = 0;
+    },
+  );
+  expect(restarts).toBe(1);
+  expect(seen).toEqual(["full", "answer", "done"]);
 });

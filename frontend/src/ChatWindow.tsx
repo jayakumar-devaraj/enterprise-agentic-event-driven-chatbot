@@ -54,7 +54,7 @@ export function ChatWindow({ auth, fetchImpl = fetch }: { auth: string; fetchImp
           appendToken(event.detail);
           setStatus("awaiting_approval");
         }
-      });
+      }, () => setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", text: "" }]));
     } catch (err) {
       setError(describe(err));
       setStatus("error");

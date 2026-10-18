@@ -69,4 +69,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   concurrent repeats may produce twice (the worker dedupes) and so may audit `chat_accepted` twice.
   A retried `/approve` after the worker consumed the decision gets 404, not the original 202.
   Refund marker, request and audit entry are one atomic Lua script with a non-expiring marker (P1);
-  the three keys must share a hash slot before any move to Redis Cluster.
+  the three keys must share a hash slot before any move to Redis Cluster. Redelivery after a crash
+  no longer duplicates the history turn or deletes a finished stream (P1); a new chat during a
+  pending refund now clears it and audits `refund_abandoned` (supersedes the Task 10 entry). These
+  crashes are simulated in-process (`tests/integration/test_replay_recovery.py`), not by killing a
+  worker container. A crash after the interrupt checkpoint may audit `refund_proposed` twice.

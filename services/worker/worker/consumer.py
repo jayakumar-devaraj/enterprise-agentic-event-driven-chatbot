@@ -136,7 +136,19 @@ class Worker:
             maxlen=self._s.stream_maxlen,
             ttl_s=self._s.stream_ttl_s,
         )
-        await writer.reset()
+        last = await writer.last_event()
+        if last is not None and last["type"] != "token":
+            # An earlier attempt wrote its terminal event and died before recording the outcome:
+            # keep the stream the client may be reading and finish the bookkeeping only.
+            log.info("terminal event already streamed; recording outcome", extra=ctx)
+            if last.get("code") == "dependency_unavailable":
+                await self._to_dlq(msg, "dependency_unavailable", "recovered after restart", env)
+                await self._redis.delete(f"dedupe:{env.message_id}")
+            else:
+                await self._redis.set(f"dedupe:{env.message_id}", "done", ex=self._s.dedupe_ttl_s)
+            await self._commit(msg)
+            return
+        await writer.reset()  # partial attempt: the retry restarts the stream at seq 0 (SPEC §6)
         error = await self._run_with_retries(env, writer, ctx)
         if error is None:
             try:

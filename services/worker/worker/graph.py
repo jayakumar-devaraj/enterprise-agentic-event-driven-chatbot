@@ -32,6 +32,7 @@ class ChatState(TypedDict, total=False):
     turns: Annotated[list[Turn], operator.add]
     pending: str  # scrubbed user text of the turn being answered (overwritten each turn)
     message_id: str
+    answered: str  # message_id whose reply is the last assistant turn (replay idempotency)
     user_id: str
     intent: str
     route_score: float
@@ -117,7 +118,8 @@ def build_graph(
             "turns": [
                 {"role": "user", "text": state["pending"]},
                 {"role": "assistant", "text": reply},
-            ]
+            ],
+            "answered": state["message_id"],
         }
 
     def await_approval(state: ChatState) -> dict[str, Any]:
@@ -150,7 +152,8 @@ def build_graph(
             "turns": [
                 {"role": "user", "text": state["pending"]},
                 {"role": "assistant", "text": reply},
-            ]
+            ],
+            "answered": decision["message_id"],
         }
 
     builder = StateGraph(ChatState)
@@ -181,13 +184,23 @@ def make_processor(
             await _process(env, writer)
 
     async def _process(env: Envelope, writer: StreamWriter) -> None:
+        """Advance the thread by this envelope once, however often it is delivered."""
         config = {"configurable": {"thread_id": env.thread_id}}
+        mid = str(env.message_id)
         token = current_writer.set(writer)
         try:
-            if env.kind == "approval":
+            snapshot = await compiled.aget_state(config)
+            values = snapshot.values
+            paused = values.get("message_id") if "await_approval" in snapshot.next else None
+            if values.get("answered") == mid and not snapshot.next:
+                # An earlier attempt checkpointed this reply, then died before `done`: re-send it.
+                if env.kind == "approval":
+                    await redis.delete(approval.pending_key(env.thread_id, str(env.ref_message_id)))
+                for part in values["turns"][-1]["text"].split(" "):
+                    await writer.token(part)
+            elif env.kind == "approval":
                 ref = str(env.ref_message_id)
-                snapshot = await compiled.aget_state(config)
-                if not snapshot.next or snapshot.values.get("message_id") != ref:
+                if paused != ref:
                     await writer.error("approval_not_pending", "no refund is awaiting approval")
                     return
                 await compiled.ainvoke(
@@ -196,22 +209,31 @@ def make_processor(
                             "approved": env.approved,
                             "user_id": env.user_id,
                             "thread_id": env.thread_id,
+                            "message_id": mid,
                         }
                     ),
                     config,
                 )
                 await redis.delete(approval.pending_key(env.thread_id, ref))
             else:
-                result = await compiled.ainvoke(
-                    {
-                        "pending": env.text,
-                        "message_id": str(env.message_id),
-                        "user_id": env.user_id,
-                    },
-                    config,
-                )
-                if result.get("__interrupt__"):
-                    mid = str(env.message_id)
+                if paused is not None and paused != mid:
+                    # A new chat supersedes the paused refund; /approve on it now gets 404.
+                    await redis.delete(approval.pending_key(env.thread_id, paused))
+                    await AuditLog(redis).record(
+                        "refund_abandoned",
+                        actor=env.user_id,
+                        thread_id=env.thread_id,
+                        message_id=paused,
+                        superseded_by=mid,
+                    )
+                if paused == mid:  # paused by an earlier attempt that died before announcing it
+                    interrupted = True
+                else:
+                    result = await compiled.ainvoke(
+                        {"pending": env.text, "message_id": mid, "user_id": env.user_id}, config
+                    )
+                    interrupted = bool(result.get("__interrupt__"))
+                if interrupted:
                     await redis.set(
                         approval.pending_key(env.thread_id, mid), env.user_id, ex=approval_ttl_s
                     )

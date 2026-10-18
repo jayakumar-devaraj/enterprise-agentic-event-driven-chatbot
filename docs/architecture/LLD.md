@@ -120,22 +120,25 @@ failed write never leaves a marker without its refund record. The marker never e
 stateDiagram-v2
   [*] --> route
   route --> refuse: injection score ≥ INJECTION_THRESHOLD
+  route --> await_approval: intent=billing and "refund" in text
   route --> billing: intent=billing
   route --> tech_support: intent=tech_support
   route --> general: score < ROUTE_THRESHOLD or intent=general
-  billing --> await_approval: refund requested
-  await_approval --> apply_refund: approved
-  await_approval --> respond: rejected
-  apply_refund --> respond
-  billing --> respond
-  tech_support --> respond
-  general --> respond
-  refuse --> respond
-  respond --> [*]
+  await_approval --> settle_refund: resumed by POST /approve (apply or reject)
+  billing --> [*]
+  tech_support --> [*]
+  general --> [*]
+  refuse --> [*]
+  settle_refund --> [*]
 ```
 
-State (`TypedDict`): `thread_id`, `message_id`, `user_id`, `turns: list[{role, text}]` (scrubbed),
-`intent`, `route_score`, `injection_score`, `refund: {status, ref_message_id} | None`.
+`billing`, `tech_support`, `general` and `refuse` all run `respond` (stream through the output
+guard, append the user+assistant pair). State (`ChatState`, `worker/graph.py`): `turns:
+list[{role, text}]` (scrubbed, appended), `pending` (scrubbed text of the current turn),
+`message_id`, `user_id`, `intent`, `route_score`, `injection_score`, `decision` (approval resume
+payload), `answered` (message_id whose reply is the last turn). Before invoking, the processor reads
+the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this message ⇒ re-announce
+`approval_required`; paused on another message and a chat arrives ⇒ abandon it (`refund_abandoned`).
 
 ## 6 · Redis key schema
 

@@ -1,5 +1,6 @@
 """Per-message Redis Stream writer (ADR 0005): seq from 0, bounded, expiring."""
 
+import json
 from typing import Any
 from uuid import UUID
 
@@ -24,6 +25,11 @@ class StreamWriter:
         self._maxlen = maxlen
         self._ttl_s = ttl_s
         self.seq = 0
+
+    async def last_event(self) -> dict[str, Any] | None:
+        """The newest event already in the stream, if any (left by an earlier attempt)."""
+        rows = await self._redis.xrevrange(self.key, count=1)
+        return json.loads(rows[0][1]["data"]) if rows else None
 
     async def reset(self) -> None:
         """Drop events from an attempt that never finished (lease expired after a crash)."""
