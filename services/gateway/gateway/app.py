@@ -80,10 +80,13 @@ async def current_user(
 
 
 async def bind_owner(deps: Deps, thread_id: str, user: str) -> None:
-    """First caller owns the thread; anyone else gets 403 (SPEC.md §3)."""
+    """First caller owns the thread; anyone else gets 403 (SPEC.md §3).
+
+    The binding never expires: checkpoints refresh their TTL on read, so any finite owner TTL could
+    lapse while the thread's history survives and hand it to the next caller.
+    """
     key = auth.owner_key(thread_id)
-    ttl = deps.settings.checkpoint_ttl_min * 60
-    await deps.redis.set(key, user, nx=True, ex=ttl)
+    await deps.redis.set(key, user, nx=True)
     if await deps.redis.get(key) != user:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "thread belongs to another user")
 
