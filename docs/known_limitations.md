@@ -101,3 +101,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   phone or IP streamed in pieces reached the client unscrubbed, and the 200-char forced flush could
   split a card number. Sentence ends now need trailing whitespace and forced cuts fall between
   lowercase words (`tests/unit/test_llm_guards.py`). Residual risk is described in LLD §10.
+- **Harder PII set measured (2026-10-18):** `tests/fixtures/pii_hard.jsonl` (30 sentences, all seven
+  entity types; written by the agent) recalls 33/38 (86.8 %): IP, phone and SSN 100 %, card 3/4,
+  email 4/5, location 6/7, person 8/10. Misses: obfuscated email and spelled-out card, a lowercase
+  name, a name of common words ("Hope Summers"), "Kraków" (`docs/reports/pii_recall_hard.json`). No
+  recall floor is set; the lead sets one.

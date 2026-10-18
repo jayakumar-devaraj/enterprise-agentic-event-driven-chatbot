@@ -1,0 +1,30 @@
+{"text": "Call me on +44 20 7946 0958 after six.", "entities": [{"type": "PHONE_NUMBER", "value": "+44 20 7946 0958"}]}
+{"text": "My mobile is (415) 555-0132, text first please.", "entities": [{"type": "PHONE_NUMBER", "value": "(415) 555-0132"}]}
+{"text": "Reach the office at 1-800-555-0199 ext 42.", "entities": [{"type": "PHONE_NUMBER", "value": "1-800-555-0199"}]}
+{"text": "you can ring 312.555.0147 any time", "entities": [{"type": "PHONE_NUMBER", "value": "312.555.0147"}]}
+{"text": "Send it to priya.raman+billing@mail.example.co.uk instead.", "entities": [{"type": "EMAIL_ADDRESS", "value": "priya.raman+billing@mail.example.co.uk"}]}
+{"text": "contact: OLIVER_TWIST@EXAMPLE.ORG", "entities": [{"type": "EMAIL_ADDRESS", "value": "OLIVER_TWIST@EXAMPLE.ORG"}]}
+{"text": "my email is jane at example dot com", "entities": [{"type": "EMAIL_ADDRESS", "value": "jane at example dot com"}]}
+{"text": "Charge the card 4111111111111111 again.", "entities": [{"type": "CREDIT_CARD", "value": "4111111111111111"}]}
+{"text": "The Amex ending is 3714-496353-98431, full number on file.", "entities": [{"type": "CREDIT_CARD", "value": "3714-496353-98431"}]}
+{"text": "card number five five five five four four four four three three three three one one one one", "entities": [{"type": "CREDIT_CARD", "value": "five five five five four four four four three three three three one one one one"}]}
+{"text": "SSN 536228726 for the tax form.", "entities": [{"type": "US_SSN", "value": "536228726"}]}
+{"text": "my social is 536 22 8726 if you need it", "entities": [{"type": "US_SSN", "value": "536 22 8726"}]}
+{"text": "The router at 2001:db8:85a3::8a2e:370:7334 keeps dropping.", "entities": [{"type": "IP_ADDRESS", "value": "2001:db8:85a3::8a2e:370:7334"}]}
+{"text": "Blocked from 10.0.0.254 since this morning.", "entities": [{"type": "IP_ADDRESS", "value": "10.0.0.254"}]}
+{"text": "Public IP: 203.0.113.77/24 per the modem page.", "entities": [{"type": "IP_ADDRESS", "value": "203.0.113.77"}]}
+{"text": "this is aisha okonkwo writing about my bill", "entities": [{"type": "PERSON", "value": "aisha okonkwo"}]}
+{"text": "Account holder: Nguyen Van Minh.", "entities": [{"type": "PERSON", "value": "Nguyen Van Minh"}]}
+{"text": "Please ask Siobhan O'Sullivan to call back.", "entities": [{"type": "PERSON", "value": "Siobhan O'Sullivan"}]}
+{"text": "Dr. Rajesh Kumar Iyer approved the change.", "entities": [{"type": "PERSON", "value": "Rajesh Kumar Iyer"}]}
+{"text": "Mark Rose said the bill was wrong.", "entities": [{"type": "PERSON", "value": "Mark Rose"}]}
+{"text": "Hope Summers moved to the annual plan.", "entities": [{"type": "PERSON", "value": "Hope Summers"}]}
+{"text": "Ship the modem to 221B Baker Street, London NW1 6XE.", "entities": [{"type": "LOCATION", "value": "London"}]}
+{"text": "I moved from São Paulo to Kraków last year.", "entities": [{"type": "LOCATION", "value": "São Paulo"}, {"type": "LOCATION", "value": "Kraków"}]}
+{"text": "service is down across north carolina", "entities": [{"type": "LOCATION", "value": "north carolina"}]}
+{"text": "The outage near Springfield started at noon.", "entities": [{"type": "LOCATION", "value": "Springfield"}]}
+{"text": "Ana Lucía Pérez in Medellín reports slow speeds, call +57 604 555 0123.", "entities": [{"type": "PERSON", "value": "Ana Lucía Pérez"}, {"type": "LOCATION", "value": "Medellín"}, {"type": "PHONE_NUMBER", "value": "+57 604 555 0123"}]}
+{"text": "Billing contact is tomás.garcía@example.es, IP 198.51.100.9.", "entities": [{"type": "EMAIL_ADDRESS", "value": "tomás.garcía@example.es"}, {"type": "IP_ADDRESS", "value": "198.51.100.9"}]}
+{"text": "JOHN DOE, 4012 8888 8888 1881, exp 09/29", "entities": [{"type": "PERSON", "value": "JOHN DOE"}, {"type": "CREDIT_CARD", "value": "4012 8888 8888 1881"}]}
+{"text": "my name's kevin and my number's 07700 900123", "entities": [{"type": "PERSON", "value": "kevin"}, {"type": "PHONE_NUMBER", "value": "07700 900123"}]}
+{"text": "Fatima Al-Sayed (fatima.alsayed@example.com) lives in Dubai.", "entities": [{"type": "PERSON", "value": "Fatima Al-Sayed"}, {"type": "EMAIL_ADDRESS", "value": "fatima.alsayed@example.com"}, {"type": "LOCATION", "value": "Dubai"}]}
