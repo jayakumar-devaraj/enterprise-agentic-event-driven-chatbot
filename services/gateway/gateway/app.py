@@ -123,11 +123,12 @@ def request_binding(envelope: Envelope) -> str:
 async def enqueue(deps: Deps, envelope: Envelope, user: str) -> ChatAccepted:
     """Idempotent on message_id; 202 only once the broker has acknowledged the record.
 
-    `accepted:{id}` binds the id to one request (a different request under it is a 422);
-    `delivered:{id}` is set only after the ack. A repeat of a delivered request returns the same
-    202 without producing. A repeat of an undelivered one (earlier send failed, was cancelled, or
-    the process died) produces again; a concurrent repeat may produce twice, which the worker's
-    dedupe on message_id absorbs (SPEC.md §5).
+    `accepted:{id}` and `delivered:{id}` both hold the request binding, so a different request
+    under the id is a 422 for as long as either key lives (DEDUPE_TTL_S). `delivered:{id}` is set
+    only after the ack and the acceptance audit entry. A repeat of a delivered request returns the
+    same 202 without producing. A repeat of an undelivered one (earlier send or audit failed, was
+    cancelled, or the process died) produces again; a concurrent repeat may produce twice, which
+    the worker's dedupe on message_id absorbs (SPEC.md §5).
     """
     accepted = ChatAccepted(
         message_id=envelope.message_id,
@@ -136,23 +137,27 @@ async def enqueue(deps: Deps, envelope: Envelope, user: str) -> ChatAccepted:
     )
     ttl = deps.settings.dedupe_ttl_s
     binding = request_binding(envelope)
+    reused = HTTPException(
+        status.HTTP_422_UNPROCESSABLE_CONTENT, "message_id already used for a different request"
+    )
+    # Checked first: the claim is set before the send, so it expires before the delivered marker.
+    delivered = await deps.redis.get(f"delivered:{envelope.message_id}")
+    if delivered is not None:
+        if delivered != binding:
+            raise reused
+        return accepted
     claim = f"accepted:{envelope.message_id}"
     if not await deps.redis.set(claim, binding, nx=True, ex=ttl):
         if await deps.redis.get(claim) != binding:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
-                "message_id already used for a different request",
-            )
-        if await deps.redis.get(f"delivered:{envelope.message_id}") is not None:
-            return accepted
+            raise reused
     await deps.producer.send(envelope)
-    await deps.redis.set(f"delivered:{envelope.message_id}", "1", ex=ttl)
     await deps.audit.record(
         f"{envelope.kind}_accepted",
         actor=user,
         thread_id=envelope.thread_id,
         message_id=str(envelope.message_id),
     )
+    await deps.redis.set(f"delivered:{envelope.message_id}", binding, ex=ttl)
     return accepted
 
 
@@ -245,9 +250,16 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         user: Annotated[str, Depends(current_user)],
         deps: Annotated[Deps, Depends(_deps)],
     ) -> ChatAccepted:
-        """Owner's decision on a paused refund; 404 when nothing is awaiting approval."""
+        """Owner's decision on a paused refund; 404 when nothing is awaiting approval.
+
+        A retry of an already-delivered decision reaches `enqueue` even after the worker removed
+        the pending key, so it gets the original 202 (or 422 if the request differs).
+        """
         await require_owner(deps, thread_id, user)
-        if await deps.redis.get(f"pending_approval:{thread_id}:{message_id}") is None:
+        if (
+            await deps.redis.get(f"pending_approval:{thread_id}:{message_id}") is None
+            and await deps.redis.get(f"delivered:{body.message_id}") is None
+        ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "no pending approval for this message")
         envelope = Envelope(
             message_id=body.message_id,

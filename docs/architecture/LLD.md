@@ -49,9 +49,11 @@ sequenceDiagram
   G->>R: SET thread_owner NX / GET (403 if other user)
   G->>R: INCR ratelimit:{thread}:{minute} (429)
   G->>G: ascrub(message) in thread pool
-  G->>R: SET accepted:{message_id} thread:digest NX (other request ⇒ 422; delivered:{id} set ⇒ same 202, no produce)
+  G->>R: GET delivered:{message_id} (same digest ⇒ same 202, no produce; other ⇒ 422)
+  G->>R: SET accepted:{message_id} thread:digest NX (other request ⇒ 422)
   G->>K: produce Envelope key=thread_id, wait for ack (503 on failure)
-  G->>R: SET delivered:{message_id}
+  G->>R: XADD audit:events chat_accepted
+  G->>R: SET delivered:{message_id} thread:digest
   G-->>C: 202 ChatAccepted {stream_url}
   C->>G: GET /stream/{thread}/{msg} (Last-Event-ID optional)
   W->>K: poll
@@ -100,7 +102,7 @@ sequenceDiagram
   W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S; audit refund_proposed
   W->>R: XADD ApprovalRequiredEvent ⇒ stream closes
   C->>G: POST /approve/{thread}/{msg} {message_id: new, approved}
-  G->>R: owner check (403), pending exists (404 if expired/unknown)
+  G->>R: owner check (403), pending exists or decision already delivered (404 if neither)
   G->>K: produce Envelope{kind: approval, ref_message_id, approved}
   G-->>C: 202 ChatAccepted {stream_url for new message_id}
   W->>W: resume graph with decision
@@ -150,7 +152,7 @@ the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this 
 | `tokens:{thread_id}:{message_id}` | Stream | worker | `MAXLEN ~ STREAM_MAXLEN`, `EXPIRE STREAM_TTL_S` | Token/done/error/approval events |
 | `dedupe:{message_id}` | String `processing`/`done` | worker | `DEDUPE_LEASE_S` / `DEDUPE_TTL_S` | At-least-once → effectively-once |
 | `accepted:{message_id}` | String (`thread_id:request digest`) | gateway | `DEDUPE_TTL_S` | Binds the id to one request (422 otherwise) |
-| `delivered:{message_id}` | String | gateway | `DEDUPE_TTL_S` | Set after the broker ack; repeat ⇒ same 202, no produce |
+| `delivered:{message_id}` | String (`thread_id:request digest`) | gateway | `DEDUPE_TTL_S` | Set after the broker ack and the acceptance audit; same request ⇒ same 202, no produce; other ⇒ 422 |
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |
 | `thread_owner:{thread_id}` | String (user) | gateway | none (outlives checkpoints, which refresh on read) | Access binding |
 | `pending_approval:{thread_id}:{message_id}` | String (user) | worker | `APPROVAL_TTL_S` | Approval window |
