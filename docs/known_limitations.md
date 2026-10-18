@@ -52,7 +52,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   20 concurrent users) and the async Kafka producer adds up to ~1 s per POST through its default
   1 s Python-side buffer. One fix attempt broke delivery and was reverted; next steps are in
   `docs/reports/a11-latency.md`.
-- **Review items not done before the 20:30 stop:** stripping the 1B model's `<user_message>` echo in
-  the output guard; an automated A4 "Qdrant stopped while running" test; publishing only Caddy by
+- **Review items not done before the 20:30 stop:** an automated A4 "Qdrant stopped while running" test; publishing only Caddy by
   default (moving dev ports 8000–8003 / 5173 to an opt-in override). The injection false positive
   needs a lead decision (the rules forbid tuning the threshold or seed data to pass a case).
+- **Small-model echo — fixed (20:11):** the output guard now drops echoed `<user_message>` /
+  `<history>` blocks before scrubbing (`tests/unit/test_llm_guards.py`); not re-run against Ollama.

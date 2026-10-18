@@ -81,3 +81,4 @@ round trip — which exposed and fixed an SSE relay bug where the gateway's Redi
 own `XREAD BLOCK` (PR #23, regression test `tests/integration/test_stream_slow_first_event.py`) —
 Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this reconciliation.
 | review findings | docs: A11 investigation (worker CPU bottleneck, AIOProducer 1 s buffer; reverted fix attempt) | fix-review-items | see PR |
+| echo fix | code: output guard drops echoed delimiter blocks; tests: 1 unit | fix-model-echo | see PR |

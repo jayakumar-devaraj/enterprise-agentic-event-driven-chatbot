@@ -7,6 +7,11 @@ from worker.llm import SYSTEM_PROMPTS
 
 _BOUNDARY = re.compile(r"[.!?\n]\s*$")
 _MAX_CHUNK = 200
+_MAX_OPEN_ECHO = 2000  # keep buffering while an echoed delimiter block is still open
+# Small models sometimes repeat the delimited prompt fields; drop them (and stray tags) from output.
+_ECHO_BLOCK = re.compile(r"<(user_message|history)>.*?</\1>", re.DOTALL)
+_STRAY_TAG = re.compile(r"</?(user_message|history)>")
+_OPEN_ECHO = re.compile(r"<(user_message|history)>(?![\s\S]*</\1>)")
 _ECHO_PROBES = tuple(p[:40] for p in SYSTEM_PROMPTS.values())
 REDACTED = "[redacted]"
 
@@ -25,7 +30,8 @@ async def guarded_tokens(
 
     async def drain(chunk: str) -> AsyncIterator[str]:
         nonlocal emitted, done
-        clean = await scrub(chunk)
+        chunk = _STRAY_TAG.sub("", _ECHO_BLOCK.sub("", chunk))
+        clean = await scrub(chunk) if chunk.strip() else ""
         if any(probe in clean for probe in _ECHO_PROBES):
             done = True
             yield REDACTED
@@ -39,6 +45,8 @@ async def guarded_tokens(
 
     async for delta in deltas:
         buffer += delta
+        if _OPEN_ECHO.search(buffer) and len(buffer) < _MAX_OPEN_ECHO:
+            continue
         if _BOUNDARY.search(buffer) or len(buffer) >= _MAX_CHUNK:
             async for token in drain(buffer):
                 yield token
