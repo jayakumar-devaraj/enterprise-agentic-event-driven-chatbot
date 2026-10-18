@@ -67,3 +67,4 @@ reran every documented command before merge (PR #18).
 | 12 verification | docs: `docs/reports/e2e-containers.md` (containerized e2e verified after the fact) | task-12-verification | see PR |
 | 15 A10 scale | tests: tests/load/test_scale_a10.py (marker `scale`); docs: docs/reports/a10-scale.md | task-15-scale-a10 | see PR |
 | 13 A9 real Ollama | code: gateway Redis socket timeout fix + regression test, Ollama Dockerfile PID fix, worker MOCK_LLM env; tests: tests/load/test_ollama_a9.py (marker `llm`); docs: a9 report | task-13-ollama-a9 | see PR |
+| T3 Caddy TLS | config: deploy/caddy/Caddyfile, compose caddy service; docs: tier3 report | tier3-caddy-tls | see PR |

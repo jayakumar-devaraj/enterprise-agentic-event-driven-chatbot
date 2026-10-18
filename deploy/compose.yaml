@@ -176,3 +176,18 @@ services:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-5173}:5173"
     mem_limit: 512m
     restart: unless-stopped
+
+  # Tier 3: HTTPS (HTTP/2) entry point. https://localhost:8443 — trust Caddy's internal CA or use -k.
+  caddy:
+    image: caddy:2.11.7
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${HTTPS_HOST_PORT:-8443}:443"
+    mem_limit: 256m
+    restart: unless-stopped
