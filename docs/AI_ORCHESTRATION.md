@@ -83,6 +83,7 @@ Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this 
 | review findings | docs: A11 investigation (worker CPU bottleneck, AIOProducer 1 s buffer; reverted fix attempt) | fix-review-items | see PR |
 | echo fix | code: output guard drops echoed delimiter blocks; tests: 1 unit | fix-model-echo | see PR |
 | final consistency | docs: coverage re-measured at `c3b4f0f` (88 %, 86 passed), summary figures, PR-number mapping below | final-consistency | #29 |
+| remove open risk | docs: CLAUDE.md §9 open-risk block deleted (lead approved, after the 20:30 stop); resolved by `tests/integration/test_spike_checkpointer.py`, PR #7 | remove-open-risk | see PR |
 
 PR numbers for rows above that were written as "see PR" (appended, not edited, to keep this log
 append-only): 12 verification → #21 · 15 A10 scale → #22 · 13 A9 real Ollama → #23 · T3 Caddy TLS →

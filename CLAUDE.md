@@ -236,8 +236,3 @@ code is right and the document is the bug.
 (writes a `>=` floor at the resolved version), `uv lock`; `uv.lock` holds the exact pins. Keep the
 lockfile committed; never hand-edit it. The `dev` dependency group (pytest, ruff, DeepEval) must
 never enter a runtime image: DeepEval ships telemetry and test tooling has no place in production.
-
-**Open risk** — *delete this block in the same commit that resolves it; a resolved risk left standing
-here is misinformation.* `langgraph-checkpoint-redis` 0.5.2 has not yet been shown to write and read
-a checkpoint on `redis:8.10.2` (spike a, Task 4). If it fails, the checkpointer moves to Postgres per
-the pre-declared fallback, adding a stateful service.
