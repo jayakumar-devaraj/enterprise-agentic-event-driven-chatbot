@@ -135,7 +135,8 @@ flowchart TB
   Per-thread order is preserved by keying on `thread_id`. Changing partition count remaps keys and is
   an ADR decision, never a runtime tweak.
 - Redis: single node now; streams are bounded (`STREAM_MAXLEN`, `STREAM_TTL_S`), checkpoints expire
-  (`CHECKPOINT_TTL_MIN`). Next step is Redis Cluster with hash-tagged keys per thread.
+  (`CHECKPOINT_TTL_MIN`); `thread_owner:*` keys never expire (one short string per thread ever
+  opened). Next step is Redis Cluster with hash-tagged keys per thread.
 - Inference: swap Ollama for vLLM on GPU behind the same OpenAI-compatible URL.
 
 ## 8 · Security and guardrails

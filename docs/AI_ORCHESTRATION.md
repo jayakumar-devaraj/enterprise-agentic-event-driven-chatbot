@@ -104,3 +104,11 @@ build ran 10:20–20:17 CDT in Claude Code session `25d36d33-a0a9-4fd7-aea8-7681
 "single agent throughout, one session, 10:20–17:40" is superseded. The 87 % coverage figure in the
 QA paragraph was measured at PR #18; the current report is 88 % at `c3b4f0f` (PR #29). Remove open
 risk → #30. Work after 20:30 is outside the challenge snapshot `399e970`.
+
+Addendum (audit remediation, from 2026-10-17 22:00 CDT): fixes for
+`docs/reports/project-audit-2026-10-17.md` in Claude Code session
+`9d3720f9-c703-48da-98b6-8e84e2261304` (model `claude-opus-5-5`), worked in a separate git worktree
+after a first attempt shared the main checkout with the concurrent demo-script session and one of
+that session's commits landed on this session's branch (discarded unpushed; the demo work was
+re-committed as PR #35). One PR per finding, each with a test that failed before the fix:
+ownership lifetime → this PR.

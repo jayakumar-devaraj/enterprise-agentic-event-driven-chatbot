@@ -107,6 +107,20 @@ async def test_foreign_thread_403(h) -> None:
     assert len(harness.producer.sent) == 1
 
 
+async def test_ownership_outlives_every_expiring_key(h) -> None:
+    """After every key with a TTL has expired, the thread still belongs to its first user.
+
+    Checkpoints refresh their TTL on read, so an expiring owner key could lapse while the history
+    survives and let another user claim it.
+    """
+    harness, client = h
+    assert (await client.post("/chat", json=body("t8"), auth=ALICE)).status_code == 202
+    for key in list(harness.redis.expiry):
+        harness.redis.expiry[key] = 0
+    assert (await client.post("/chat", json=body("t8"), auth=BOB)).status_code == 403
+    assert (await client.post("/chat", json=body("t8"), auth=ALICE)).status_code == 202
+
+
 async def test_oversize_413_and_invalid_422(h) -> None:
     """Too long ⇒ 413; bad thread_id or missing field ⇒ 422."""
     _, client = h

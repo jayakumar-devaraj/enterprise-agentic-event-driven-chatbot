@@ -35,7 +35,7 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 
 The first authenticated `POST /chat` on a `thread_id` binds it to that user
 (`thread_owner:{thread_id}`); every later chat, stream or approve call on that thread by another
-user returns 403.
+user returns 403. The binding never expires, so it outlives every piece of thread data.
 
 ## 4 · Kafka
 

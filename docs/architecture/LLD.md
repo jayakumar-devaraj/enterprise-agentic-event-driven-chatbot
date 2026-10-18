@@ -143,7 +143,7 @@ State (`TypedDict`): `thread_id`, `message_id`, `user_id`, `turns: list[{role, t
 | `dedupe:{message_id}` | String `processing`/`done` | worker | `DEDUPE_LEASE_S` / `DEDUPE_TTL_S` | At-least-once → effectively-once |
 | `accepted:{message_id}` | String (thread_id) | gateway | `DEDUPE_TTL_S` | Idempotent 202 |
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |
-| `thread_owner:{thread_id}` | String (user) | gateway | `CHECKPOINT_TTL_MIN` | Access binding |
+| `thread_owner:{thread_id}` | String (user) | gateway | none (outlives checkpoints, which refresh on read) | Access binding |
 | `pending_approval:{thread_id}:{message_id}` | String (user) | worker | `APPROVAL_TTL_S` | Approval window |
 | `refund_applied:{message_id}` | String | worker | `DEDUPE_TTL_S` | Apply idempotency |
 | `refunds` | Stream | worker | none | The side effect being gated |
