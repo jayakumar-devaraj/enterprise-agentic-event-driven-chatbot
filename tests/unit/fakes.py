@@ -103,5 +103,10 @@ class RecordingProducer:
             raise DependencyUnavailable("fake kafka outage")
         self.sent.append(envelope)
 
+    async def ready(self) -> None:
+        """Ready unless an outage is simulated."""
+        if self.fail:
+            raise DependencyUnavailable("fake kafka outage")
+
     async def close(self) -> None:
         """No-op close."""

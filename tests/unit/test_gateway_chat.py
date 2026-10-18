@@ -184,13 +184,22 @@ async def test_kafka_down_503_and_retry_produces(h) -> None:
     assert len(harness.producer.sent) == 1
 
 
-async def test_redis_down_503_and_healthz(h) -> None:
-    """Redis outage ⇒ 503 on chat and healthz; healthz is 200 otherwise."""
+async def test_redis_down_503_on_chat_and_readyz_while_healthz_stays_live(h) -> None:
+    """Redis outage ⇒ 503 on chat and readyz; healthz is liveness only and stays 200."""
     harness, client = h
-    assert (await client.get("/healthz")).status_code == 200
+    assert (await client.get("/readyz")).status_code == 200
     harness.redis.fail = True
     assert (await client.post("/chat", json=body(), auth=ALICE)).status_code == 503
-    assert (await client.get("/healthz")).status_code == 503
+    assert (await client.get("/readyz")).status_code == 503
+    assert (await client.get("/healthz")).status_code == 200
+
+
+async def test_kafka_down_readyz_503(h) -> None:
+    """Broker unreachable ⇒ not ready, even though Redis answers."""
+    harness, client = h
+    harness.producer.fail = True
+    r = await client.get("/readyz")
+    assert r.status_code == 503 and r.json() == {"detail": "dependency unavailable"}
 
 
 def test_parse_users_rejects_malformed() -> None:

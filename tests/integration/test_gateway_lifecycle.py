@@ -14,7 +14,7 @@ from confluent_kafka.aio import AIOConsumer
 from conftest import KAFKA, REDIS_URL
 from gateway import auth
 from gateway.app import Deps, create_app, request_binding
-from gateway.producer import KafkaEnvelopeProducer
+from gateway.producer import DependencyUnavailable, KafkaEnvelopeProducer
 
 pytestmark = pytest.mark.integration
 
@@ -115,3 +115,14 @@ async def test_claim_left_by_a_crash_is_recovered_by_the_retry(client) -> None:
     assert (await client.post("/chat", json=body, auth=ALICE)).status_code == 202
     assert (await client.post("/chat", json=body, auth=ALICE)).status_code == 202
     assert await _count_records(body["message_id"]) == 1
+
+
+async def test_readyz_checks_the_real_broker_and_topic(client) -> None:
+    """Ready against the compose broker; not ready when the request topic does not exist."""
+    assert (await client.get("/readyz")).status_code == 200
+    missing = KafkaEnvelopeProducer(KAFKA, f"missing-{uuid.uuid4().hex[:8]}", timeout_s=3)
+    try:
+        with pytest.raises(DependencyUnavailable):
+            await missing.ready()
+    finally:
+        await missing.close()

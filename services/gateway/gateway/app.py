@@ -181,7 +181,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         await deps.redis.aclose()
 
     app = FastAPI(title="chat-gateway", lifespan=lifespan)
-    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz")
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=Settings().cors_origin_list,
@@ -200,10 +200,16 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         return JSONResponse({"detail": "dependency unavailable"}, status_code=503)
 
     @app.get("/healthz")
-    async def healthz(deps: Annotated[Deps, Depends(_deps)]) -> dict[str, str]:
-        """200 when Redis answers; RedisError maps to 503."""
-        await deps.redis.ping()
+    async def healthz() -> dict[str, str]:
+        """Liveness: 200 while the process serves requests; never checks dependencies."""
         return {"status": "ok"}
+
+    @app.get("/readyz")
+    async def readyz(deps: Annotated[Deps, Depends(_deps)]) -> dict[str, str]:
+        """Readiness: Redis answers and the Kafka request topic is reachable, else 503."""
+        await deps.redis.ping()
+        await deps.producer.ready()
+        return {"status": "ready"}
 
     async def stream_access(
         thread_id: Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
