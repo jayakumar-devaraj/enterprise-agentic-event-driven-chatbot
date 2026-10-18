@@ -1,0 +1,15 @@
+{
+  "requests": 200,
+  "concurrency": 20,
+  "gateways": 2,
+  "engine": "mock",
+  "wall_s": 47.62,
+  "post_ms": {
+    "p50": 3544.5,
+    "p95": 4822.4
+  },
+  "ttft_ms": {
+    "p50": 4442.6,
+    "p95": 6807.0
+  }
+}
