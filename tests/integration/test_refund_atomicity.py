@@ -8,6 +8,7 @@ import redis.asyncio as aioredis
 from conftest import REDIS_URL
 from redis.exceptions import ConnectionError, ResponseError
 from worker import approval
+from worker.lease import Lease, LeaseLost
 
 pytestmark = pytest.mark.integration
 
@@ -56,7 +57,9 @@ async def test_failed_write_then_retry_records_exactly_once(n: int, after: bool)
     """Fail the Nth write, retry like the worker does, and require one complete record set."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     ref, thread = str(uuid.uuid4()), f"rf-{uuid.uuid4().hex[:8]}"
-    kwargs = {"thread_id": thread, "ref_message_id": ref, "user_id": "alice"}
+    lease = Lease(f"dedupe:rf-{uuid.uuid4()}")
+    await redis.set(lease.key, lease.token, ex=60)
+    kwargs = {"thread_id": thread, "ref_message_id": ref, "user_id": "alice", "lease": lease}
     try:
         try:
             await approval.apply_refund(FailNthWrite(redis, n, after), **kwargs)
@@ -72,8 +75,10 @@ async def test_failed_write_then_retry_records_exactly_once(n: int, after: bool)
 
 async def _apply_to(redis: Any, marker: str, refunds: str, audit: str) -> int:
     """Run the production script against disposable keys (never the application's streams)."""
+    lease = Lease(f"{marker}:lease")
+    await redis.set(lease.key, lease.token, ex=60)
     args = (approval._flat({"ref_message_id": "r"}), approval._flat({"event": "e"}), 100)
-    return await redis.eval(approval._APPLY, 3, marker, refunds, audit, *args)
+    return await lease.run(redis, approval._APPLY, [marker, refunds, audit], list(args))
 
 
 @pytest.mark.parametrize("bad", [1, 2], ids=["refunds", "audit"])
@@ -91,7 +96,7 @@ async def test_wrong_type_key_fails_before_any_write(bad: int) -> None:
         assert await _apply_to(redis, *keys) == 1
         assert await _apply_to(redis, *keys) == 0
     finally:
-        await redis.delete(*keys)
+        await redis.delete(*keys, f"{keys[0]}:lease")
         await redis.aclose()
 
 
@@ -107,5 +112,23 @@ async def test_marker_without_its_receipt_is_an_error_not_a_success() -> None:
         with pytest.raises(ResponseError):
             await _apply_to(redis, *keys)
     finally:
-        await redis.delete(*keys)
+        await redis.delete(*keys, f"{keys[0]}:lease")
+        await redis.aclose()
+
+
+async def test_worker_that_lost_its_lease_cannot_apply() -> None:
+    """Another attempt holds the dedupe lease: the script fails before any write (ADR 0009)."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    ref, thread = str(uuid.uuid4()), f"rf-{uuid.uuid4().hex[:8]}"
+    stale, owner = Lease(f"dedupe:rf-{uuid.uuid4()}"), "processing:another-attempt"
+    try:
+        await redis.set(stale.key, owner, ex=60)
+        with pytest.raises(LeaseLost):
+            await approval.apply_refund(
+                redis, thread_id=thread, ref_message_id=ref, user_id="alice", lease=stale
+            )
+        assert await _state(redis, ref) == (False, 0, 0)
+        assert await redis.get(stale.key) == owner
+    finally:
+        await redis.delete(stale.key)
         await redis.aclose()

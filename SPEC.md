@@ -47,10 +47,18 @@ committed manually and only after the outcome is durable (stream event written, 
 
 ## 5 · Worker idempotency
 
-`SET dedupe:{message_id} processing NX EX DEDUPE_LEASE_S`. On success set `done` with `DEDUPE_TTL_S`.
-On terminal failure delete the key. `done` ⇒ skip and commit; `processing` ⇒ do not commit; the lease
-expires and the message is redelivered. Settings validation fails startup unless
+`SET dedupe:{message_id} processing:<token> NX EX DEDUPE_LEASE_S`, with a token unique to each
+attempt. On success set `done` with `DEDUPE_TTL_S`. On terminal failure delete the key. `done` ⇒ skip
+and commit; `processing:*` ⇒ do not commit; the lease expires and the message is redelivered.
+Settings validation fails startup unless
 `DEDUPE_LEASE_S > INFERENCE_TIMEOUT_S × (MAX_RETRIES + 1) + RETRY_BACKOFF_MAX_S × MAX_RETRIES`.
+
+Writes under the lease are fenced (ADR 0009). Token-stream appends and resets, `done`, release and
+the refund apply each check the token in the same Lua script, and fail before writing unless the
+lease still holds it. The DLQ produce is preceded by a lease check. A failed check stops the worker
+process without committing, so a worker that stalled past its lease cannot change the stream,
+lease or refund records of the attempt that took over. Checkpoint, `pending_approval:*` and audit
+writes are not fenced atomically (ADR 0009, Consequences).
 
 ## 6 · Token stream
 

@@ -57,14 +57,14 @@ sequenceDiagram
   G-->>C: 202 ChatAccepted {stream_url}
   C->>G: GET /stream/{thread}/{msg} (Last-Event-ID optional)
   W->>K: poll
-  W->>R: SET dedupe:{message_id} processing NX EX lease
+  W->>R: SET dedupe:{message_id} processing:<token> NX EX lease
   W->>Q: embed(query prefix) → gRPC search injection_patterns, benign_patterns, intents
   W->>L: chat.completions (system fixed, user text in delimited field)
   loop sentence-buffered chunks
     W->>W: L5 scrub chunk
     W->>R: XADD tokens:{thread}:{msg} TokenEvent{seq}
   end
-  W->>R: checkpoint (scrubbed turn), XADD DoneEvent, SET dedupe done EX ttl
+  W->>R: checkpoint (scrubbed turn), fenced XADD DoneEvent, fenced SET dedupe done EX ttl
   W->>K: commit offset
   G->>R: XREAD BLOCK from 0 / Last-Event-ID
   G-->>C: SSE id=<entry id> data={seq, token} … event done ⇒ close
@@ -83,7 +83,7 @@ sequenceDiagram
   W->>W: retry ≤ MAX_RETRIES, backoff ≤ RETRY_BACKOFF_MAX_S
   W->>R: XADD ErrorEvent{code: dependency_unavailable}
   W->>K: produce record to chat-requests.dlq
-  W->>R: DEL dedupe:{message_id}
+  W->>R: fenced DEL dedupe:{message_id}
   W->>K: commit offset
   Note over W,K: Malformed envelope: DLQ + commit immediately, no retry
 ```
@@ -153,7 +153,7 @@ the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this 
 | Key | Type | Written by | TTL / bound | Purpose |
 |---|---|---|---|---|
 | `tokens:{thread_id}:{message_id}` | Stream | worker | `MAXLEN ~ STREAM_MAXLEN`, `EXPIRE STREAM_TTL_S` | Token/done/error/approval events |
-| `dedupe:{message_id}` | String `processing`/`done` | worker | `DEDUPE_LEASE_S` / `DEDUPE_TTL_S` | At-least-once → effectively-once |
+| `dedupe:{message_id}` | String `processing:<token>`/`done` | worker | `DEDUPE_LEASE_S` / `DEDUPE_TTL_S` | At-least-once → effectively-once. Stream, `done`/release and refund writes check the token in the same script (ADR 0009) |
 | `accepted:{message_id}` | String (`thread_id:request digest`) | gateway | `DEDUPE_TTL_S` | Binds the id to one request (422 otherwise) |
 | `delivered:{message_id}` | String (`thread_id:request digest`) | gateway | `DEDUPE_TTL_S` | Set after the broker ack and the acceptance audit; same request ⇒ same 202, no produce; other ⇒ 422 |
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |

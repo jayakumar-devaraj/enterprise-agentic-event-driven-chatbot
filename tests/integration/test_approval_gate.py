@@ -11,6 +11,7 @@ from conftest import REDIS_URL
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
 from worker.graph import build_graph, make_processor
+from worker.lease import Lease
 from worker.llm import MockEngine
 from worker.router import Route
 from worker.streams import StreamWriter
@@ -28,7 +29,9 @@ class _Billing:
 
 async def _process(redis, env: Envelope) -> list[dict]:
     """Run one envelope through the compiled graph; return that message's stream events."""
-    writer = StreamWriter(redis, env.thread_id, env.message_id, maxlen=100, ttl_s=120)
+    lease = Lease(f"dedupe:{env.message_id}")
+    await redis.set(lease.key, lease.token, ex=120)
+    writer = StreamWriter(redis, env.thread_id, env.message_id, lease=lease, maxlen=100, ttl_s=120)
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(_Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis)

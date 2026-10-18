@@ -5,6 +5,7 @@ Real Redis checkpointer, streams, dedupe and audit; the production graph with th
 is the same record handled again once the dedupe lease has expired.
 """
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
@@ -20,6 +21,7 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
 from worker.consumer import Worker
 from worker.graph import build_graph, make_processor
+from worker.lease import LeaseLost
 from worker.llm import MockEngine
 from worker.router import Route
 from worker.streams import StreamWriter
@@ -233,3 +235,41 @@ async def test_chat_while_approval_pending_abandons_it(stack) -> None:
     assert await redis.get(approval.pending_key(thread, str(ask.message_id))) is None
     audit = [f for _, f in await redis.xrange("audit:events") if f["thread_id"] == thread]
     assert [f["event"] for f in audit] == ["refund_proposed", "refund_abandoned"]
+
+
+async def test_stale_worker_cannot_write_after_another_took_over(stack, monkeypatch) -> None:
+    """A stalls past its lease, B redoes and finishes the message, then A resumes (ADR 0009).
+
+    A must stop without committing and leave B's stream, turn and `done` marker as B left them.
+    """
+    redis, worker_b, consumer_b, graph, saver = stack
+    consumer_a = Consumer()
+    worker_a = Worker(
+        SETTINGS, consumer=consumer_a, dlq_producer=NoDLQ(), redis=redis, process=worker_b._process
+    )
+    env = _chat(f"rp-{uuid.uuid4().hex[:8]}", "Why is my bill higher?")
+    stalled, resume = asyncio.Event(), asyncio.Event()
+    original = StreamWriter.reset
+
+    async def stall_first_reset(self: StreamWriter) -> None:
+        await original(self)
+        if not stalled.is_set():
+            stalled.set()
+            await resume.wait()  # outside asyncio.timeout, like a frozen process
+
+    monkeypatch.setattr(StreamWriter, "reset", stall_first_reset)
+    task_a = asyncio.create_task(worker_a.handle(Msg(env)))
+    await stalled.wait()
+    await asyncio.sleep(SETTINGS.dedupe_lease_s + 0.5)
+    await worker_b.handle(Msg(env))
+    finished = await _events(redis, env)
+
+    resume.set()
+    with pytest.raises(LeaseLost):
+        await task_a
+    assert await _events(redis, env) == finished
+    assert [e["seq"] for _, e in finished] == list(range(len(finished)))
+    assert finished[-1][1]["type"] == "done"
+    assert len(await _turns(saver, graph, env.thread_id)) == 2
+    assert await redis.get(f"dedupe:{env.message_id}") == "done"
+    assert (consumer_a.commits, consumer_b.commits) == (0, 1)

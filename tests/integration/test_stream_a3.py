@@ -14,6 +14,7 @@ from gateway import auth
 from gateway.app import Deps, create_app
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker.graph import build_graph, make_processor
+from worker.lease import Lease
 from worker.llm import MockEngine
 from worker.router import Route
 from worker.streams import StreamWriter
@@ -62,7 +63,9 @@ async def _run_turn(thread: str, text: str) -> uuid.UUID:
     env = Envelope(
         message_id=uuid.uuid4(), thread_id=thread, user_id="alice", text=text, trace_id="t"
     )
-    writer = StreamWriter(redis, thread, env.message_id, maxlen=100, ttl_s=120)
+    lease = Lease(f"dedupe:{env.message_id}")
+    await redis.set(lease.key, lease.token, ex=120)
+    writer = StreamWriter(redis, thread, env.message_id, lease=lease, maxlen=100, ttl_s=120)
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(_Router(), MockEngine(), get_scrubber().ascrub, 256)

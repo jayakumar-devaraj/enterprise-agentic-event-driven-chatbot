@@ -13,6 +13,7 @@ from chat_common.settings import Settings
 from pydantic import ValidationError
 from redis.exceptions import RedisError
 
+from worker.lease import Lease, LeaseLost
 from worker.streams import StreamWriter
 
 log = logging.getLogger("worker.consumer")
@@ -61,8 +62,8 @@ class Worker:
         """Poll until `stop` is set.
 
         Anything that prevents a durable outcome (Redis down while taking the lease, DLQ write
-        failing) propagates and stops the process without committing, so the record is redelivered
-        after restart instead of being skipped.
+        failing, the dedupe lease lost to another attempt) propagates and stops the process without
+        committing, so the record is redelivered after restart instead of being skipped.
         """
         await self._consumer.subscribe([topic])
         while not stop.is_set():
@@ -72,7 +73,11 @@ class Worker:
             if msg.error():
                 log.warning("kafka poll error", extra={"error": str(msg.error())})
                 continue
-            await self.handle(msg)
+            try:
+                await self.handle(msg)
+            except LeaseLost as exc:
+                log.error("dedupe lease lost; stopping without commit", extra={"lease": str(exc)})
+                raise
 
     async def _commit(self, msg: _Message) -> None:
         """Synchronous commit of this record's offset."""
@@ -94,19 +99,20 @@ class Worker:
         )
         await delivery
 
-    async def _acquire_lease(self, env: Envelope) -> bool:
-        """True when this worker owns the message; False when it is already done.
+    async def _acquire_lease(self, env: Envelope) -> Lease | None:
+        """This attempt's lease when it owns the message; None when the message is already done.
 
-        A live `processing` lease means a previous holder may still finish or has crashed: wait
-        (blocking this partition, preserving per-thread order) until it turns `done` or expires.
+        A live `processing:<token>` lease means a previous holder may still finish or has crashed:
+        wait (blocking this partition, preserving per-thread order) until it turns `done` or
+        expires. Writes made under the lease are fenced by its token (ADR 0009).
         """
-        key = f"dedupe:{env.message_id}"
+        lease = Lease(f"dedupe:{env.message_id}")
         while True:
-            if await self._redis.set(key, "processing", nx=True, ex=self._s.dedupe_lease_s):
-                return True
-            state = await self._redis.get(key)
+            if await self._redis.set(lease.key, lease.token, nx=True, ex=self._s.dedupe_lease_s):
+                return lease
+            state = await self._redis.get(lease.key)
             if state == "done":
-                return False
+                return None
             await asyncio.sleep(1.0)
 
     async def handle(self, msg: _Message) -> None:
@@ -124,7 +130,8 @@ class Worker:
             "message_id": str(env.message_id),
             "trace_id": env.trace_id,
         }
-        if not await self._acquire_lease(env):
+        lease = await self._acquire_lease(env)
+        if lease is None:
             log.info("duplicate delivery skipped", extra=ctx)
             await self._commit(msg)
             return
@@ -133,6 +140,7 @@ class Worker:
             self._redis,
             env.thread_id,
             env.message_id,
+            lease=lease,
             maxlen=self._s.stream_maxlen,
             ttl_s=self._s.stream_ttl_s,
         )
@@ -142,17 +150,18 @@ class Worker:
             # keep the stream the client may be reading and finish the bookkeeping only.
             log.info("terminal event already streamed; recording outcome", extra=ctx)
             if last.get("code") == "dependency_unavailable":
+                await lease.check(self._redis)
                 await self._to_dlq(msg, "dependency_unavailable", "recovered after restart", env)
-                await self._redis.delete(f"dedupe:{env.message_id}")
+                await lease.release(self._redis)
             else:
-                await self._redis.set(f"dedupe:{env.message_id}", "done", ex=self._s.dedupe_ttl_s)
+                await lease.done(self._redis, self._s.dedupe_ttl_s)
             await self._commit(msg)
             return
         await writer.reset()  # partial attempt: the retry restarts the stream at seq 0 (SPEC §6)
         error = await self._run_with_retries(env, writer, ctx)
         if error is None:
             try:
-                await self._redis.set(f"dedupe:{env.message_id}", "done", ex=self._s.dedupe_ttl_s)
+                await lease.done(self._redis, self._s.dedupe_ttl_s)
             except RedisError:
                 # The DoneEvent is already durable; the lease simply expires.
                 log.error("could not mark message done", extra=ctx)
@@ -163,9 +172,10 @@ class Worker:
             await writer.error("dependency_unavailable", "a dependency is unavailable; try again")
         except RedisError:
             log.error("could not write ErrorEvent", extra=ctx)
+        await lease.check(self._redis)
         await self._to_dlq(msg, "dependency_unavailable", error, env)
         try:
-            await self._redis.delete(f"dedupe:{env.message_id}")
+            await lease.release(self._redis)
         except RedisError:
             log.error("could not release dedupe lease; it will expire", extra=ctx)
         await self._commit(msg)

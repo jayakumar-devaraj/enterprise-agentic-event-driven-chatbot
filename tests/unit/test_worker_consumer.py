@@ -8,6 +8,7 @@ from chat_common.schemas import Envelope
 from chat_common.settings import Settings
 from fakes import FakeRedis
 from worker.consumer import TransientDependencyError, Worker
+from worker.lease import Lease
 from worker.streams import StreamWriter
 
 SETTINGS = Settings(
@@ -74,6 +75,13 @@ def _worker(process) -> tuple[Worker, FakeConsumer, FakeDLQ, FakeRedis]:
     consumer, dlq, redis = FakeConsumer(), FakeDLQ(), FakeRedis()
     w = Worker(SETTINGS, consumer=consumer, dlq_producer=dlq, redis=redis, process=process)
     return w, consumer, dlq, redis
+
+
+async def _crashed_writer(redis: FakeRedis, env: Envelope) -> StreamWriter:
+    """The writer of an earlier attempt, holding its lease (delete it to model the crash expiry)."""
+    lease = Lease(f"dedupe:{env.message_id}")
+    await redis.set(lease.key, lease.token)
+    return StreamWriter(redis, "t1", env.message_id, lease=lease, maxlen=100, ttl_s=60)
 
 
 async def _ok(env: Envelope, writer: StreamWriter) -> None:
@@ -170,7 +178,9 @@ async def test_redelivery_after_streamed_done_keeps_stream_and_skips_processing(
     calls = []
     w, consumer, dlq, redis = _worker(lambda e, wr: calls.append(e))
     env = _env()
-    await _ok(env, StreamWriter(redis, "t1", env.message_id, maxlen=100, ttl_s=60))
+    writer = await _crashed_writer(redis, env)
+    await _ok(env, writer)
+    await redis.delete(writer.lease.key)
     before = list(redis.streams[f"tokens:t1:{env.message_id}"])
     await w.handle(FakeMsg(env.model_dump_json().encode()))
     assert calls == [] and dlq.records == [] and len(consumer.commits) == 1
@@ -183,8 +193,9 @@ async def test_redelivery_after_streamed_dependency_error_still_reaches_dlq() ->
     calls = []
     w, consumer, dlq, redis = _worker(lambda e, wr: calls.append(e))
     env = _env()
-    writer = StreamWriter(redis, "t1", env.message_id, maxlen=100, ttl_s=60)
+    writer = await _crashed_writer(redis, env)
     await writer.error("dependency_unavailable", "a dependency is unavailable; try again")
+    await redis.delete(writer.lease.key)
     await w.handle(FakeMsg(env.model_dump_json().encode()))
     assert calls == [] and dlq.records[0]["reason"] == "dependency_unavailable"
     assert await redis.get(f"dedupe:{env.message_id}") is None

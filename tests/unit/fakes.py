@@ -5,6 +5,8 @@ from typing import Any
 
 from chat_common.schemas import Envelope
 from gateway.producer import DependencyUnavailable
+from redis.exceptions import ResponseError
+from worker import lease, streams
 
 
 class FakeRedis:
@@ -84,6 +86,23 @@ class FakeRedis:
         """XREVRANGE."""
         self._check()
         return list(reversed(self.streams.get(name, [])))[:count]
+
+    async def eval(self, script: str, numkeys: int, *args: Any) -> Any:
+        """Emulate the worker's fenced scripts (ADR 0009); real Lua runs in integration tests."""
+        self._check()
+        keys, argv = list(args[:numkeys]), list(args[numkeys:])
+        if (self.kv[keys[-1]] if self._live(keys[-1]) else None) != argv[-1]:
+            raise ResponseError(f"LEASE_LOST {keys[-1]}")
+        if script == streams._ADD:
+            entry_id = await self.xadd(keys[0], {"data": argv[1]})
+            await self.expire(keys[0], int(argv[2]))
+            return entry_id
+        if script in (streams._RESET, lease._RELEASE):
+            self.streams.pop(keys[0], None)
+            return await self.delete(keys[0])
+        if script == lease._DONE:
+            return await self.set(keys[0], "done", ex=int(argv[0]))
+        raise NotImplementedError("script not emulated by FakeRedis")
 
     async def aclose(self) -> None:
         """No-op close."""
