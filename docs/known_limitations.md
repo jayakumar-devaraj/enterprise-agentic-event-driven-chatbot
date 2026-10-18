@@ -48,3 +48,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **TLS (Tier 3, done 19:06):** Caddy now serves https://localhost:8443 with an internal CA. Basic
   credentials are still cleartext on the direct dev ports (gateway 8000–8003, Vite 5173), which remain
   published on 127.0.0.1 for development; browsers must trust Caddy's local CA or accept the warning.
+- **Latency (review, 20:07):** worker CPU is the bottleneck (both replicas at their 2-CPU cap under
+  20 concurrent users) and the async Kafka producer adds up to ~1 s per POST through its default
+  1 s Python-side buffer. One fix attempt broke delivery and was reverted; next steps are in
+  `docs/reports/a11-latency.md`.
+- **Review items not done before the 20:30 stop:** stripping the 1B model's `<user_message>` echo in
+  the output guard; an automated A4 "Qdrant stopped while running" test; publishing only Caddy by
+  default (moving dev ports 8000–8003 / 5173 to an opt-in override). The injection false positive
+  needs a lead decision (the rules forbid tuning the threshold or seed data to pass a case).
