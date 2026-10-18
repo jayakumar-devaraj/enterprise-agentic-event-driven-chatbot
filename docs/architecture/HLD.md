@@ -53,19 +53,19 @@ flowchart TB
   end
   subgraph work[Worker replicas - consumer group chat-workers]
     dedupe[Dedupe lease]
-    graph[LangGraph StateGraph]
+    lg[LangGraph StateGraph]
     llm[OpenAI-compatible client / mock]
     outg[Output guardrail L5]
   end
   redis[(Redis 8 :6379<br/>streams, checkpoints, dedupe,<br/>rate limit, owners, audit)]
   qdrant[(Qdrant gRPC :6334, REST :6333<br/>intents, injection_patterns,<br/>benign_patterns)]
   seed[[seed one-shot]]
-  auth --> guard --> prod --> req --> dedupe --> graph --> llm --> outg
+  auth --> guard --> prod --> req --> dedupe --> lg --> llm --> outg
   ui --> auth
   sse -- SSE --> ui
-  graph -- "route (gRPC)" --> qdrant
+  lg -- "route (gRPC)" --> qdrant
   outg -- XADD tokens --> redis
-  graph -- checkpoint --> redis
+  lg -- checkpoint --> redis
   sse -- XREAD --> redis
   appr -- decision --> req
   work -- failures --> dlq
