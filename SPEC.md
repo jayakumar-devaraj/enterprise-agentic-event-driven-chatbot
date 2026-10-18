@@ -75,11 +75,14 @@ immediately, no retry.
 
 Qdrant collection `intents` (384-dim, cosine), seeded by the one-shot `seed` service from
 `data/intents.seed.jsonl` (≥ 10 exemplars per intent); injection exemplars in `injection_patterns`
-from `data/injection.seed.jsonl`. Worker starts only after `seed` completes successfully; both fail
+from `data/injection.seed.jsonl`; benign look-alikes in `benign_patterns` from
+`data/benign.seed.jsonl`. A message is refused as an injection when its top-1 score against
+`injection_patterns` exceeds the nearer of `intents` and `benign_patterns` by ≥ `INJECTION_MARGIN`. Worker starts only after `seed` completes successfully; both fail
 loud if the model or collection is missing. `data/intents.eval.jsonl` (≥ 3 per intent + ≥ 5
 off-topic) is never loaded into Qdrant. Top-1 score < `ROUTE_THRESHOLD` ⇒ `general`.
-`ROUTE_THRESHOLD` is set once by leave-one-out over the seed file (max-accuracy cut), recorded in an
-ADR; changing it requires an ADR update.
+`ROUTE_THRESHOLD` and `INJECTION_MARGIN` are set by leave-one-out over the seed files (max-accuracy
+cut), recorded in ADR 0004; changing either requires an ADR update. `data/guard.holdout.jsonl` and
+`data/guard.eval.jsonl` are never loaded into Qdrant.
 
 ## 9 · Inference and prompts
 

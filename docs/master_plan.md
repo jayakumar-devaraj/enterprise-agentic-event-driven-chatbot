@@ -150,10 +150,10 @@ reserve under Phase 2.5 item 5.
 | REDIS_URL | redis://redis:6379/0 |
 | QDRANT_URL | http://qdrant:6333 (REST: seed, healthcheck) |
 | QDRANT_GRPC_PORT / QDRANT_PREFER_GRPC | 6334 / true (worker search) |
-| QDRANT_COLLECTION / QDRANT_INJECTION_COLLECTION | intents / injection_patterns |
+| QDRANT_COLLECTION / QDRANT_INJECTION_COLLECTION / QDRANT_BENIGN_COLLECTION | intents / injection_patterns / benign_patterns |
 | EMBED_MODEL | BAAI/bge-small-en-v1.5 |
 | SPACY_MODEL | en_core_web_lg |
-| ROUTE_THRESHOLD / INJECTION_THRESHOLD | 0.5821 / 0.6113 (leave-one-out, ADR 0004) |
+| ROUTE_THRESHOLD / INJECTION_MARGIN | 0.5821 / -0.0149 (leave-one-out, ADR 0004) |
 | LLM_BASE_URL | http://ollama:11434/v1 |
 | LLM_MODEL / LLM_MAX_TOKENS | llama3.2:1b / 256 |
 | MOCK_LLM | true (CI/tests) |

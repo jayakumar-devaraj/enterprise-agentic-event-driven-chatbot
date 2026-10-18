@@ -22,9 +22,10 @@ class Settings(BaseSettings):
     qdrant_prefer_grpc: bool = True
     qdrant_collection: str = "intents"
     qdrant_injection_collection: str = "injection_patterns"
+    qdrant_benign_collection: str = "benign_patterns"
     embed_model: str = "BAAI/bge-small-en-v1.5"
     route_threshold: float = 0.5821  # ADR 0004
-    injection_threshold: float = 0.6113  # ADR 0004
+    injection_margin: float = -0.0149  # ADR 0004 addendum 2026-10-18 (LOO-calibrated)
 
     spacy_model: str = "en_core_web_lg"
 

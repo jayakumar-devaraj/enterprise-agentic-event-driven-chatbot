@@ -37,12 +37,30 @@ def route_threshold(
     return _best_threshold(items)
 
 
-def injection_threshold(
-    injection_queries: np.ndarray, injection_passages: np.ndarray, benign_queries: np.ndarray
+def injection_margin(
+    injection_queries: np.ndarray,
+    injection_passages: np.ndarray,
+    benign_queries: np.ndarray,
+    benign_passages: np.ndarray,
 ) -> tuple[float, float]:
-    """Positives: each held-out injection vs the other injections; negatives: benign vs all."""
-    inj_sims = injection_queries @ injection_passages.T
-    np.fill_diagonal(inj_sims, -np.inf)
-    items = [(float(row.max()), True, False) for row in inj_sims]
-    items += [(float(row.max()), False, True) for row in benign_queries @ injection_passages.T]
+    """Hold out each exemplar and score the router's margin (top-1 injection − top-1 benign).
+
+    Positives are injections (accepted ⇒ correct); negatives are benign exemplars, i.e. the
+    intent seeds plus the benign seeds (rejected ⇒ correct). A held-out exemplar never matches
+    itself.
+    """
+    inj_self = injection_queries @ injection_passages.T
+    np.fill_diagonal(inj_self, -np.inf)
+    ben_self = benign_queries @ benign_passages.T
+    np.fill_diagonal(ben_self, -np.inf)
+    inj_vs_ben = injection_queries @ benign_passages.T
+    ben_vs_inj = benign_queries @ injection_passages.T
+    items = [
+        (float(inj_self[i].max() - inj_vs_ben[i].max()), True, False)
+        for i in range(len(injection_queries))
+    ]
+    items += [
+        (float(ben_vs_inj[i].max() - ben_self[i].max()), False, True)
+        for i in range(len(benign_queries))
+    ]
     return _best_threshold(items)

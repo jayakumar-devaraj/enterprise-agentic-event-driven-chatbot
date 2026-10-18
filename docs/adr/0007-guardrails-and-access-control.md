@@ -15,7 +15,8 @@ not count.
 - **L2 Abuse:** Redis fixed-window counter per thread → 429.
 - **L3 PII:** Presidio scrub before Kafka; raw text never leaves the gateway process.
 - **L4 Injection:** structural — fixed system prompt, user text only inside `<user_message>` with
-  delimiters escaped; detection — fastembed similarity against `injection_patterns`, threshold
+  delimiters escaped; detection — contrastive fastembed similarity: top-1 against
+  `injection_patterns` minus the nearer of `intents` and `benign_patterns`, cut `INJECTION_MARGIN`
   calibrated with leave-one-out (ADR 0004); a hit routes to a refusal node and is flagged in logs and
   spans, never silently dropped. The refund decision is a deterministic rule, not model output.
 - **L5 Output:** Presidio scrub of model output per sentence chunk, `LLM_MAX_TOKENS` cap,

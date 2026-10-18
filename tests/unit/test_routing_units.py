@@ -24,6 +24,21 @@ def test_route_threshold_on_toy_vectors() -> None:
     assert acc == 1.0 and 0 < t <= 1.01
 
 
+def test_injection_margin_separates_clusters_and_never_self_matches() -> None:
+    """Two injection and two benign exemplars in separate clusters ⇒ perfect LOO accuracy.
+
+    If a held-out exemplar could match itself every margin would be inflated by 1.0; the chosen
+    cut lies between the two clusters' margins instead.
+    """
+    inj = np.array([[1, 0], [0.98, 0.2]], dtype=float)
+    ben = np.array([[0, 1], [0.2, 0.98]], dtype=float)
+    inj /= np.linalg.norm(inj, axis=1, keepdims=True)
+    ben /= np.linalg.norm(ben, axis=1, keepdims=True)
+    margin, acc = calibrate.injection_margin(inj, inj, ben, ben)
+    assert acc == 1.0
+    assert -0.8 < margin < 0.8
+
+
 @dataclass
 class _Point:
     payload: dict[str, str]
@@ -56,16 +71,23 @@ class FakeEmbedder:
         return [0.0] * 384
 
 
-def _router(intent_hit: _Point | None, inj_score: float) -> Router:
-    """Router over doubles with thresholds 0.6 / 0.7."""
-    qdrant = FakeQdrant({"intents": intent_hit, "inj": _Point({"label": "injection"}, inj_score)})
+def _router(intent_hit: _Point | None, inj_score: float, benign_score: float = 0.0) -> Router:
+    """Router over doubles: route cut 0.6, injection margin cut 0.05."""
+    qdrant = FakeQdrant(
+        {
+            "intents": intent_hit,
+            "inj": _Point({"label": "injection"}, inj_score),
+            "benign": _Point({"label": "benign"}, benign_score),
+        }
+    )
     return Router(
         FakeEmbedder(),  # type: ignore[arg-type]
         qdrant,  # type: ignore[arg-type]
         intents_collection="intents",
         injection_collection="inj",
+        benign_collection="benign",
         route_threshold=0.6,
-        injection_threshold=0.7,
+        injection_margin=0.05,
     )
 
 
@@ -82,6 +104,19 @@ async def test_low_score_falls_back_to_general() -> None:
 
 
 async def test_empty_collection_and_injection_flag() -> None:
-    """No intent points ⇒ general; injection score at the cut ⇒ flagged."""
-    r = await _router(None, 0.7).route("x")
+    """No intent points ⇒ general; margin above the cut ⇒ flagged."""
+    r = await _router(None, 0.7, benign_score=0.6).route("x")
     assert r.intent == "general" and r.injection is True
+
+
+async def test_close_benign_exemplar_cancels_a_high_injection_score() -> None:
+    """A refund question near an injection exemplar is not refused if it is nearer a benign one."""
+    r = await _router(_Point({"label": "billing"}, 0.8), 0.78, benign_score=0.75).route("x")
+    assert (r.intent, r.injection) == ("billing", False)
+    assert abs(r.injection_score - (0.78 - 0.8)) < 1e-9
+
+
+async def test_margin_uses_the_nearest_benign_of_both_collections() -> None:
+    """The benign side is max(intent top-1, benign top-1)."""
+    r = await _router(_Point({"label": "general"}, 0.5), 0.9, benign_score=0.7).route("x")
+    assert r.injection is True and abs(r.injection_score - 0.2) < 1e-9
