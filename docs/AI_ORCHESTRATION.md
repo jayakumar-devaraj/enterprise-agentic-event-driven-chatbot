@@ -87,6 +87,7 @@ Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this 
 | docs refresh (post-deadline) | docs: README project description; stale claims fixed in summary, HLD, LLD, ADR 0006/0007, master_plan, a11 report, limitations | docs-refresh | see PR |
 | demo script phase 1 | code: `scripts/end_to_end_demo.py` (POST /chat + SSE, stdlib only); verified live: argument, prompt, unreachable, 401 | demo-script-phase-1 | see PR |
 | demo script phase 2 | code: demo finds/starts the compose stack, Docker checks, one-line failures, non-tty input; verified warm, cold, Docker unreachable/missing, twice in a row, NUL stdin | demo-script-phase-2 | see PR |
+| demo script phase 3 | code: stop/ps hints use the absolute compose path; verified on Windows from CMD, PowerShell, Git Bash, another directory, cold start, printed stop command; macOS not run | demo-script-phase-3 | see PR |
 
 PR numbers for rows above that were written as "see PR" (appended, not edited, to keep this log
 append-only): 12 verification → #21 · 15 A10 scale → #22 · 13 A9 real Ollama → #23 · T3 Caddy TLS →

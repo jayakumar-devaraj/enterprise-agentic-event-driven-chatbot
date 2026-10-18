@@ -59,3 +59,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   `<history>` blocks before scrubbing (`tests/unit/test_llm_guards.py`); not re-run against Ollama.
 - **Resolved after the 20:30 stop (21:16, PR #30):** the CLAUDE.md §9 "Open risk" block was deleted
   with the lead's permission; the entry above about it is superseded.
+- **Demo script (`scripts/end_to_end_demo.py`, post-deadline):** verified on Windows 11 only (CMD,
+  PowerShell, Git Bash); macOS not run. The Ctrl+C path (exit 130) was not exercised. Python on
+  Windows reports `NUL` as a terminal, so with `< NUL` the prompt text prints before the EOF fallback
+  picks the default.

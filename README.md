@@ -120,6 +120,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - End-to-end demo: `uv run python scripts/end_to_end_demo.py ["<question>"]` finds the compose
   gateway (starting the stack with `docker compose up -d --wait` if it is down), posts the question
   and prints the streamed reply; `--base-url` skips the stack check, `--debug` shows tracebacks.
+  The same command works from CMD, PowerShell or a POSIX shell, from any directory with
+  `uv run --project <root> python <root>/scripts/end_to_end_demo.py` (verified on Windows only).
 
 ## Testing
 
