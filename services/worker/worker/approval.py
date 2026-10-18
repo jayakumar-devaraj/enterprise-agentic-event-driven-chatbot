@@ -27,12 +27,28 @@ def pending_key(thread_id: str, message_id: str) -> str:
     return f"pending_approval:{thread_id}:{message_id}"
 
 
-# Marker, refund request and audit entry in one script: Redis runs it atomically, so a failure
-# before it runs leaves nothing and a lost reply leaves all three.
+# Marker, refund request and audit entry in one script. Redis runs it in isolation but does not
+# roll back on a runtime error, so every argument and key type is checked before the first write;
+# after that the writes cannot fail on input. The marker, written last, holds the refund entry id
+# (its receipt). A marker whose receipt is missing is an error, never a success. Markers written
+# before receipts existed hold "1".
 _APPLY = """
-if not redis.call('SET', KEYS[1], '1', 'NX') then return 0 end
-redis.call('XADD', KEYS[2], '*', unpack(cjson.decode(ARGV[1])))
-redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[3], '*', unpack(cjson.decode(ARGV[2])))
+local refund, audit = cjson.decode(ARGV[1]), cjson.decode(ARGV[2])
+for i = 2, 3 do
+  local t = redis.call('TYPE', KEYS[i])['ok']
+  if t ~= 'stream' and t ~= 'none' then
+    return redis.error_reply('WRONGTYPE refund script: ' .. KEYS[i] .. ' is a ' .. t)
+  end
+end
+local receipt = redis.call('GET', KEYS[1])
+if receipt == '1' then return 0 end
+if receipt then
+  if #redis.call('XRANGE', KEYS[2], receipt, receipt) == 1 then return 0 end
+  return redis.error_reply('refund marker ' .. KEYS[1] .. ' has no receipt ' .. receipt)
+end
+local id = redis.call('XADD', KEYS[2], '*', unpack(refund))
+redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[3], '*', unpack(audit))
+redis.call('SET', KEYS[1], id)
 return 1
 """
 

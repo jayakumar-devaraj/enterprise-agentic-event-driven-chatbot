@@ -101,3 +101,10 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   phone or IP streamed in pieces reached the client unscrubbed, and the 200-char forced flush could
   split a card number. Sentence ends now need trailing whitespace and forced cuts fall between
   lowercase words (`tests/unit/test_llm_guards.py`). Residual risk is described in LLD §10.
+- **Refund script partial write (2026-10-18, R1 of `docs/reports/full-score-recommendations.md`):**
+  Redis does not roll back a Lua script on a runtime error. A wrong-type `audit:events` key left the
+  marker and the refund record written with no audit entry. The script now checks argument and key
+  types before its first write and sets the marker last, holding its `refunds` entry id
+  (`tests/integration/test_refund_atomicity.py`). Residual risk: the audit stream is trimmed by
+  `MAXLEN`, so an old marker can be checked against its `refunds` entry but not its audit entry.
+  Markers written before this change hold `1` and are trusted without that check.
