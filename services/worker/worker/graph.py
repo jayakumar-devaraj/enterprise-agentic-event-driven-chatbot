@@ -137,6 +137,7 @@ def build_graph(
                 thread_id=thread_id,
                 ref_message_id=ref,
                 user_id=decision["user_id"],
+                lease=current_writer.get().lease,
             )
             text = approval.APPROVED_TEXT
         else:

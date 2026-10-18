@@ -1,4 +1,4 @@
-"""Per-message Redis Stream writer (ADR 0005): seq from 0, bounded, expiring."""
+"""Per-message Redis Stream writer (ADR 0005): seq from 0, bounded, expiring, fenced (ADR 0009)."""
 
 import json
 from typing import Any
@@ -12,16 +12,36 @@ from chat_common.schemas import (
     stream_key,
 )
 
+from worker.lease import FENCE, Lease
+
+_ADD = (
+    FENCE
+    + """
+local id = redis.call('XADD', KEYS[1], 'MAXLEN', '~', ARGV[1], '*', 'data', ARGV[2])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return id
+"""
+)
+_RESET = FENCE + "redis.call('DEL', KEYS[1])"
+
 
 class StreamWriter:
     """Appends typed events for one message; `seq` counts events written by this writer."""
 
     def __init__(
-        self, redis: Any, thread_id: str, message_id: UUID | str, *, maxlen: int, ttl_s: int
+        self,
+        redis: Any,
+        thread_id: str,
+        message_id: UUID | str,
+        *,
+        lease: Lease,
+        maxlen: int,
+        ttl_s: int,
     ) -> None:
-        """Bind to `tokens:{thread_id}:{message_id}`."""
+        """Bind to `tokens:{thread_id}:{message_id}`; every write requires `lease` to be held."""
         self._redis = redis
         self.key = stream_key(thread_id, message_id)
+        self.lease = lease
         self._maxlen = maxlen
         self._ttl_s = ttl_s
         self.seq = 0
@@ -33,15 +53,14 @@ class StreamWriter:
 
     async def reset(self) -> None:
         """Drop events from an attempt that never finished (lease expired after a crash)."""
-        await self._redis.delete(self.key)
+        await self.lease.run(self._redis, _RESET, [self.key], [])
         self.seq = 0
 
     async def _add(self, event: TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent) -> str:
-        """XADD one event as JSON under field `data`, then refresh the TTL."""
-        entry_id = await self._redis.xadd(
-            self.key, {"data": event.model_dump_json()}, maxlen=self._maxlen, approximate=True
+        """XADD one event as JSON under field `data` and refresh the TTL, in one fenced script."""
+        entry_id = await self.lease.run(
+            self._redis, _ADD, [self.key], [self._maxlen, event.model_dump_json(), self._ttl_s]
         )
-        await self._redis.expire(self.key, self._ttl_s)
         self.seq += 1
         return str(entry_id)
 

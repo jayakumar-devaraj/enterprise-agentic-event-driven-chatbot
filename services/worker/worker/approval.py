@@ -11,6 +11,8 @@ from typing import Any
 
 from chat_common.audit import AUDIT_MAXLEN, AUDIT_STREAM, AuditLog
 
+from worker.lease import FENCE, Lease
+
 REFUND_RE = re.compile(r"\brefunds?\b", re.IGNORECASE)
 REFUNDS_STREAM = "refunds"
 APPROVED_TEXT = "Your refund request was approved and has been submitted for processing."
@@ -31,8 +33,10 @@ def pending_key(thread_id: str, message_id: str) -> str:
 # roll back on a runtime error, so every argument and key type is checked before the first write;
 # after that the writes cannot fail on input. The marker, written last, holds the refund entry id
 # (its receipt). A marker whose receipt is missing is an error, never a success. Markers written
-# before receipts existed hold "1".
-_APPLY = """
+# before receipts existed hold "1". FENCE makes a worker that lost its dedupe lease fail first.
+_APPLY = (
+    FENCE
+    + """
 local refund, audit = cjson.decode(ARGV[1]), cjson.decode(ARGV[2])
 for i = 2, 3 do
   local t = redis.call('TYPE', KEYS[i])['ok']
@@ -51,6 +55,7 @@ redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[3], '*', unpack(audit))
 redis.call('SET', KEYS[1], id)
 return 1
 """
+)
 
 
 def _flat(fields: dict[str, str]) -> str:
@@ -58,11 +63,13 @@ def _flat(fields: dict[str, str]) -> str:
     return json.dumps([item for pair in fields.items() for item in pair])
 
 
-async def apply_refund(redis: Any, *, thread_id: str, ref_message_id: str, user_id: str) -> bool:
+async def apply_refund(
+    redis: Any, *, thread_id: str, ref_message_id: str, user_id: str, lease: Lease
+) -> bool:
     """Record the refund request at most once per originating message; True if recorded now.
 
     The marker never expires, so the at-most-once guarantee has no retention window. False means
-    an earlier call already recorded all three entries.
+    an earlier call already recorded all three entries. LeaseLost if `lease` is no longer held.
     """
     refund = {
         "thread_id": thread_id,
@@ -73,6 +80,6 @@ async def apply_refund(redis: Any, *, thread_id: str, ref_message_id: str, user_
     audit = AuditLog.entry(
         "refund_applied", actor=user_id, thread_id=thread_id, ref_message_id=ref_message_id
     )
-    keys = (f"refund_applied:{ref_message_id}", REFUNDS_STREAM, AUDIT_STREAM)
-    args = (_flat(refund), _flat(audit), AUDIT_MAXLEN)
-    return bool(await redis.eval(_APPLY, len(keys), *keys, *args))
+    keys = [f"refund_applied:{ref_message_id}", REFUNDS_STREAM, AUDIT_STREAM]
+    args = [_flat(refund), _flat(audit), AUDIT_MAXLEN]
+    return bool(await lease.run(redis, _APPLY, keys, args))

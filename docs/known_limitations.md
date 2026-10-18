@@ -114,3 +114,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   email 4/5, location 6/7, person 8/10. Misses: obfuscated email and spelled-out card, a lowercase
   name, a name of common words ("Hope Summers"), "Kraków" (`docs/reports/pii_recall_hard.json`). No
   recall floor is set; the lead sets one.
+- **Stale worker after a lost lease (2026-10-18, R3 of `docs/reports/full-score-recommendations.md`):**
+  a worker that stalled past `DEDUPE_LEASE_S` while another took the message over still wrote when
+  it resumed. Observed on real Redis: it appended a second copy of the reply after the new owner's
+  `done` and committed. Stream, `done`/release and refund writes are now fenced by the lease token
+  (ADR 0009, `test_stale_worker_cannot_write_after_another_took_over`). Not fenced atomically:
+  LangGraph checkpoint writes, `pending_approval:*` and audit entries. A stale worker reaches them
+  only if it stalls for a full lease between two adjacent awaits, and can then duplicate an audit
+  entry or replace a checkpoint. The DLQ produce is preceded by a non-atomic lease check.

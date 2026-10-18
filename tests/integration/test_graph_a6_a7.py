@@ -11,6 +11,7 @@ from chat_common.scrubber import get_scrubber
 from conftest import REDIS_URL
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker.graph import build_graph, make_processor
+from worker.lease import Lease
 from worker.llm import REFUSAL, SYSTEM_PROMPTS, MockEngine, Turn, build_messages
 from worker.router import Route
 from worker.streams import StreamWriter
@@ -52,7 +53,9 @@ async def _turn(router, engine, thread: str, text: str) -> list[dict]:
     """Run one turn through the compiled graph with the real checkpointer; return stream events."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     env = Envelope(message_id=uuid.uuid4(), thread_id=thread, user_id="u", text=text, trace_id="t")
-    writer = StreamWriter(redis, thread, env.message_id, maxlen=100, ttl_s=60)
+    lease = Lease(f"dedupe:{env.message_id}")
+    await redis.set(lease.key, lease.token, ex=60)
+    writer = StreamWriter(redis, thread, env.message_id, lease=lease, maxlen=100, ttl_s=60)
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(router, engine, get_scrubber().ascrub, 256).compile(checkpointer=saver)
