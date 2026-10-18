@@ -23,9 +23,9 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 
 | Endpoint | Success | Errors |
 |---|---|---|
-| `POST /chat` | 202 `ChatAccepted`, only after the broker acknowledged the record; a repeated `message_id` with the same request returns the same 202 body, and one whose earlier attempt was never acknowledged is produced again | 401 credentials · 403 thread owned by another user · 413 message over `MAX_MESSAGE_CHARS` · 422 invalid body, `thread_id`, or `message_id` reused for a different request (other thread, text or decision) · 429 per-thread rate limit · 503 Kafka or Redis unavailable |
+| `POST /chat` | 202 `ChatAccepted`, only after the broker acknowledged the record; a repeated `message_id` with the same request returns the same 202 body, and one whose earlier attempt was never acknowledged (or not audited) is produced again; reuse for a different request is rejected for `DEDUPE_TTL_S` after acceptance | 401 credentials · 403 thread owned by another user · 413 message over `MAX_MESSAGE_CHARS` · 422 invalid body, `thread_id`, or `message_id` reused for a different request (other thread, text or decision) · 429 per-thread rate limit · 503 Kafka or Redis unavailable |
 | `GET /stream/{thread_id}/{message_id}` | 200 `text/event-stream` | 401 · 403 · 422 · 503 |
-| `POST /approve/{thread_id}/{message_id}` | 202 `ChatAccepted` for the new message | 401 · 403 · 404 no pending approval · 422 · 503 |
+| `POST /approve/{thread_id}/{message_id}` | 202 `ChatAccepted` for the new message; a repeat of an already-delivered decision returns the same 202 even after the approval was consumed | 401 · 403 · 404 no pending approval (and no delivered decision under this `message_id`) · 422 · 503 |
 | `GET /healthz` | 200 while the process serves requests (liveness; no dependency checks) | — |
 | `GET /readyz` | 200 when Redis answers and the Kafka request topic is reachable (readiness; the image healthcheck) | 503 dependency down |
 

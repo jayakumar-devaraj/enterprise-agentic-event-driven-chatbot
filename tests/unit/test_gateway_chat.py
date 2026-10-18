@@ -230,3 +230,32 @@ async def test_password_check_does_not_stall_the_event_loop(h) -> None:
     await task
     assert r.status_code == 401
     assert max(gaps) < 0.08
+
+
+async def test_reuse_after_the_claim_expires_cannot_ride_the_delivered_marker(h) -> None:
+    """The claim is set before the send, so it expires first; the delivered marker still binds."""
+    harness, client = h
+    mid = str(uuid4())
+    assert (await client.post("/chat", json=body(mid=mid), auth=ALICE)).status_code == 202
+    await harness.redis.delete(f"accepted:{mid}")
+    other = await client.post("/chat", json=body(message="other", mid=mid), auth=ALICE)
+    assert other.status_code == 422
+    assert [e.text for e in harness.producer.sent] == ["hello"]
+
+
+async def test_audit_failure_after_delivery_is_retried_not_skipped(h) -> None:
+    """An acceptance whose audit entry failed is not marked delivered, so its retry audits it."""
+    harness, client = h
+    b = body()
+    real_xadd = harness.redis.xadd
+
+    async def broken_xadd(*args, **kwargs):
+        from redis.exceptions import ConnectionError
+
+        raise ConnectionError("fake audit outage")
+
+    harness.redis.xadd = broken_xadd
+    assert (await client.post("/chat", json=b, auth=ALICE)).status_code == 503
+    harness.redis.xadd = real_xadd
+    assert (await client.post("/chat", json=b, auth=ALICE)).status_code == 202
+    assert [r[1]["event"] for r in harness.redis.streams["audit:events"]] == ["chat_accepted"]

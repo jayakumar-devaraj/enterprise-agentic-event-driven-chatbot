@@ -17,3 +17,19 @@ def test_fixture_meets_brief_minimums_and_report_shape() -> None:
     assert set(report["recall"]) == {"LOCATION", "PERSON"}
     assert all(0.0 <= r <= 1.0 for r in report["recall"].values())
     assert report["scrub_latency_ms"]["p95"] > 0
+
+
+def test_hard_fixture_covers_every_scrubbed_entity_type() -> None:
+    """The harder set labels all seven types and reports what it missed."""
+    report = pii_recall.measure(pii_recall.HARD_FIXTURE)
+    assert report["sentences"] >= 30
+    assert set(report["recall"]) == {
+        "CREDIT_CARD",
+        "EMAIL_ADDRESS",
+        "IP_ADDRESS",
+        "LOCATION",
+        "PERSON",
+        "PHONE_NUMBER",
+        "US_SSN",
+    }
+    assert isinstance(report["missed"], list)

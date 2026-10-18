@@ -62,3 +62,28 @@ async def test_competing_decisions_under_one_message_id_are_422() -> None:
 
     assert (yes.status_code, again.status_code, no.status_code) == (202, 202, 422)
     assert [e.approved for e in producer.sent] == [True]
+
+
+async def test_retry_after_the_worker_consumed_the_decision_returns_the_original_202() -> None:
+    """The worker removed the pending key after applying it; a lost-reply retry is not 404."""
+    redis, producer = FakeRedis(), RecordingProducer()
+    await redis.set(auth.owner_key("t1"), "alice")
+    ref, new = str(uuid4()), str(uuid4())
+    await redis.set(f"pending_approval:t1:{ref}", "alice")
+    path, alice = f"/approve/t1/{ref}", ("alice", "alice-pw")
+
+    first = await _call(redis, producer, path, {"message_id": new, "approved": True}, alice)
+    await redis.delete(f"pending_approval:t1:{ref}")
+    retry = await _call(redis, producer, path, {"message_id": new, "approved": True}, alice)
+    flip = await _call(redis, producer, path, {"message_id": new, "approved": False}, alice)
+    other = await _call(
+        redis, producer, path, {"message_id": str(uuid4()), "approved": True}, alice
+    )
+    bob = await _call(
+        redis, producer, path, {"message_id": new, "approved": True}, ("bob", "bob-pw")
+    )
+
+    assert (first.status_code, retry.status_code) == (202, 202)
+    assert retry.json() == first.json()
+    assert (flip.status_code, other.status_code, bob.status_code) == (422, 404, 403)
+    assert len(producer.sent) == 1
