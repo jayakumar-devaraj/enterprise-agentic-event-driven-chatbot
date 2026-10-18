@@ -45,6 +45,19 @@ jobs:
         if: failure()
         run: docker compose -f deploy/compose.yaml logs --tail 100
 
+  durability:
+    # Its own compose project: Redis and Kafka survive SIGKILL, replacement and restore (ADR 0008).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+      - name: Sync
+        run: uv sync --locked
+      - name: Durability tests
+        run: uv run pytest -m durability -v
+
   frontend:
     runs-on: ubuntu-latest
     container: node:24.22.0-slim

@@ -21,8 +21,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # The image default is /tmp/kafka-logs, which a recreated container loses.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       # The default heap is 1 GiB; a single-node dev broker needs far less.
       KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     ports:
       - "127.0.0.1:${KAFKA_HOST_PORT:-19092}:19092"
     # A TCP probe, not a Kafka CLI tool: each CLI call starts a JVM (~2 CPU-seconds), which at a
@@ -60,6 +64,11 @@ services:
 
   redis:
     image: redis:8.10.2
+    # AOF fsynced every second (RPO ≤ 1 s for acknowledged writes) on a named volume, so streams,
+    # checkpoints, owners, refunds and the audit trail survive a crash or a recreated container.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis-data:/data
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"
     healthcheck:
@@ -191,3 +200,7 @@ services:
       - "127.0.0.1:${HTTPS_HOST_PORT:-8443}:443"
     mem_limit: 256m
     restart: unless-stopped
+
+volumes:
+  redis-data:
+  kafka-data:

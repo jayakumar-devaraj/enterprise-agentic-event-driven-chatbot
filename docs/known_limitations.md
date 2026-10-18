@@ -74,3 +74,6 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   pending refund now clears it and audits `refund_abandoned` (supersedes the Task 10 entry). These
   crashes are simulated in-process (`tests/integration/test_replay_recovery.py`), not by killing a
   worker container. A crash after the interrupt checkpoint may audit `refund_proposed` twice.
+  Redis now persists (AOF `everysec`) and Kafka writes to a named volume instead of `/tmp` (P1,
+  ADR 0008); a host crash can still lose ≤ 1 s of Redis writes, Kafka has no replica and is not
+  backed up. Restore was tested on a disposable compose project, not on a production host.
