@@ -1,0 +1,54 @@
+{
+  "sentences": 30,
+  "spacy_model": "en_core_web_lg",
+  "recall": {
+    "CREDIT_CARD": 0.75,
+    "EMAIL_ADDRESS": 0.8,
+    "IP_ADDRESS": 1.0,
+    "LOCATION": 0.8571,
+    "PERSON": 0.8,
+    "PHONE_NUMBER": 1.0,
+    "US_SSN": 1.0
+  },
+  "counts": {
+    "CREDIT_CARD": {
+      "labeled": 4,
+      "recalled": 3
+    },
+    "EMAIL_ADDRESS": {
+      "labeled": 5,
+      "recalled": 4
+    },
+    "IP_ADDRESS": {
+      "labeled": 4,
+      "recalled": 4
+    },
+    "LOCATION": {
+      "labeled": 7,
+      "recalled": 6
+    },
+    "PERSON": {
+      "labeled": 10,
+      "recalled": 8
+    },
+    "PHONE_NUMBER": {
+      "labeled": 6,
+      "recalled": 6
+    },
+    "US_SSN": {
+      "labeled": 2,
+      "recalled": 2
+    }
+  },
+  "missed": [
+    "EMAIL_ADDRESS: jane at example dot com",
+    "CREDIT_CARD: five five five five four four four four three three three three one one one one",
+    "PERSON: aisha okonkwo",
+    "PERSON: Hope Summers",
+    "LOCATION: Krak\u00f3w"
+  ],
+  "scrub_latency_ms": {
+    "p50": 4.42,
+    "p95": 10.13
+  }
+}

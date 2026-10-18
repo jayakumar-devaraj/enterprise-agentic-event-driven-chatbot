@@ -97,3 +97,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   per message and one history turn per message per thread. Kill points are timing-based, not
   targeted at a specific boundary; the targeted boundaries are covered in-process by
   `tests/integration/test_replay_recovery.py`.
+- **Harder PII set measured (2026-10-18):** `tests/fixtures/pii_hard.jsonl` (30 sentences, all seven
+  entity types; written by the agent) recalls 33/38 (86.8 %): IP, phone and SSN 100 %, card 3/4,
+  email 4/5, location 6/7, person 8/10. Misses: obfuscated email and spelled-out card, a lowercase
+  name, a name of common words ("Hope Summers"), "Kraków" (`docs/reports/pii_recall_hard.json`). No
+  recall floor is set; the lead sets one.

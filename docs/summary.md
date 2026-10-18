@@ -12,11 +12,12 @@ actions are written to a durable audit log.
 
 **Evidence.** 78 unit tests, 34 integration tests against the real message broker, database and
 vector store, 3 durability tests (kill, container replacement, backup restore) and 10 front-end
-tests, run on every change in GitHub Actions; plus an earlier scale test (2 gateways + 2 workers),
-a real local-LLM round trip, and HTTPS through a reverse proxy. Crash recovery is tested by
-injecting failures at each step in-process, not yet by killing live containers. Measured PII recall
-is 100 % on a small, easy 32-sentence sample, which overstates real-world accuracy. The committed
-coverage report (88 %) predates the 2026-10-17 audit fixes.
+tests, run on every change in GitHub Actions; plus an earlier scale test (2 gateways + 2 workers), a
+real local-LLM round trip, and HTTPS through a reverse proxy. Crash recovery is tested by injecting
+failures at each step in-process, by stopping Qdrant live, and by killing the live worker container
+under load. Measured PII recall is 100 % on a small, easy 32-sentence sample and 87 % on a harder
+30-sentence one (obfuscated and lowercase entities are missed). The committed coverage report (88 %)
+predates the 2026-10-17 audit fixes.
 
 **The most important trade-off.** Reliability over immediacy: the system answers "accepted" as soon
 as the request is safely queued and delivers the reply through a queue and a replayable stream.
