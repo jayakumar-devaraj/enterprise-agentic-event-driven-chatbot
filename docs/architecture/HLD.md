@@ -122,7 +122,8 @@ flowchart TB
 | Malformed envelope in Kafka | Pydantic on consume | DLQ immediately, commit, no retry | — |
 | Qdrant / LLM / Redis fault in worker | Exception class + timeout | Bounded retries with backoff → `ErrorEvent{dependency_unavailable}` + DLQ → commit | SSE `error` event, stream closes |
 | Worker crash mid-message | Lease `processing` never reaches `done` | Offset uncommitted; lease expires; redelivered and reprocessed | Delayed answer, no duplicate `done` |
-| Duplicate delivery / repeated POST | Gateway idempotency key / worker `done` key | Same 202 body; worker skips and commits | One stream, one `done` |
+| Duplicate delivery / repeated POST | Gateway `accepted`/`delivered` keys / worker `done` key | Same 202 body; worker skips and commits | One stream, one `done` |
+| Gateway interrupted between claim and broker ack | `delivered:{id}` absent | Client retries the same body (the React client does once); gateway produces again; worker dedupes | 202 only for acknowledged work |
 | Prompt injection | Injection-collection similarity ≥ threshold | Refusal node; flagged in span + log | Refusal text |
 | Refund requested | Billing node | `interrupt()`; nothing applied until approval; expires after `APPROVAL_TTL_S` | `approval_required` event |
 | LangFuse unreachable | Exporter error | Logged; never fails the request | — |

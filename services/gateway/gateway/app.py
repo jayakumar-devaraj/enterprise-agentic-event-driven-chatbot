@@ -1,5 +1,7 @@
 """FastAPI gateway: auth, input guardrails L1–L3, idempotent enqueue (SPEC.md §2–§4)."""
 
+import hashlib
+import json
 import logging
 import time
 import uuid
@@ -107,26 +109,41 @@ async def enforce_rate_limit(deps: Deps, thread_id: str) -> None:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate limit exceeded")
 
 
+def request_binding(envelope: Envelope) -> str:
+    """What a message_id names: its thread plus a digest of the request it carries."""
+    content = json.dumps(
+        [envelope.kind, envelope.text, str(envelope.ref_message_id), envelope.approved]
+    )
+    return f"{envelope.thread_id}:{hashlib.sha256(content.encode()).hexdigest()[:32]}"
+
+
 async def enqueue(deps: Deps, envelope: Envelope, user: str) -> ChatAccepted:
-    """Idempotent on message_id: a repeat returns the same 202 body without producing again."""
+    """Idempotent on message_id; 202 only once the broker has acknowledged the record.
+
+    `accepted:{id}` binds the id to one request (a different request under it is a 422);
+    `delivered:{id}` is set only after the ack. A repeat of a delivered request returns the same
+    202 without producing. A repeat of an undelivered one (earlier send failed, was cancelled, or
+    the process died) produces again; a concurrent repeat may produce twice, which the worker's
+    dedupe on message_id absorbs (SPEC.md §5).
+    """
     accepted = ChatAccepted(
         message_id=envelope.message_id,
         thread_id=envelope.thread_id,
         stream_url=f"/stream/{envelope.thread_id}/{envelope.message_id}",
     )
-    key = f"accepted:{envelope.message_id}"
-    first = await deps.redis.set(key, envelope.thread_id, nx=True, ex=deps.settings.dedupe_ttl_s)
-    if not first:
-        if await deps.redis.get(key) != envelope.thread_id:
+    ttl = deps.settings.dedupe_ttl_s
+    binding = request_binding(envelope)
+    claim = f"accepted:{envelope.message_id}"
+    if not await deps.redis.set(claim, binding, nx=True, ex=ttl):
+        if await deps.redis.get(claim) != binding:
             raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, "message_id already used on another thread"
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "message_id already used for a different request",
             )
-        return accepted
-    try:
-        await deps.producer.send(envelope)
-    except DependencyUnavailable:
-        await deps.redis.delete(key)  # let the client's retry produce it
-        raise
+        if await deps.redis.get(f"delivered:{envelope.message_id}") is not None:
+            return accepted
+    await deps.producer.send(envelope)
+    await deps.redis.set(f"delivered:{envelope.message_id}", "1", ex=ttl)
     await deps.audit.record(
         f"{envelope.kind}_accepted",
         actor=user,

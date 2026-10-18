@@ -1,16 +1,19 @@
-"""Gateway state lifecycle against real Redis and Kafka: thread ownership."""
+"""Gateway state lifecycle against real Redis and Kafka: thread ownership, acceptance recovery."""
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 
 import httpx
 import pytest
 import redis.asyncio as aioredis
+from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
+from confluent_kafka.aio import AIOConsumer
 from conftest import KAFKA, REDIS_URL
 from gateway import auth
-from gateway.app import Deps, create_app
+from gateway.app import Deps, create_app, request_binding
 from gateway.producer import KafkaEnvelopeProducer
 
 pytestmark = pytest.mark.integration
@@ -56,3 +59,59 @@ async def test_owner_binding_has_no_expiry(client) -> None:
     finally:
         await redis.aclose()
     assert (await client.post("/chat", json=_body(thread), auth=BOB)).status_code == 403
+
+
+async def _count_records(message_id: str, settle_s: float = 5.0) -> int:
+    """Records on chat-requests carrying `message_id`, read from the start until quiet."""
+    consumer = AIOConsumer(
+        {
+            "bootstrap.servers": KAFKA,
+            "group.id": f"acc-{uuid.uuid4().hex[:8]}",
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+        }
+    )
+    await consumer.subscribe([Settings().kafka_topic])
+    found, idle = 0, 0.0
+    try:
+        async with asyncio.timeout(90):
+            while idle < settle_s:
+                msg = await consumer.poll(1.0)
+                if msg is None:
+                    idle += 1.0
+                    continue
+                idle = 0.0
+                if not msg.error() and Envelope.model_validate_json(msg.value()).message_id == (
+                    uuid.UUID(message_id)
+                ):
+                    found += 1
+    finally:
+        await consumer.close()
+    return found
+
+
+async def test_claim_left_by_a_crash_is_recovered_by_the_retry(client) -> None:
+    """A process that died after claiming the id but before the ack left `accepted:` behind.
+
+    The client's retry must reach Kafka, then a further repeat returns 202 without producing.
+    """
+    thread = f"acc-{uuid.uuid4().hex[:8]}"
+    body = _body(thread)
+    assert (await client.post("/chat", json=_body(thread), auth=ALICE)).status_code == 202
+    scrubbed = await get_scrubber().ascrub(body["message"])
+    crashed = Envelope(
+        message_id=uuid.UUID(body["message_id"]),
+        thread_id=thread,
+        user_id="alice",
+        text=scrubbed,
+        trace_id="x",
+    )
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    try:
+        await redis.set(f"accepted:{body['message_id']}", request_binding(crashed), ex=600)
+    finally:
+        await redis.aclose()
+
+    assert (await client.post("/chat", json=body, auth=ALICE)).status_code == 202
+    assert (await client.post("/chat", json=body, auth=ALICE)).status_code == 202
+    assert await _count_records(body["message_id"]) == 1

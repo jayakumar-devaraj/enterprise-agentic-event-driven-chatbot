@@ -45,9 +45,10 @@ sequenceDiagram
   G->>G: verify credentials (401), validate (422/413)
   G->>R: SET thread_owner NX / GET (403 if other user)
   G->>R: INCR ratelimit:{thread}:{minute} (429)
-  G->>R: SET accepted:{message_id} NX (repeat ⇒ same 202, no produce)
   G->>G: ascrub(message) in thread pool
-  G->>K: produce Envelope key=thread_id (503 on failure)
+  G->>R: SET accepted:{message_id} thread:digest NX (other request ⇒ 422; delivered:{id} set ⇒ same 202, no produce)
+  G->>K: produce Envelope key=thread_id, wait for ack (503 on failure)
+  G->>R: SET delivered:{message_id}
   G-->>C: 202 ChatAccepted {stream_url}
   C->>G: GET /stream/{thread}/{msg} (Last-Event-ID optional)
   W->>K: poll
@@ -141,7 +142,8 @@ State (`TypedDict`): `thread_id`, `message_id`, `user_id`, `turns: list[{role, t
 |---|---|---|---|---|
 | `tokens:{thread_id}:{message_id}` | Stream | worker | `MAXLEN ~ STREAM_MAXLEN`, `EXPIRE STREAM_TTL_S` | Token/done/error/approval events |
 | `dedupe:{message_id}` | String `processing`/`done` | worker | `DEDUPE_LEASE_S` / `DEDUPE_TTL_S` | At-least-once → effectively-once |
-| `accepted:{message_id}` | String (thread_id) | gateway | `DEDUPE_TTL_S` | Idempotent 202 |
+| `accepted:{message_id}` | String (`thread_id:request digest`) | gateway | `DEDUPE_TTL_S` | Binds the id to one request (422 otherwise) |
+| `delivered:{message_id}` | String | gateway | `DEDUPE_TTL_S` | Set after the broker ack; repeat ⇒ same 202, no produce |
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |
 | `thread_owner:{thread_id}` | String (user) | gateway | none (outlives checkpoints, which refresh on read) | Access binding |
 | `pending_approval:{thread_id}:{message_id}` | String (user) | worker | `APPROVAL_TTL_S` | Approval window |

@@ -23,7 +23,7 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 
 | Endpoint | Success | Errors |
 |---|---|---|
-| `POST /chat` | 202 `ChatAccepted`; a repeated `message_id` returns the same 202 body | 401 credentials · 403 thread owned by another user · 413 message over `MAX_MESSAGE_CHARS` · 422 invalid body, `thread_id`, or `message_id` reused on another thread · 429 per-thread rate limit · 503 Kafka or Redis unavailable |
+| `POST /chat` | 202 `ChatAccepted`, only after the broker acknowledged the record; a repeated `message_id` with the same request returns the same 202 body, and one whose earlier attempt was never acknowledged is produced again | 401 credentials · 403 thread owned by another user · 413 message over `MAX_MESSAGE_CHARS` · 422 invalid body, `thread_id`, or `message_id` reused for a different request (other thread, text or decision) · 429 per-thread rate limit · 503 Kafka or Redis unavailable |
 | `GET /stream/{thread_id}/{message_id}` | 200 `text/event-stream` | 401 · 403 · 422 · 503 |
 | `POST /approve/{thread_id}/{message_id}` | 202 `ChatAccepted` for the new message | 401 · 403 · 404 no pending approval · 422 · 503 |
 | `GET /healthz` | 200 | 503 dependency down |

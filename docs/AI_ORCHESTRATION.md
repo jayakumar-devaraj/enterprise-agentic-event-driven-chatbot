@@ -111,4 +111,4 @@ Addendum (audit remediation, from 2026-10-17 22:00 CDT): fixes for
 after a first attempt shared the main checkout with the concurrent demo-script session and one of
 that session's commits landed on this session's branch (discarded unpushed; the demo work was
 re-committed as PR #35). One PR per finding, each with a test that failed before the fix:
-ownership lifetime → this PR.
+ownership lifetime → #36 · acceptance protocol + client retry identity → this PR.

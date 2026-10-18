@@ -46,3 +46,19 @@ async def test_approve_flow_statuses() -> None:
     (env,) = producer.sent
     assert (env.kind, str(env.ref_message_id), env.approved) == ("approval", ref, True)
     assert redis.streams["audit:events"][-1][1]["event"] == "approval_accepted"
+
+
+async def test_competing_decisions_under_one_message_id_are_422() -> None:
+    """The same approval message_id cannot carry approve and then reject."""
+    redis, producer = FakeRedis(), RecordingProducer()
+    await redis.set(auth.owner_key("t1"), "alice")
+    ref, new = str(uuid4()), str(uuid4())
+    await redis.set(f"pending_approval:t1:{ref}", "alice")
+    path, alice = f"/approve/t1/{ref}", ("alice", "alice-pw")
+
+    yes = await _call(redis, producer, path, {"message_id": new, "approved": True}, alice)
+    again = await _call(redis, producer, path, {"message_id": new, "approved": True}, alice)
+    no = await _call(redis, producer, path, {"message_id": new, "approved": False}, alice)
+
+    assert (yes.status_code, again.status_code, no.status_code) == (202, 202, 422)
+    assert [e.approved for e in producer.sent] == [True]

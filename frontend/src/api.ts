@@ -27,16 +27,30 @@ export function basicAuth(user: string, password: string): string {
   return "Basic " + btoa(`${user}:${password}`);
 }
 
+/**
+ * POST once more on an uncertain outcome (network failure or 503). The body, and so its
+ * message_id, is identical, so the gateway either produces it or answers with the original 202.
+ */
 async function postJson(fetchImpl: Fetch, path: string, auth: string, body: unknown): Promise<Accepted> {
-  const res = await fetchImpl(`${BASE}${path}`, {
+  const init = {
     method: "POST",
     headers: { Authorization: auth, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
-  if (res.status !== 202) {
-    throw new HttpError(res.status, await res.text());
+  };
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetchImpl(`${BASE}${path}`, init);
+    } catch (err) {
+      if (attempt === 1) throw err;
+      continue;
+    }
+    if (res.status === 503 && attempt === 0) continue;
+    if (res.status !== 202) {
+      throw new HttpError(res.status, await res.text());
+    }
+    return (await res.json()) as Accepted;
   }
-  return (await res.json()) as Accepted;
 }
 
 export function postChat(fetchImpl: Fetch, auth: string, threadId: string, message: string) {

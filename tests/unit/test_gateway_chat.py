@@ -1,15 +1,17 @@
 """POST /chat status matrix (SPEC.md §2) with Redis and Kafka test doubles; real scrubber."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from uuid import uuid4
 
 import httpx
 import pytest
+from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from fakes import FakeRedis, RecordingProducer
 from gateway import auth
-from gateway.app import Deps, create_app
+from gateway.app import Deps, create_app, enqueue
 
 USERS = {
     "alice": auth.hash_password("alice-pw", salt=b"a" * 16),
@@ -91,6 +93,38 @@ async def test_message_id_reused_on_other_thread_is_422(h) -> None:
     assert (await client.post("/chat", json=body("t2", mid=mid), auth=ALICE)).status_code == 422
 
 
+async def test_message_id_reused_for_a_different_message_is_422(h) -> None:
+    """A message_id names one request; reusing it for different text is a caller error."""
+    harness, client = h
+    mid = str(uuid4())
+    first = await client.post("/chat", json=body(message="hello", mid=mid), auth=ALICE)
+    second = await client.post("/chat", json=body(message="other", mid=mid), auth=ALICE)
+    assert (first.status_code, second.status_code) == (202, 422)
+    assert len(harness.producer.sent) == 1
+
+
+async def test_send_interrupted_before_ack_is_not_reported_accepted_on_retry(h) -> None:
+    """Cancellation (or a crash) between claiming the id and the broker ack leaves no record.
+
+    The retry must produce it rather than return 202 for work that was never enqueued.
+    """
+    harness, _ = h
+    deps = await harness.deps()
+    env = Envelope(message_id=uuid4(), thread_id="t1", user_id="alice", text="hi", trace_id="x")
+
+    async def interrupted(envelope: Envelope) -> None:
+        raise asyncio.CancelledError
+
+    harness.producer.send = interrupted
+    with pytest.raises(asyncio.CancelledError):
+        await enqueue(deps, env, "alice")
+    del harness.producer.send
+
+    accepted = await enqueue(deps, env, "alice")
+    assert accepted.message_id == env.message_id
+    assert harness.producer.sent == [env]
+
+
 @pytest.mark.parametrize("creds", [None, ("alice", "wrong"), ("mallory", "x")])
 async def test_bad_or_missing_credentials_401(h, creds) -> None:
     """No valid Basic credentials ⇒ 401 with a challenge."""
@@ -139,7 +173,7 @@ async def test_rate_limit_429(h) -> None:
 
 
 async def test_kafka_down_503_and_retry_produces(h) -> None:
-    """Producer failure ⇒ 503 and the idempotency key is released so a retry succeeds."""
+    """Producer failure ⇒ 503 and the retry with the same body is produced."""
     harness, client = h
     b = body()
     harness.producer.fail = True
