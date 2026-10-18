@@ -59,6 +59,40 @@ async def test_guard_scrubs_pii_split_across_deltas() -> None:
     assert "jane.doe@example.com" not in " ".join(out) and "<EMAIL_ADDRESS>" in out
 
 
+async def test_guard_does_not_flush_at_a_dot_inside_a_token() -> None:
+    """Streamed one character at a time, dots inside an email, phone or IP are not sentence ends.
+
+    Flushing at "jane." or "192." would emit fragments the scrubber cannot recognise.
+    """
+    text = "Write to jane.doe@example.com or call 212.555.0187 from 192.168.10.24 today."
+    out = " ".join(await _collect(guarded_tokens(_deltas(*text), get_scrubber().ascrub, 100)))
+    for fragment in ("jane", "doe", "example", "212", "555", "0187", "192", "168", "10.24"):
+        assert fragment not in out, (fragment, out)
+
+
+async def test_guard_forced_flush_does_not_split_an_entity() -> None:
+    """A long run without punctuation is cut before 200 chars, but never through a card number."""
+    words = ("please note that " * 11 + "the card 4111 1111 1111 1111 was used again").split(" ")
+    deltas = [w if i == 0 else f" {w}" for i, w in enumerate(words)]
+    out = " ".join(await _collect(guarded_tokens(_deltas(*deltas), get_scrubber().ascrub, 200)))
+    assert "4111" not in out and "1111" not in out, out
+
+
+async def test_guard_emits_a_sentence_once_the_next_one_starts() -> None:
+    """Deltas carry leading spaces ("Hello.", " How"); the first sentence must not wait for more."""
+    log: list[str] = []
+
+    async def deltas() -> AsyncIterator[str]:
+        for d in ("Hello.", " How are", " you", " today?"):
+            log.append(f"delta {d.strip()}")
+            yield d
+
+    async for token in guarded_tokens(deltas(), get_scrubber().ascrub, 50):
+        log.append(f"token {token}")
+    assert log.index("token Hello.") < log.index("delta you")
+    assert [x for x in log if x.startswith("token")][-1] == "token today?"
+
+
 async def test_guard_blocks_system_prompt_echo_and_caps_tokens() -> None:
     """Echoed system prompt is redacted; output is capped at max_tokens."""
     echo = await _collect(
