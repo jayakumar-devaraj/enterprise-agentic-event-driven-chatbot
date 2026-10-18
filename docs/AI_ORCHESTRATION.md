@@ -85,6 +85,7 @@ Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this 
 | final consistency | docs: coverage re-measured at `c3b4f0f` (88 %, 86 passed), summary figures, PR-number mapping below | final-consistency | #29 |
 | remove open risk | docs: CLAUDE.md §9 open-risk block deleted (lead approved, after the 20:30 stop); resolved by `tests/integration/test_spike_checkpointer.py`, PR #7 | remove-open-risk | see PR |
 | docs refresh (post-deadline) | docs: README project description; stale claims fixed in summary, HLD, LLD, ADR 0006/0007, master_plan, a11 report, limitations | docs-refresh | see PR |
+| demo script phase 1 | code: `scripts/end_to_end_demo.py` (POST /chat + SSE, stdlib only); verified live: argument, prompt, unreachable, 401 | demo-script-phase-1 | see PR |
 
 PR numbers for rows above that were written as "see PR" (appended, not edited, to keep this log
 append-only): 12 verification → #21 · 15 A10 scale → #22 · 13 A9 real Ollama → #23 · T3 Caddy TLS →
