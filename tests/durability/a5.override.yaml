@@ -1,0 +1,9 @@
+# Overlay for tests/durability/test_worker_kill.py: a short dedupe lease so a SIGKILLed worker's
+# lease expires in seconds. 5 * (1 + 1) + 1 * 1 = 11 < 15 satisfies the SPEC §5 formula.
+services:
+  worker:
+    environment:
+      INFERENCE_TIMEOUT_S: "5"
+      MAX_RETRIES: "1"
+      RETRY_BACKOFF_MAX_S: "1"
+      DEDUPE_LEASE_S: "15"

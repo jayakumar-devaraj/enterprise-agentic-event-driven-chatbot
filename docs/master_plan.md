@@ -120,7 +120,7 @@ reserve under Phase 2.5 item 5.
 | A2 routing | 5 |
 | A3 streaming | 9 |
 | A4 failure | 7 (malformed + dependency-failure path with doubles); live Qdrant-stop automated 2026-10-18 (`tests/durability/test_dependency_outage.py`) |
-| A5 idempotency | 7 |
+| A5 idempotency | 7; live SIGKILL of the worker container under load automated 2026-10-18 (`tests/durability/test_worker_kill.py`) |
 | A6 memory | 8 |
 | A7 injection | 8 |
 | A8 frontend | 14 (restored by the lead) |

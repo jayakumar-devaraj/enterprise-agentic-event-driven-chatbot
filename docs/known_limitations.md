@@ -92,3 +92,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **A4 live Qdrant outage automated (2026-10-18):** `tests/durability/test_dependency_outage.py` stops
   the real Qdrant container under the production worker, graph and router; supersedes the "not
   automated" A4 entries above.
+- **A5 live worker kill automated (2026-10-18):** `tests/durability/test_worker_kill.py` SIGKILLs the
+  real worker container 3 times while 300 messages on 6 threads are in flight and checks one `done`
+  per message and one history turn per message per thread. Kill points are timing-based, not
+  targeted at a specific boundary; the targeted boundaries are covered in-process by
+  `tests/integration/test_replay_recovery.py`.
