@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "deploy" / "compose.yaml"
 DEFAULT_QUESTION = "My Wi-Fi drops every evening at the café. What should I try first?"
 TERMINAL = {"done", "error", "approval_required"}
-STOP_HINT = "stop it with: docker compose -f deploy/compose.yaml stop"
+STOP_HINT = f'stop it with: docker compose -f "{COMPOSE_FILE}" stop'
 
 
 class DemoError(Exception):
@@ -118,7 +118,7 @@ def ensure_stack(password: str, user: str) -> str:
             print(f"Gateway ready at {base}; the stack keeps running ({STOP_HINT})")
             return base
         time.sleep(2)
-    raise DemoError("gateway not ready after 120 s - check `docker compose ps`")
+    raise DemoError(f'gateway not ready after 120 s - see `docker compose -f "{COMPOSE_FILE}" ps`')
 
 
 def ask(default: str) -> str:
