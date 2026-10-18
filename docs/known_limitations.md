@@ -67,7 +67,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   no longer expires (P1); `thread_owner:*` keys now grow by one short string per thread. 202 is
   returned only after the broker ack, and an unacknowledged claim is re-produced on retry (P1);
   concurrent repeats may produce twice (the worker dedupes) and so may audit `chat_accepted` twice.
-  A retried `/approve` after the worker consumed the decision gets 404, not the original 202.
+  A retried `/approve` after the worker consumed the decision got 404, not the original 202 (fixed
+  2026-10-18: it now returns the original 202).
   Refund marker, request and audit entry are one atomic Lua script with a non-expiring marker (P1);
   the three keys must share a hash slot before any move to Redis Cluster. Redelivery after a crash
   no longer duplicates the history turn or deletes a finished stream (P1); a new chat during a
