@@ -87,7 +87,6 @@ async def run(settings: Settings) -> None:
             scrubber.ascrub,
             settings.llm_max_tokens,
             redis=redis,
-            refund_ttl_s=settings.dedupe_ttl_s,
             observer=make_observer(settings),
             model="mock" if settings.mock_llm else settings.llm_model,
         )

@@ -11,7 +11,8 @@ stream.
   billing, technical support, general help, or a refusal when prompt injection is detected, with
   per-thread memory in a Redis checkpointer.
 - **Human in the loop:** a refund request pauses the graph (`interrupt()`) until the thread owner
-  calls `POST /approve`; a refund is applied at most once.
+  calls `POST /approve`; a refund request is then appended to the Redis stream `refunds` at most
+  once, atomically with its audit entry (no payment processor is integrated).
 - **Reliability:** idempotent enqueue, dedupe leases, Kafka offsets committed only after a durable
   outcome, and a dead-letter queue plus an SSE `error` event when a dependency fails.
 - **Operations:** HTTP Basic auth with thread ownership, per-thread rate limits, OpenTelemetry traces

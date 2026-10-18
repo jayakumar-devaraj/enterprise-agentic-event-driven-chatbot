@@ -51,7 +51,6 @@ def build_graph(
     max_tokens: int,
     *,
     redis: Any = None,
-    refund_ttl_s: int = 86400,
     observer: LLMObserver | None = None,
     model: str = "mock",
 ) -> StateGraph:
@@ -136,7 +135,6 @@ def build_graph(
                 thread_id=thread_id,
                 ref_message_id=ref,
                 user_id=decision["user_id"],
-                ttl_s=refund_ttl_s,
             )
             text = approval.APPROVED_TEXT
         else:

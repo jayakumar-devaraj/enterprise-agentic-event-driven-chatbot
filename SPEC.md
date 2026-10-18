@@ -86,8 +86,10 @@ output is scrubbed before it is checkpointed, streamed, logged or traced.
 
 A refund request proposed by the billing node is not applied until the thread owner approves it via
 `POST /approve`. Pending approvals expire after `APPROVAL_TTL_S`. A refund is applied at most once per
-originating message. Proposals, decisions and applications are written to the Redis stream
-`audit:events`.
+originating message: the marker, the `refunds` stream entry and the `refund_applied` audit entry
+are written together or not at all, and the marker never expires. Applying means appending a
+request to the Redis stream `refunds`; no payment processor is called. Proposals, decisions and
+applications are written to the Redis stream `audit:events`.
 
 ## 11 · Config
 
