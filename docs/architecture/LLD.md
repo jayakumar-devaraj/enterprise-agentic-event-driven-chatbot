@@ -110,8 +110,9 @@ sequenceDiagram
 ```
 
 The refund decision is made by a deterministic rule, not by model output, so an injected prompt
-cannot trigger or approve it. The apply step is idempotent on `ref_message_id` (Redis `SET NX`
-marker before XADD), so a redelivered approval never applies twice.
+cannot trigger or approve it. The apply step is one Lua script (`SET NX` marker, XADD `refunds`,
+XADD `audit:events`) that Redis runs atomically, so a redelivered approval never applies twice and a
+failed write never leaves a marker without its refund record. The marker never expires.
 
 ## 5 · LangGraph state machine
 
@@ -147,7 +148,7 @@ State (`TypedDict`): `thread_id`, `message_id`, `user_id`, `turns: list[{role, t
 | `ratelimit:{thread_id}:{epoch_min}` | Counter | gateway | 60 s | 429 |
 | `thread_owner:{thread_id}` | String (user) | gateway | none (outlives checkpoints, which refresh on read) | Access binding |
 | `pending_approval:{thread_id}:{message_id}` | String (user) | worker | `APPROVAL_TTL_S` | Approval window |
-| `refund_applied:{message_id}` | String | worker | `DEDUPE_TTL_S` | Apply idempotency |
+| `refund_applied:{message_id}` | String | worker | none | Apply idempotency (written atomically with `refunds` and the audit entry) |
 | `refunds` | Stream | worker | none | The side effect being gated |
 | `audit:events` | Stream | gateway, worker | `MAXLEN ~ 100000` | Durable, queryable runtime audit trail |
 | checkpointer keys | JSON (library-managed) | worker | `CHECKPOINT_TTL_MIN` | Conversation memory per `thread_id` |

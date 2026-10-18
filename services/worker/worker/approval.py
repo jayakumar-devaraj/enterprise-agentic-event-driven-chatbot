@@ -4,11 +4,12 @@ The decision to propose a refund is a deterministic rule on scrubbed text, never
 an injected prompt cannot trigger or approve it. Nothing is applied before the owner approves.
 """
 
+import json
 import re
 from datetime import UTC, datetime
 from typing import Any
 
-from chat_common.audit import AuditLog
+from chat_common.audit import AUDIT_MAXLEN, AUDIT_STREAM, AuditLog
 
 REFUND_RE = re.compile(r"\brefunds?\b", re.IGNORECASE)
 REFUNDS_STREAM = "refunds"
@@ -26,22 +27,36 @@ def pending_key(thread_id: str, message_id: str) -> str:
     return f"pending_approval:{thread_id}:{message_id}"
 
 
-async def apply_refund(
-    redis: Any, *, thread_id: str, ref_message_id: str, user_id: str, ttl_s: int
-) -> bool:
-    """Write the refund request at most once per originating message; True if written now."""
-    if not await redis.set(f"refund_applied:{ref_message_id}", "1", nx=True, ex=ttl_s):
-        return False
-    await redis.xadd(
-        REFUNDS_STREAM,
-        {
-            "thread_id": thread_id,
-            "ref_message_id": ref_message_id,
-            "user_id": user_id,
-            "ts": datetime.now(UTC).isoformat(),
-        },
-    )
-    await AuditLog(redis).record(
+# Marker, refund request and audit entry in one script: Redis runs it atomically, so a failure
+# before it runs leaves nothing and a lost reply leaves all three.
+_APPLY = """
+if not redis.call('SET', KEYS[1], '1', 'NX') then return 0 end
+redis.call('XADD', KEYS[2], '*', unpack(cjson.decode(ARGV[1])))
+redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[3], '*', unpack(cjson.decode(ARGV[2])))
+return 1
+"""
+
+
+def _flat(fields: dict[str, str]) -> str:
+    """Stream fields as the JSON array [k1, v1, k2, v2, ...] the script unpacks."""
+    return json.dumps([item for pair in fields.items() for item in pair])
+
+
+async def apply_refund(redis: Any, *, thread_id: str, ref_message_id: str, user_id: str) -> bool:
+    """Record the refund request at most once per originating message; True if recorded now.
+
+    The marker never expires, so the at-most-once guarantee has no retention window. False means
+    an earlier call already recorded all three entries.
+    """
+    refund = {
+        "thread_id": thread_id,
+        "ref_message_id": ref_message_id,
+        "user_id": user_id,
+        "ts": datetime.now(UTC).isoformat(),
+    }
+    audit = AuditLog.entry(
         "refund_applied", actor=user_id, thread_id=thread_id, ref_message_id=ref_message_id
     )
-    return True
+    keys = (f"refund_applied:{ref_message_id}", REFUNDS_STREAM, AUDIT_STREAM)
+    args = (_flat(refund), _flat(audit), AUDIT_MAXLEN)
+    return bool(await redis.eval(_APPLY, len(keys), *keys, *args))

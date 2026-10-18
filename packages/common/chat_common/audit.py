@@ -25,15 +25,20 @@ class AuditLog:
         """Wrap an async Redis client (decode_responses=True expected)."""
         self._redis = redis
 
-    async def record(self, event: str, *, actor: str, thread_id: str, **details: Any) -> str:
-        """Append one audit entry and return its stream id."""
-        fields = {
+    @staticmethod
+    def entry(event: str, *, actor: str, thread_id: str, **details: Any) -> dict[str, str]:
+        """The stream fields of one audit entry (also written by atomic multi-key scripts)."""
+        return {
             "event": event,
             "actor": actor,
             "thread_id": thread_id,
             "ts": datetime.now(UTC).isoformat(),
             "details": json.dumps(details, default=str, sort_keys=True),
         }
+
+    async def record(self, event: str, *, actor: str, thread_id: str, **details: Any) -> str:
+        """Append one audit entry and return its stream id."""
+        fields = self.entry(event, actor=actor, thread_id=thread_id, **details)
         entry_id = await self._redis.xadd(
             AUDIT_STREAM, fields, maxlen=AUDIT_MAXLEN, approximate=True
         )
