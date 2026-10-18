@@ -53,6 +53,15 @@ class Deps:
         return AuditLog(self.redis)
 
 
+def make_redis(settings: Settings) -> Any:
+    """Redis client whose socket timeout outlives the SSE relay's XREAD BLOCK window."""
+    return aioredis.from_url(
+        settings.redis_url,
+        decode_responses=True,
+        socket_timeout=settings.stream_block_ms / 1000 + 5,
+    )
+
+
 def _deps(request: Request) -> Deps:
     """Fetch the Deps bundle attached at startup."""
     return request.app.state.deps
@@ -134,7 +143,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         scrubber = get_scrubber(settings.spacy_model)
         return Deps(
             settings=settings,
-            redis=aioredis.from_url(settings.redis_url, decode_responses=True),
+            redis=make_redis(settings),
             producer=KafkaEnvelopeProducer(settings.kafka_bootstrap_servers, settings.kafka_topic),
             scrub=scrubber.ascrub,
             users=auth.parse_users(settings.auth_users.get_secret_value()),

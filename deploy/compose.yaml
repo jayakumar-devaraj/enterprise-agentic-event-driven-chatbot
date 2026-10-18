@@ -101,9 +101,11 @@ services:
         LLM_MODEL: ${LLM_MODEL:-llama3.2:1b}
     healthcheck:
       test: ["CMD", "ollama", "list"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 20
+    cpus: 4
+    mem_limit: 3g
 
   # One-shot: loads the Qdrant collections and calibrates thresholds; fails loudly.
   seed:
@@ -126,6 +128,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    environment:
+      # Real inference: `MOCK_LLM=false docker compose --profile llm up -d` (A9).
+      MOCK_LLM: ${MOCK_LLM:-true}
     depends_on:
       seed:
         condition: service_completed_successfully

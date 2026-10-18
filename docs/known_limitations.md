@@ -43,3 +43,6 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **`worker.main` has no automated test** (0 % in `docs/reports/coverage.txt`); it was exercised by
   the process smoke runs in PR #11 and `docs/reports/e2e-observability.md`.
 - **Single-turn prompts to the real LLM** include only the last 6 history turns.
+- **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
+  user's own, already scrubbed text) at the start of its reply. Harmless for privacy, poor UX; a
+  larger model or stripping echoed delimiters in the output guard would fix it.
