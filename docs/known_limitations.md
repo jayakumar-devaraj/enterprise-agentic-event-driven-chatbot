@@ -57,3 +57,5 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   needs a lead decision (the rules forbid tuning the threshold or seed data to pass a case).
 - **Small-model echo — fixed (20:11):** the output guard now drops echoed `<user_message>` /
   `<history>` blocks before scrubbing (`tests/unit/test_llm_guards.py`); not re-run against Ollama.
+- **Resolved after the 20:30 stop (21:16, PR #30):** the CLAUDE.md §9 "Open risk" block was deleted
+  with the lead's permission; the entry above about it is superseded.

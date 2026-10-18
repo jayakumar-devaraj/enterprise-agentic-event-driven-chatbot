@@ -1,5 +1,26 @@
 # enterprise-agentic-event-driven-chatbot
 
+An event-driven customer-support chatbot. `POST /chat` answers `202 Accepted` at once; Kafka-driven
+workers produce the reply asynchronously and stream it back token by token over SSE from Redis
+Streams, so a slow model never holds an HTTP request open and any gateway replica can serve any
+stream.
+
+- **Privacy:** user text is PII-scrubbed (Presidio) in the gateway before it reaches Kafka, the
+  model, logs or traces; model output is scrubbed again before it is streamed.
+- **Agentic routing:** a LangGraph `StateGraph` routes each turn by local embeddings + Qdrant to
+  billing, technical support, general help, or a refusal when prompt injection is detected, with
+  per-thread memory in a Redis checkpointer.
+- **Human in the loop:** a refund request pauses the graph (`interrupt()`) until the thread owner
+  calls `POST /approve`; a refund is applied at most once.
+- **Reliability:** idempotent enqueue, dedupe leases, Kafka offsets committed only after a durable
+  outcome, and a dead-letter queue plus an SSE `error` event when a dependency fails.
+- **Operations:** HTTP Basic auth with thread ownership, per-thread rate limits, OpenTelemetry traces
+  to Jaeger and LLM traces to LangFuse, a Redis `audit:events` trail, a React chat window, and Caddy
+  TLS in front; runs at $0 on CPU with Ollama or a deterministic mock.
+
+Contracts: `SPEC.md`. Summary for leadership: `docs/summary.md`. Known gaps:
+`docs/known_limitations.md`.
+
 ## Tech stack
 
 Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
@@ -92,9 +113,9 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Config: every key and default is in `.env.example`; settings come from the environment.
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
-- Real inference instead of the mock: `docker compose -f deploy/compose.yaml --profile llm up -d
-  --build ollama`, publish its port, set `MOCK_LLM=false` and `LLM_BASE_URL` (not verified in this
-  build, see `docs/known_limitations.md`).
+  The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.
+- Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):
+  `MOCK_LLM=false docker compose -f deploy/compose.yaml --profile llm up -d --build --wait`.
 - Generate a user: `uv run python -m gateway.auth <user> <password>` → append to `AUTH_USERS`.
 
 ## Testing

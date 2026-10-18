@@ -10,7 +10,7 @@
 
 Wall time 47.62 s for 200 turns.
 
-Not verified, a hypothesis for the lead: POST time is dominated by queueing for the CPU-bound
+Not verified, a hypothesis for the lead (refuted by the follow-up investigation below): POST time is dominated by queueing for the CPU-bound
 Presidio scrub (5.72 ms p95 in isolation, `docs/reports/pii_recall.json`) on a gateway capped at 1
 CPU with ~10 requests in flight per replica. Raising the gateway CPU cap or replica count is the
 first experiment. The lead sets the SLOs; nothing here is tuned to a target.

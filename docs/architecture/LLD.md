@@ -187,7 +187,9 @@ system prompt is byte-identical to the baseline and that injected text appears o
 ## 10 · Output guard and streaming
 
 The worker buffers model tokens until a sentence boundary (or 200 chars), runs the scrubber on that
-chunk off-loop, checks for a system-prompt echo, then XADDs the chunk's tokens. This trades a little
+chunk off-loop, checks for a system-prompt echo, then XADDs the chunk's tokens. Echoed
+`<user_message>` / `<history>` blocks and stray delimiter tags are removed first; while such a block
+is still open the guard keeps buffering (up to 2000 chars) so a half-echoed block is never streamed. This trades a little
 time-to-first-token for the guarantee that unscrubbed output never reaches the stream, checkpoint,
 logs or traces. An entity split across a chunk boundary is a known residual risk.
 

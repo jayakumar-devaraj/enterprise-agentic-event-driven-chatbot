@@ -17,10 +17,11 @@ instructions take precedence over the brief and changed several of these.
 | Eval | — | DeepEval (dev-only) | Round 2 |
 | Qdrant transport | REST :6333 | Worker searches over gRPC :6334 (`prefer_grpc`); REST kept for seed and healthcheck | Chat, 11:07 CDT |
 | React client | Tier 2 | Restored after the Step B cut; deadline 17:40 CDT | Chat, 10:58 CDT |
-| Deadline | Tier marks within 5 h | 7 h 20 min window ending 17:40 CDT | Gate B, later go |
-| Cuts | Tiers 1–3 | Tier 3, A9, A10, service images/e2e cut (A8 restored) | Step B |
+| Deadline | Tier marks within 5 h | 7 h 20 min window ending 17:40 CDT, then extended to 19:30 and 20:30 CDT | Gate B, later go; "a", "b" after wrap-up |
+| Cuts | Tiers 1–3 | Tier 3, A9, A10, service images/e2e cut at Step B (A8 restored); all rebuilt 17:07–19:20 (PRs #20–#25) except an automated A4 live-Qdrant-stop test | Step B; restored on the lead's request |
 
 ## Consequences
 - Runtime is no longer fully offline: scrubbed text egresses to LangFuse Cloud.
-- Basic auth without TLS sends credentials in cleartext (Tier 3 proxy cut).
+- Basic auth is encrypted only through the Caddy TLS entry point (:8443); the direct dev ports send
+  credentials in cleartext.
 - `SPEC.md` carries the added contracts; anything not there is not guaranteed.
