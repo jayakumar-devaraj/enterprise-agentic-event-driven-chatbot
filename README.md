@@ -137,7 +137,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run pytest                      # unit tests (integration excluded by default)
 uv run pytest -m integration       # needs the compose stack + seed from Quickstart
 uv run pytest -m "not scale and not llm and not durability" --cov=chat_common --cov=gateway --cov=worker --cov=seed
-uv run pytest -m durability   # own compose project: SIGKILL, replacement, backup/restore, A4 Qdrant outage
+uv run pytest -m durability   # own compose project: SIGKILL, replacement, backup/restore, A4 Qdrant outage, A5 worker SIGKILL
 uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
 uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
