@@ -80,3 +80,4 @@ containers (PR #21, `docs/reports/e2e-containers.md`), added A10 (PR #22), A9 wi
 round trip — which exposed and fixed an SSE relay bug where the gateway's Redis client timed out its
 own `XREAD BLOCK` (PR #23, regression test `tests/integration/test_stream_slow_first_event.py`) —
 Caddy TLS/HTTP/2 (PR #24), the first A11 latency measurement (PR #25), and this reconciliation.
+| review findings | docs: A11 investigation (worker CPU bottleneck, AIOProducer 1 s buffer; reverted fix attempt) | fix-review-items | see PR |
