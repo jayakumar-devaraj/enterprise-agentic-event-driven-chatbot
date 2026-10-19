@@ -43,3 +43,12 @@ def test_secrets_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
     """Secret values never appear in repr (and so never in logs)."""
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-very-secret")
     assert "sk-very-secret" not in repr(Settings())
+
+
+def test_stream_maxlen_must_hold_a_whole_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A trimmed stream would leave a resuming client with a seq gap; a reply never fills it."""
+    monkeypatch.setenv("STREAM_MAXLEN", "258")
+    with pytest.raises(ValidationError, match="STREAM_MAXLEN=258 must exceed"):
+        Settings()
+    monkeypatch.setenv("STREAM_MAXLEN", "259")
+    assert Settings().stream_maxlen == 259

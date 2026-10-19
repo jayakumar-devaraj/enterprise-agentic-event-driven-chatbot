@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from chat_common.schemas import TERMINAL_TYPES
+from chat_common.schemas import TERMINAL_TYPES, ErrorEvent
 from fastapi.sse import ServerSentEvent
 
 log = logging.getLogger("gateway.sse")
@@ -38,3 +38,11 @@ async def relay(
     except asyncio.CancelledError:
         log.info("client disconnected", extra={"stream": key})
         raise
+
+
+def expired_event() -> ServerSentEvent:
+    """Terminal event for a finished message whose stream outlived STREAM_TTL_S (SPEC §6)."""
+    event = ErrorEvent(
+        seq=0, code="stream_expired", detail="This reply is no longer available to stream."
+    )
+    return ServerSentEvent(event="error", raw_data=event.model_dump_json())

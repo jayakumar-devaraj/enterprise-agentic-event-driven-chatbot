@@ -72,6 +72,19 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _stream_holds_a_whole_reply(self) -> "Settings":
+        """A reply is at most LLM_MAX_TOKENS tokens, one redaction token and a terminal event.
+
+        A stream long enough for that is never trimmed, so a resuming client never meets a gap.
+        """
+        if not self.stream_maxlen > self.llm_max_tokens + 2:
+            raise ValueError(
+                f"STREAM_MAXLEN={self.stream_maxlen} must exceed "
+                f"LLM_MAX_TOKENS+2={self.llm_max_tokens + 2}"
+            )
+        return self
+
     @property
     def cors_origin_list(self) -> list[str]:
         """CORS allowlist; a wildcard is rejected rather than silently allowed."""

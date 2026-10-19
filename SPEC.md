@@ -24,7 +24,7 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 | Endpoint | Success | Errors |
 |---|---|---|
 | `POST /chat` | 202 `ChatAccepted`, only after the broker acknowledged the record; a repeated `message_id` with the same request returns the same 202 body, and one whose earlier attempt was never acknowledged (or not audited) is produced again; reuse for a different request is rejected for `DEDUPE_TTL_S` after acceptance | 401 credentials · 403 thread owned by another user · 413 message over `MAX_MESSAGE_CHARS` · 422 invalid body, `thread_id`, or `message_id` reused for a different request (other thread, text or decision) · 429 per-thread rate limit · 503 Kafka or Redis unavailable |
-| `GET /stream/{thread_id}/{message_id}` | 200 `text/event-stream` | 401 · 403 · 422 · 503 |
+| `GET /stream/{thread_id}/{message_id}` | 200 `text/event-stream` | 401 · 403 · 404 no stream and the message was never accepted · 422 · 503 |
 | `POST /approve/{thread_id}/{message_id}` | 202 `ChatAccepted` for the new message; a repeat of an already-delivered decision returns the same 202 even after the approval was consumed | 401 · 403 · 404 no pending approval (and no delivered decision under this `message_id`) · 422 · 503 |
 | `GET /healthz` | 200 while the process serves requests (liveness; no dependency checks) | — |
 | `GET /readyz` | 200 when Redis answers and the Kafka request topic is reachable (readiness; the image healthcheck) | 503 dependency down |
@@ -66,6 +66,14 @@ One Redis Stream per message, `tokens:{thread_id}:{message_id}`; `seq` starts at
 from config. SSE `id:` is the Redis entry id; the payload carries `seq`. Read from `0`, or from
 `Last-Event-ID` (exclusive) when sent. Close after `done`, `error` or `approval_required`. A client
 disconnect stops the relay without error logs.
+
+A reply never exceeds `LLM_MAX_TOKENS` tokens, one redaction token and a terminal event, and settings
+validation fails startup unless `STREAM_MAXLEN > LLM_MAX_TOKENS + 2`, so a stream is never trimmed and
+a resume never meets a gap. A stream that no longer exists, for a message that finished (dedupe
+`done`), expired after `STREAM_TTL_S`: the response is a single terminal
+`ErrorEvent{seq: 0, code: "stream_expired"}` with no `id:`, sent at once whether or not
+`Last-Event-ID` is given. A missing stream for a message that is still queued or running is waited
+for, as before.
 
 Redelivery after a worker crash advances the conversation by one turn at most. A stream that already
 ends in a terminal event is kept unchanged and only the outcome is recorded. A reply already
