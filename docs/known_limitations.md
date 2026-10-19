@@ -129,3 +129,15 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   (DLQ, dedupe key deleted) and whose stream has also expired cannot be told apart from a queued
   one, so it still waits out the window. The finished reply itself is not retrievable once its
   stream expires; no history endpoint exists.
+- **Rebalance under load automated (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):**
+  `test_rebalance_while_processing_loses_and_duplicates_nothing` in
+  `tests/durability/test_worker_kill.py` produces 600 messages on 12 threads in four batches, one
+  right before each step: scale the worker 1 → 3, SIGKILL one replica, scale to 2, back to 1. At
+  least two steps must leave work unfinished when they return. It then requires one `done` with
+  contiguous `seq` per message, and every thread's turns in order with one pair per message. A first
+  version with one up-front batch passed locally (629 s), but failed its guard in one CI run because
+  the runner drained every message before the second step (the correctness checks still passed). The
+  batched version is verified in CI only: a local rerun was stopped for low host memory. Not shown:
+  whether a fenced write was rejected during the run (the project's logs are removed with it), or
+  that the test fails on the code before ADR 0009. Step timing is wall-clock based, like the kill
+  test.
