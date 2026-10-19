@@ -45,6 +45,15 @@ def test_secrets_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "sk-very-secret" not in repr(Settings())
 
 
+def test_stream_maxlen_must_hold_a_whole_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A trimmed stream would leave a resuming client with a seq gap; a reply never fills it."""
+    monkeypatch.setenv("STREAM_MAXLEN", "258")
+    with pytest.raises(ValidationError, match="STREAM_MAXLEN=258 must exceed"):
+        Settings()
+    monkeypatch.setenv("STREAM_MAXLEN", "259")
+    assert Settings().stream_maxlen == 259
+
+
 def test_dedupe_ttl_must_outlive_kafka_retention(monkeypatch: pytest.MonkeyPatch) -> None:
     """Kafka can redeliver a record until retention plus one segment; dedupe must remember it."""
     s = Settings()

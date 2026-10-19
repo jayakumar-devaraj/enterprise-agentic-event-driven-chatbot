@@ -1,6 +1,7 @@
 """A3: SSE ordering, late join from 0, Last-Event-ID resume, per-turn isolation (real Redis)."""
 
 import json
+import time
 import uuid
 
 import httpx
@@ -43,7 +44,7 @@ class _Router:
 
 
 def parse_sse(body: str) -> list[dict]:
-    """Parse `id:` / `event:` / `data:` frames; keep-alive comments are skipped."""
+    """Parse `id:` (None if absent) / `event:` / `data:` frames; skip keep-alive comments."""
     frames = []
     for block in body.strip().split("\n\n"):
         fields = dict(
@@ -51,7 +52,7 @@ def parse_sse(body: str) -> list[dict]:
         )
         if fields:
             frames.append(
-                {"id": fields["id"], "event": fields["event"], **json.loads(fields["data"])}
+                {"id": fields.get("id"), "event": fields["event"], **json.loads(fields["data"])}
             )
     return frames
 
@@ -141,3 +142,31 @@ async def test_stream_requires_owner() -> None:
             bad = await client.get(f"/stream/bad id/{mid}", auth=("bob", "bob-pw"))
     assert r.status_code == 403
     assert bad.status_code == 422
+
+
+async def test_expired_stream_of_a_finished_message_ends_at_once_with_stream_expired() -> None:
+    """Finished (dedupe `done`) but its stream outlived STREAM_TTL_S: one defined terminal event,
+    not a silent wait for the relay's whole window (SPEC §6)."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread, mid = f"a3x-{uuid.uuid4().hex[:8]}", uuid.uuid4()
+    await redis.set(auth.owner_key(thread), "alice", ex=600)
+    await redis.set(f"delivered:{mid}", "x", ex=600)
+    await redis.set(f"dedupe:{mid}", "done", ex=600)
+    await redis.aclose()
+
+    started = time.monotonic()
+    r = await _get(thread, mid, last_id="1-0")
+    assert time.monotonic() - started < 5  # the relay window in _get is 10 s; app setup is ~3 s
+    (event,) = parse_sse(r.text)
+    assert (event["event"], event["seq"], event["code"]) == ("error", 0, "stream_expired")
+    assert event["id"] is None  # synthetic: there is no Redis entry to resume from
+
+
+async def test_stream_of_an_unknown_message_is_404() -> None:
+    """Never accepted (no `delivered:` marker) and no stream: 404 before any event."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread = f"a3u-{uuid.uuid4().hex[:8]}"
+    await redis.set(auth.owner_key(thread), "alice", ex=600)
+    await redis.aclose()
+    r = await _get(thread, uuid.uuid4())
+    assert r.status_code == 404

@@ -122,6 +122,13 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   LangGraph checkpoint writes, `pending_approval:*` and audit entries. A stale worker reaches them
   only if it stalls for a full lease between two adjacent awaits, and can then duplicate an audit
   entry or replace a checkpoint. The DLQ produce is preceded by a non-atomic lease check.
+- **Expired streams (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):** opening or
+  resuming a stream that had expired used to wait silently for up to `STREAM_TTL_S` (1 h) and then
+  close with no terminal event. A finished message now gets an immediate `stream_expired` error
+  event, and a message that was never accepted gets 404 (SPEC §6). Residual: a message that failed
+  (DLQ, dedupe key deleted) and whose stream has also expired cannot be told apart from a queued
+  one, so it still waits out the window. The finished reply itself is not retrievable once its
+  stream expires; no history endpoint exists.
 - **Rebalance under load automated (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):**
   `test_rebalance_while_processing_loses_and_duplicates_nothing` in
   `tests/durability/test_worker_kill.py` produces 300 messages on 12 threads. While they are
