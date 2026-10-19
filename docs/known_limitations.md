@@ -122,3 +122,12 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   LangGraph checkpoint writes, `pending_approval:*` and audit entries. A stale worker reaches them
   only if it stalls for a full lease between two adjacent awaits, and can then duplicate an audit
   entry or replace a checkpoint. The DLQ produce is preceded by a non-atomic lease check.
+- **Rebalance under load automated (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):**
+  `test_rebalance_while_processing_loses_and_duplicates_nothing` in
+  `tests/durability/test_worker_kill.py` produces 300 messages on 12 threads. While they are
+  processed, it scales the worker 1 → 3, SIGKILLs one replica, then scales to 2 and back to 1. At
+  least two steps must land with work pending. It then requires one `done` with contiguous `seq` per
+  message, and every thread's turns in order with one pair per message. Passed locally in 629 s,
+  together with the kill test. Not shown: whether a fenced write was rejected during the run (the
+  project's logs are removed with it), or that the test fails on the code before ADR 0009. Step
+  timing is wall-clock based, like the kill test.

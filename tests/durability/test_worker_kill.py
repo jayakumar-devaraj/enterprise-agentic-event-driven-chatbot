@@ -52,6 +52,11 @@ def _compose(*args: str, timeout: int = 900) -> None:
     subprocess.run(cmd, env=ENV, check=True, capture_output=True, timeout=timeout)
 
 
+def _kill(replica: str) -> None:
+    """SIGKILL one replica of the isolated project (`compose kill` would hit every replica)."""
+    subprocess.run(["docker", "kill", f"{PROJECT}-{replica}"], check=True, capture_output=True)
+
+
 @pytest.fixture(scope="module")
 def stack() -> Iterator[None]:
     """Fresh infra + seed + one worker built from this checkout; removed afterwards."""
@@ -87,10 +92,10 @@ class _Unused:
         raise AssertionError
 
 
-async def test_a5_sigkill_during_processing_loses_and_duplicates_nothing(stack) -> None:
-    """Every message: one `done`, contiguous seq; every thread: one user+assistant pair each."""
+def _envelopes(prefix: str, threads: int, per_thread: int) -> tuple[list[str], list[Envelope]]:
+    """`per_thread` messages on each of `threads` new threads, interleaved across threads."""
     run = uuid.uuid4().hex[:6]
-    threads = [f"a5-{run}-{i}" for i in range(THREADS)]
+    names = [f"{prefix}-{run}-{i}" for i in range(threads)]
     envelopes = [
         Envelope(
             message_id=uuid.uuid4(),
@@ -100,9 +105,44 @@ async def test_a5_sigkill_during_processing_loses_and_duplicates_nothing(stack) 
             ts=datetime.now(UTC),
             trace_id="t",
         )
-        for n in range(PER_THREAD)
-        for t in threads
+        for n in range(per_thread)
+        for t in names
     ]
+    return names, envelopes
+
+
+async def _assert_each_processed_once(
+    redis: aioredis.Redis, threads: list[str], envelopes: list[Envelope], per_thread: int
+) -> None:
+    """Wait for all; then every message: one `done`, contiguous seq; every thread: its turns in
+    order, one user+assistant pair per message."""
+    deadline = time.monotonic() + 300
+    while await _terminal_count(redis, envelopes) < len(envelopes):
+        assert time.monotonic() < deadline, "messages still unfinished after 300 s"
+        await asyncio.sleep(1)
+
+    for env in envelopes:
+        rows = await redis.xrange(f"tokens:{env.thread_id}:{env.message_id}")
+        events = [json.loads(f["data"]) for _, f in rows]
+        assert [e["seq"] for e in events] == list(range(len(events))), env.message_id
+        assert [e["type"] for e in events].count("done") == 1, events[-3:]
+        assert events[-1]["type"] == "done", events[-1]
+        assert await redis.get(f"dedupe:{env.message_id}") == "done"
+
+    async with AsyncRedisSaver.from_conn_string(REDIS_URL) as saver:
+        graph = build_graph(_Unused(), MockEngine(), _Unused.route, 256).compile(  # type: ignore[arg-type]
+            checkpointer=saver
+        )
+        for t in threads:
+            snapshot = await graph.aget_state({"configurable": {"thread_id": t}})
+            users = [x["text"] for x in snapshot.values["turns"] if x["role"] == "user"]
+            assert users == [f"message {n} on {t}" for n in range(per_thread)], t
+            assert len(snapshot.values["turns"]) == 2 * per_thread, t
+
+
+async def test_a5_sigkill_during_processing_loses_and_duplicates_nothing(stack) -> None:
+    """Every message: one `done`, contiguous seq; every thread: one user+assistant pair each."""
+    threads, envelopes = _envelopes("a5", THREADS, PER_THREAD)
     _produce(envelopes)
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     kills_with_work_pending = 0
@@ -113,29 +153,37 @@ async def test_a5_sigkill_during_processing_loses_and_duplicates_nothing(stack) 
                 kills_with_work_pending += 1
             _compose("kill", "worker")
             _compose("up", "-d", "--wait", "--no-build", "worker")
-
-        deadline = time.monotonic() + 300
-        while await _terminal_count(redis, envelopes) < len(envelopes):
-            assert time.monotonic() < deadline, "messages still unfinished after 300 s"
-            await asyncio.sleep(1)
-
-        for env in envelopes:
-            rows = await redis.xrange(f"tokens:{env.thread_id}:{env.message_id}")
-            events = [json.loads(f["data"]) for _, f in rows]
-            assert [e["seq"] for e in events] == list(range(len(events))), env.message_id
-            assert [e["type"] for e in events].count("done") == 1, events[-3:]
-            assert events[-1]["type"] == "done", events[-1]
-            assert await redis.get(f"dedupe:{env.message_id}") == "done"
-
-        async with AsyncRedisSaver.from_conn_string(REDIS_URL) as saver:
-            graph = build_graph(_Unused(), MockEngine(), _Unused.route, 256).compile(  # type: ignore[arg-type]
-                checkpointer=saver
-            )
-            for t in threads:
-                snapshot = await graph.aget_state({"configurable": {"thread_id": t}})
-                users = [x["text"] for x in snapshot.values["turns"] if x["role"] == "user"]
-                assert users == [f"message {n} on {t}" for n in range(PER_THREAD)], t
-                assert len(snapshot.values["turns"]) == 2 * PER_THREAD, t
+        await _assert_each_processed_once(redis, threads, envelopes, PER_THREAD)
     finally:
         await redis.aclose()
     assert kills_with_work_pending >= 1, "no kill landed while messages were in flight"
+
+
+async def test_rebalance_while_processing_loses_and_duplicates_nothing(stack) -> None:
+    """Partitions move between consumers mid-flight: scale out, SIGKILL one replica, scale in.
+
+    Each step rebalances the consumer group, so a partition's uncommitted records are redelivered
+    to a new owner while the old one may still hold their dedupe lease (ADR 0009).
+    """
+    threads, envelopes = _envelopes("rb", 2 * THREADS, PER_THREAD // 2)
+    _produce(envelopes)
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    steps_with_work_pending = 0
+    try:
+        for step in (
+            ("up", "-d", "--wait", "--no-build", "--scale", "worker=3", "worker"),
+            ("kill", "worker-2"),
+            ("up", "-d", "--wait", "--no-build", "--scale", "worker=2", "worker"),
+            ("up", "-d", "--wait", "--no-build", "--scale", "worker=1", "worker"),
+        ):
+            await asyncio.sleep(1.5)
+            if await _terminal_count(redis, envelopes) < len(envelopes):
+                steps_with_work_pending += 1
+            if step[0] == "kill":
+                _kill(step[1])
+            else:
+                _compose(*step)
+        await _assert_each_processed_once(redis, threads, envelopes, PER_THREAD // 2)
+    finally:
+        await redis.aclose()
+    assert steps_with_work_pending >= 2, "rebalances did not land while messages were in flight"
