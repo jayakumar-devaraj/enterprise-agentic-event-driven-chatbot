@@ -34,7 +34,7 @@ from redis.exceptions import RedisError
 
 from gateway import auth
 from gateway.producer import DependencyUnavailable, EnvelopeSink, KafkaEnvelopeProducer
-from gateway.sse import relay
+from gateway.sse import expired_event, relay
 
 log = logging.getLogger("gateway")
 _basic = HTTPBasic(auto_error=False)
@@ -221,18 +221,32 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         message_id: uuid.UUID,
         user: Annotated[str, Depends(current_user)],
         deps: Annotated[Deps, Depends(_deps)],
-    ) -> str:
-        """Resolve auth, validation and ownership before the response starts streaming."""
+    ) -> tuple[str, bool]:
+        """Resolve auth, validation, ownership and a missing stream before streaming starts.
+
+        Returns the stream key and whether the stream expired: the message finished (dedupe
+        `done`) but its stream is gone. With no stream and no `delivered:` marker the message was
+        never accepted (404). Otherwise a missing stream is still to come (queued or running).
+        """
         await require_owner(deps, thread_id, user)
-        return stream_key(thread_id, message_id)
+        key = stream_key(thread_id, message_id)
+        if await deps.redis.exists(key):
+            return key, False
+        if await deps.redis.get(f"delivered:{message_id}") is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown message")
+        return key, await deps.redis.get(f"dedupe:{message_id}") == "done"
 
     @app.get("/stream/{thread_id}/{message_id}", response_class=EventSourceResponse)
     async def stream(
-        key: Annotated[str, Depends(stream_access)],
+        access: Annotated[tuple[str, bool], Depends(stream_access)],
         deps: Annotated[Deps, Depends(_deps)],
         last_event_id: Annotated[str | None, Header()] = None,
     ) -> AsyncIterator[ServerSentEvent]:
         """Relay the message's events as SSE (SPEC.md §6)."""
+        key, expired = access
+        if expired:
+            yield expired_event()
+            return
         async for event in relay(
             deps.redis,
             key,

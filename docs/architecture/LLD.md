@@ -180,7 +180,7 @@ support per-message headers (spike b, ADR 0003). Consumer: `enable.auto.commit=f
 | Endpoint | 2xx | 401 | 403 | 404 | 413 | 422 | 429 | 503 |
 |---|---|---|---|---|---|---|---|---|
 | `POST /chat` | 202 `ChatAccepted` | bad/missing creds | thread owned by another user | — | message > `MAX_MESSAGE_CHARS` | invalid body / `thread_id` / reused `message_id` on another thread | per-thread rate | Kafka or Redis down |
-| `GET /stream/{t}/{m}` | 200 SSE | bad/missing creds | not owner | — | — | invalid ids | — | Redis down |
+| `GET /stream/{t}/{m}` | 200 SSE | bad/missing creds | not owner | no stream and no `delivered:{m}` | — | invalid ids | — | Redis down |
 | `POST /approve/{t}/{m}` | 202 `ChatAccepted` | bad/missing creds | not owner | no pending approval | — | invalid body | — | Kafka or Redis down |
 | `GET /healthz` | 200 (liveness) | — | — | — | — | — | — | — |
 | `GET /readyz` | 200 (Redis + Kafka topic) | — | — | — | — | — | — | dependency down |
