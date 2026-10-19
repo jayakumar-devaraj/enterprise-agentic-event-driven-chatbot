@@ -38,7 +38,9 @@ class Settings(BaseSettings):
     retry_backoff_max_s: float = 4
 
     dedupe_lease_s: int = 200
-    dedupe_ttl_s: int = 86400
+    dedupe_ttl_s: int = 777600  # 9 days: outlives Kafka retention + one segment (SPEC §5)
+    kafka_retention_ms: int = 604800000  # 7 days; applied to the topic by kafka-init
+    kafka_segment_ms: int = 86400000  # 1 day; deletion happens per closed segment
 
     checkpoint_ttl_min: int = 1440
     stream_maxlen: int = 2000
@@ -69,6 +71,20 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"DEDUPE_LEASE_S={self.dedupe_lease_s} must exceed "
                 f"INFERENCE_TIMEOUT_S*(MAX_RETRIES+1)+RETRY_BACKOFF_MAX_S*MAX_RETRIES={worst:g}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _dedupe_outlives_kafka_retention(self) -> "Settings":
+        """Kafka can redeliver a record (after lost offsets) until retention plus one segment.
+
+        A dedupe `done` marker that expired earlier would let that redelivery run as a new turn.
+        """
+        horizon_ms = self.kafka_retention_ms + self.kafka_segment_ms
+        if not self.dedupe_ttl_s * 1000 > horizon_ms:
+            raise ValueError(
+                f"DEDUPE_TTL_S={self.dedupe_ttl_s} must exceed "
+                f"(KAFKA_RETENTION_MS+KAFKA_SEGMENT_MS)/1000={horizon_ms / 1000:g}"
             )
         return self
 

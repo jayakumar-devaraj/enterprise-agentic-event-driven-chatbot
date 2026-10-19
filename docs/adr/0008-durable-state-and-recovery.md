@@ -35,3 +35,20 @@ The deployment is a single node: no replicas, no managed backups.
   `kafka-init` recreates the topics.
 - Growth is unbounded for `thread_owner:*`, `refund_applied:*` and the `refunds` stream, each one
   small entry per thread or refund. Retention for these is future work.
+
+## Addendum 2026-10-19 · Replay horizon
+Kafka kept records for the broker default `log.retention.hours=168` (7 days, read from the running
+broker), but dedupe `done` markers lived only `DEDUPE_TTL_S=86400` (1 day). After lost or reset
+offsets (a Kafka restore, or a manual reset), a record processed more than a day earlier would run
+again as a new turn: a duplicate reply and history turn. Refunds were safe (the marker never expires).
+
+Decision: `kafka-init` sets `retention.ms=KAFKA_RETENTION_MS` (7 days) and
+`segment.ms=KAFKA_SEGMENT_MS` (1 day) on `chat-requests`. It does this with `kafka-configs --alter`,
+so it also covers existing topics. Settings validation requires
+`DEDUPE_TTL_S × 1000 > KAFKA_RETENTION_MS + KAFKA_SEGMENT_MS`. Deletion is per closed segment, hence
+the extra segment. `DEDUPE_TTL_S` defaults to 9 days. Shortening retention to 1 day was rejected,
+because a worker outage longer than that would delete accepted but unconsumed requests.
+
+Consequences: `dedupe:*`, `accepted:*` and `delivered:*` keys live 9 days instead of 1, each one
+short string per message. The guarantee depends on the topic config that `kafka-init` applies. A
+topic changed by hand outside it is not checked at runtime.
