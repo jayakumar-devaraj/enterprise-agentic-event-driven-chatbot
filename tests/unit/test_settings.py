@@ -43,3 +43,15 @@ def test_secrets_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
     """Secret values never appear in repr (and so never in logs)."""
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-very-secret")
     assert "sk-very-secret" not in repr(Settings())
+
+
+def test_dedupe_ttl_must_outlive_kafka_retention(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kafka can redeliver a record until retention plus one segment; dedupe must remember it."""
+    s = Settings()
+    assert s.dedupe_ttl_s * 1000 > s.kafka_retention_ms + s.kafka_segment_ms
+    monkeypatch.setenv("DEDUPE_TTL_S", "86400")
+    with pytest.raises(ValidationError, match="DEDUPE_TTL_S=86400 must exceed"):
+        Settings()
+    monkeypatch.setenv("KAFKA_RETENTION_MS", "43200000")
+    monkeypatch.setenv("KAFKA_SEGMENT_MS", "3600000")
+    assert Settings().dedupe_ttl_s == 86400
