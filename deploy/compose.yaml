@@ -58,6 +58,11 @@ services:
         done
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
           --topic ${KAFKA_TOPIC:-chat-requests} --partitions ${KAFKA_PARTITIONS:-4} --replication-factor 1
+        # Retention bounds how long a record can be redelivered; DEDUPE_TTL_S must outlive it (SPEC §5).
+        # --alter also covers a topic created before these settings existed.
+        /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:9092 --alter --entity-type topics \
+          --entity-name ${KAFKA_TOPIC:-chat-requests} \
+          --add-config retention.ms=${KAFKA_RETENTION_MS:-604800000},segment.ms=${KAFKA_SEGMENT_MS:-86400000}
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
           --topic ${KAFKA_DLQ_TOPIC:-chat-requests.dlq} --partitions 1 --replication-factor 1
     restart: "no"

@@ -158,7 +158,7 @@ reserve under Phase 2.5 item 5.
 | LLM_MODEL / LLM_MAX_TOKENS | llama3.2:1b / 256 |
 | MOCK_LLM | true (CI/tests) |
 | INFERENCE_TIMEOUT_S / MAX_RETRIES / RETRY_BACKOFF_MAX_S | 60 / 2 / 4 |
-| DEDUPE_LEASE_S / DEDUPE_TTL_S | 200 (> 60×3 + 4×2 = 188) / 86400 |
+| DEDUPE_LEASE_S / DEDUPE_TTL_S | 200 (> 60×3 + 4×2 = 188) / 777600 (> Kafka retention + segment, SPEC §5) |
 | CHECKPOINT_TTL_MIN | 1440 |
 | STREAM_MAXLEN / STREAM_TTL_S / STREAM_BLOCK_MS | 2000 / 3600 / 5000 |
 | MAX_MESSAGE_CHARS (413 above) | 4000 |

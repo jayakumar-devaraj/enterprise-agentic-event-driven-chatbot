@@ -53,6 +53,15 @@ and commit; `processing:*` ⇒ do not commit; the lease expires and the message 
 Settings validation fails startup unless
 `DEDUPE_LEASE_S > INFERENCE_TIMEOUT_S × (MAX_RETRIES + 1) + RETRY_BACKOFF_MAX_S × MAX_RETRIES`.
 
+**Replay horizon.** Kafka keeps `chat-requests` records for `KAFKA_RETENTION_MS` (set on the topic by
+`kafka-init`, with `segment.ms = KAFKA_SEGMENT_MS`), so after lost or reset offsets it can redeliver
+a record for at most their sum. Settings validation fails startup unless
+`DEDUPE_TTL_S × 1000 > KAFKA_RETENTION_MS + KAFKA_SEGMENT_MS` (defaults: 9 days > 7 + 1 days), so any
+record Kafka can still redeliver finds its `done` marker and is skipped, also after later turns on
+the thread. If a `done` marker itself is lost (Redis loses up to 1 s of writes on a host crash, ADR
+0008), only a redelivery of the thread's latest answered message is recognised (from the checkpoint).
+An older one would run again as a new turn.
+
 Writes under the lease are fenced (ADR 0009). Token-stream appends and resets, `done`, release and
 the refund apply each check the token in the same Lua script, and fail before writing unless the
 lease still holds it. The DLQ produce is preceded by a lease check. A failed check stops the worker

@@ -273,3 +273,20 @@ async def test_stale_worker_cannot_write_after_another_took_over(stack, monkeypa
     assert len(await _turns(saver, graph, env.thread_id)) == 2
     assert await redis.get(f"dedupe:{env.message_id}") == "done"
     assert (consumer_a.commits, consumer_b.commits) == (0, 1)
+
+
+async def test_old_message_redelivered_after_a_later_turn_changes_nothing(stack) -> None:
+    """Offsets lost (restore, reset): Kafka replays M1 after M2 was answered. Within the replay
+    horizon (DEDUPE_TTL_S > Kafka retention + segment, SPEC §5) dedupe skips it."""
+    redis, worker, consumer, graph, saver = stack
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    first, second = _chat(thread, "Why is my bill higher?"), _chat(thread, "And next month?")
+    await worker.handle(Msg(first))
+    await worker.handle(Msg(second))
+    streams = (await _events(redis, first), await _events(redis, second))
+    turns = await _turns(saver, graph, thread)
+
+    await worker.handle(Msg(first))
+    assert (await _events(redis, first), await _events(redis, second)) == streams
+    assert await _turns(saver, graph, thread) == turns and len(turns) == 4
+    assert consumer.commits == 3
