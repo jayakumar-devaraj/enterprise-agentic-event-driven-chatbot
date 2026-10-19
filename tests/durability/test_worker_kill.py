@@ -165,25 +165,31 @@ async def test_rebalance_while_processing_loses_and_duplicates_nothing(stack) ->
     Each step rebalances the consumer group, so a partition's uncommitted records are redelivered
     to a new owner while the old one may still hold their dedupe lease (ADR 0009).
     """
-    threads, envelopes = _envelopes("rb", 2 * THREADS, PER_THREAD // 2)
-    _produce(envelopes)
+    steps = (
+        ("up", "-d", "--wait", "--no-build", "--scale", "worker=3", "worker"),
+        ("kill", "worker-2"),
+        ("up", "-d", "--wait", "--no-build", "--scale", "worker=2", "worker"),
+        ("up", "-d", "--wait", "--no-build", "--scale", "worker=1", "worker"),
+    )
+    threads, envelopes = _envelopes("rb", 2 * THREADS, PER_THREAD)
+    # One batch before each step, cut in message order, so per-thread order is kept and every
+    # step starts with fresh uncommitted records instead of racing a fast runner (CI drained a
+    # single up-front batch before the second step).
+    size = len(envelopes) // len(steps)
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    steps_with_work_pending = 0
+    steps_overlapping_work = 0
     try:
-        for step in (
-            ("up", "-d", "--wait", "--no-build", "--scale", "worker=3", "worker"),
-            ("kill", "worker-2"),
-            ("up", "-d", "--wait", "--no-build", "--scale", "worker=2", "worker"),
-            ("up", "-d", "--wait", "--no-build", "--scale", "worker=1", "worker"),
-        ):
-            await asyncio.sleep(1.5)
-            if await _terminal_count(redis, envelopes) < len(envelopes):
-                steps_with_work_pending += 1
+        for i, step in enumerate(steps):
+            produced = envelopes[: (i + 1) * size]
+            _produce(envelopes[i * size : (i + 1) * size])
             if step[0] == "kill":
                 _kill(step[1])
             else:
                 _compose(*step)
-        await _assert_each_processed_once(redis, threads, envelopes, PER_THREAD // 2)
+            # Still unfinished once the step returned ⇒ the rebalance overlapped in-flight work.
+            if await _terminal_count(redis, produced) < len(produced):
+                steps_overlapping_work += 1
+        await _assert_each_processed_once(redis, threads, envelopes, PER_THREAD)
     finally:
         await redis.aclose()
-    assert steps_with_work_pending >= 2, "rebalances did not land while messages were in flight"
+    assert steps_overlapping_work >= 2, "rebalances did not overlap in-flight messages"
