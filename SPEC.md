@@ -147,3 +147,30 @@ applications are written to the Redis stream `audit:events`.
 ## 11 · Config
 
 Every key has a default in `.env.example`; config comes from the environment.
+
+## 12 · Durability and recovery
+
+Failure model: one host. Redis writes an AOF with `appendfsync everysec` and Kafka a log with
+replication factor 1, each on a named volume. Objectives and measurements are in ADR 0008.
+
+| | Guarantee |
+|---|---|
+| RPO, process crash or container replacement | 0 for Redis and Kafka |
+| RPO, host or OS crash | Redis ≤ 1 s of acknowledged writes. Kafka bounded by the OS page-cache flush |
+| RTO | Redis 4.3 s, Kafka 16.5 s from SIGKILL to healthy (measured on the development machine, ADR 0008) |
+| Retention | `chat-requests` records `KAFKA_RETENTION_MS` (+ one `KAFKA_SEGMENT_MS`). Dedupe markers `DEDUPE_TTL_S` (§5). Token streams `STREAM_TTL_S`. Checkpoints `CHECKPOINT_TTL_MIN`, refreshed on read. Owner bindings and refund markers never expire. `audit:events` capped by `MAXLEN` |
+| Backup | Redis: tar of the stopped `redis-data` volume (README). Kafka: none |
+
+**Restoring a Redis backup.** The backup must be younger than `KAFKA_RETENTION_MS`. Stop the
+gateways and the workers, restore the volume, rewind the worker group to the earliest retained
+record, start the workers, and start the gateways once the group has no lag (README). Messages
+finished before the backup find their `done` marker and are skipped. Every message processed after
+it is processed again, in per-thread order, exactly once relative to the restored state: its turns,
+token stream, pending approval, refund receipt (`refunds` entry and marker) and thread binding (§3)
+are rebuilt. Not rebuilt: gateway-side records written after the backup (`accepted:`/`delivered:`
+markers, so a client retry of such a message is produced again and deduplicated, `*_accepted` audit
+entries, rate-limit counters). A real model's regenerated reply can differ from the one the client
+already saw. Gateways stay stopped until the replay finishes, because a thread whose binding was lost
+could otherwise be claimed before its replay restores it (the replay would then be refused,
+`thread_owner_mismatch`). Losing the Kafka volume loses the requests it held that no worker had
+finished, and their 202 acceptances.
