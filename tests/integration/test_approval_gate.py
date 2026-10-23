@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from datetime import timedelta
 
 import pytest
 import redis.asyncio as aioredis
@@ -120,4 +121,55 @@ async def test_non_refund_billing_message_is_not_gated() -> None:
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     events = await _process(redis, _chat(f"nb-{uuid.uuid4().hex[:8]}", "Why did my price go up?"))
     assert events[-1]["type"] == "done" and "approval_required" not in {e["type"] for e in events}
+    await redis.aclose()
+
+
+async def test_decision_accepted_after_the_window_is_refused_where_applied() -> None:
+    """The gateway checks expiry at acceptance; the worker enforces the same rule when it applies
+    the decision, using the acceptance time the envelope carries (SPEC §10)."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread = f"ax-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "I want a refund for last month")
+    await _process(redis, ask)
+    late = _decision(thread, ask.message_id, approved=True)
+    late = late.model_copy(update={"ts": late.ts + timedelta(seconds=3601)})
+
+    events = await _process(redis, late)
+    assert [(e["type"], e.get("code")) for e in events] == [("error", "approval_expired")]
+    assert await _refunds_for(redis, str(ask.message_id)) == 0
+    assert await redis.get(approval.pending_key(thread, str(ask.message_id))) is None
+    assert await _audit_events(redis, thread) == ["refund_proposed", "refund_expired"]
+    await redis.aclose()
+
+
+async def test_decision_from_another_user_is_refused_where_applied() -> None:
+    """Only the user who asked can decide, even for an envelope that bypassed the gateway."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread = f"au-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "I want a refund for last month")
+    await _process(redis, ask)
+    forged = _decision(thread, ask.message_id, approved=True).model_copy(update={"user_id": "bob"})
+
+    events = await _process(redis, forged)
+    assert [(e["type"], e.get("code")) for e in events] == [("error", "approval_forbidden")]
+    assert await _refunds_for(redis, str(ask.message_id)) == 0
+    assert await redis.get(approval.pending_key(thread, str(ask.message_id))) == "alice"
+    follow = await _process(redis, _decision(thread, ask.message_id, approved=True))
+    assert follow[-1]["type"] == "done" and await _refunds_for(redis, str(ask.message_id)) == 1
+    await redis.aclose()
+
+
+async def test_competing_decisions_first_wins_second_is_not_pending() -> None:
+    """Reject and approve under different message ids, both accepted: the first queued wins."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread = f"ac-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "Please refund my payment")
+    await _process(redis, ask)
+    no, yes = (_decision(thread, ask.message_id, approved=a) for a in (False, True))
+
+    first, second = await _process(redis, no), await _process(redis, yes)
+    assert " ".join(e["token"] for e in first if e["type"] == "token") == approval.REJECTED_TEXT
+    assert [(e["type"], e.get("code")) for e in second] == [("error", "approval_not_pending")]
+    assert await _refunds_for(redis, str(ask.message_id)) == 0
+    assert await _audit_events(redis, thread) == ["refund_proposed", "refund_rejected"]
     await redis.aclose()

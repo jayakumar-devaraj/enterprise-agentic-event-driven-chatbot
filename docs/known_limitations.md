@@ -141,3 +141,12 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   whether a fenced write was rejected during the run (the project's logs are removed with it), or
   that the test fails on the code before ADR 0009. Step timing is wall-clock based, like the kill
   test.
+- **Approval rules enforced where applied (2026-10-23, R4 of
+  `docs/reports/full-score-recommendations.md`):** before this change, the gateway alone checked the
+  approval window and the decider's identity. On real Redis, the worker applied a refund for a
+  decision accepted an hour after the window, and for a decision carrying another user's id. The
+  worker now refuses both (`approval_expired`, `approval_forbidden`; SPEC §10). Residuals: an
+  expired decision leaves the refund paused in the checkpoint, so the next chat on the thread also
+  audits it as `refund_abandoned`. A refund paused before `proposed_at` existed counts as expired.
+  The check compares the gateway's and the worker's clocks, which are the same host clock under
+  compose but would need synchronised clocks on separate hosts.

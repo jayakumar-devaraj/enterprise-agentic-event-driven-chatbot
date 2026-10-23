@@ -4,6 +4,7 @@ import logging
 import operator
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, TypedDict
 
 from chat_common.audit import AuditLog
@@ -38,6 +39,7 @@ class ChatState(TypedDict, total=False):
     route_score: float
     injection_score: float
     decision: dict[str, Any]
+    proposed_at: str  # ISO time the refund approval window opened (SPEC §10)
 
 
 async def _single(text: str) -> Any:
@@ -83,7 +85,7 @@ def build_graph(
 
     def after_route(state: ChatState) -> str:
         if approval.wants_refund(state["intent"], state["pending"]):
-            return "await_approval"
+            return "propose_refund"
         return state["intent"]
 
     async def stream_reply(deltas: Any) -> str:
@@ -121,6 +123,10 @@ def build_graph(
             ],
             "answered": state["message_id"],
         }
+
+    def propose_refund(state: ChatState) -> dict[str, Any]:
+        """Checkpoint when the approval window opens, before the pause, so it survives resumes."""
+        return {"proposed_at": datetime.now(UTC).isoformat()}
 
     def await_approval(state: ChatState) -> dict[str, Any]:
         """Pause before any side effect; resumed with {"approved": bool, "user_id": str}."""
@@ -162,10 +168,12 @@ def build_graph(
     for name in ("billing", "tech_support", "general", "refuse"):
         builder.add_node(name, respond)
         builder.add_edge(name, END)
+    builder.add_node("propose_refund", propose_refund)
     builder.add_node("await_approval", await_approval)
     builder.add_node("settle_refund", settle_refund)
     builder.add_edge(START, "route")
     builder.add_conditional_edges("route", after_route)
+    builder.add_edge("propose_refund", "await_approval")
     builder.add_edge("await_approval", "settle_refund")
     builder.add_edge("settle_refund", END)
     return builder
@@ -203,6 +211,21 @@ def make_processor(
                 ref = str(env.ref_message_id)
                 if paused != ref:
                     await writer.error("approval_not_pending", "no refund is awaiting approval")
+                    return
+                # The gateway already checked both; enforce them again where the action is applied.
+                if env.user_id != values.get("user_id"):
+                    await writer.error("approval_forbidden", "only the requester can decide")
+                    return
+                proposed = values.get("proposed_at")
+                deadline = proposed and datetime.fromisoformat(proposed) + timedelta(
+                    seconds=approval_ttl_s
+                )
+                if not deadline or env.ts > deadline:  # no proposed_at: paused before it existed
+                    await redis.delete(approval.pending_key(env.thread_id, ref))
+                    await AuditLog(redis).record(
+                        "refund_expired", actor=env.user_id, thread_id=env.thread_id, message_id=ref
+                    )
+                    await writer.error("approval_expired", "the refund approval window has closed")
                     return
                 await compiled.ainvoke(
                     Command(
