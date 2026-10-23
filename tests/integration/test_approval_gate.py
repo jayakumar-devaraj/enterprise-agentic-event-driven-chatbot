@@ -143,15 +143,21 @@ async def test_decision_accepted_after_the_window_is_refused_where_applied() -> 
 
 
 async def test_decision_from_another_user_is_refused_where_applied() -> None:
-    """Only the user who asked can decide, even for an envelope that bypassed the gateway."""
+    """Only the owner (the requester) can decide, even for an envelope that bypassed the gateway,
+    and even when the owner binding was lost: it is restored to the history's user, not to bob."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     thread = f"au-{uuid.uuid4().hex[:8]}"
     ask = _chat(thread, "I want a refund for last month")
     await _process(redis, ask)
     forged = _decision(thread, ask.message_id, approved=True).model_copy(update={"user_id": "bob"})
+    owner = f"thread_owner:{thread}"
 
     events = await _process(redis, forged)
-    assert [(e["type"], e.get("code")) for e in events] == [("error", "approval_forbidden")]
+    assert [(e["type"], e.get("code")) for e in events] == [("error", "thread_owner_mismatch")]
+    await redis.delete(owner)  # binding lost (Redis restore or a lost write)
+    again = await _process(redis, forged.model_copy(update={"message_id": uuid.uuid4()}))
+    assert [(e["type"], e.get("code")) for e in again] == [("error", "thread_owner_mismatch")]
+    assert await redis.get(owner) == "alice"
     assert await _refunds_for(redis, str(ask.message_id)) == 0
     assert await redis.get(approval.pending_key(thread, str(ask.message_id))) == "alice"
     follow = await _process(redis, _decision(thread, ask.message_id, approved=True))

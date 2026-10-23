@@ -106,3 +106,8 @@ TERMINAL_TYPES = frozenset({"done", "error", "approval_required"})
 def stream_key(thread_id: str, message_id: UUID | str) -> str:
     """Redis Stream key for one message's events (ADR 0005)."""
     return f"tokens:{thread_id}:{message_id}"
+
+
+def owner_key(thread_id: str) -> str:
+    """Redis key binding a thread to the user who opened it (SPEC §3)."""
+    return f"thread_owner:{thread_id}"

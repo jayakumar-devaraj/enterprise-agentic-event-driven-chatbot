@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, TypedDict
 
 from chat_common.audit import AuditLog
-from chat_common.schemas import Envelope
+from chat_common.schemas import Envelope, owner_key
 from chat_common.tracing import context_from_traceparent
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
@@ -200,6 +200,15 @@ def make_processor(
         try:
             snapshot = await compiled.aget_state(config)
             values = snapshot.values
+            # Ownership is checked here too, not only at the gateway. A missing binding (Redis
+            # restore, lost write) is restored to the user the history belongs to, or to this
+            # envelope's user for a new thread, so a replay never leaves history unowned and an
+            # intruder's envelope never claims it (SPEC §3, §12).
+            owner = owner_key(env.thread_id)
+            await redis.set(owner, values.get("user_id", env.user_id), nx=True)
+            if await redis.get(owner) != env.user_id:
+                await writer.error("thread_owner_mismatch", "this thread belongs to another user")
+                return
             paused = values.get("message_id") if "await_approval" in snapshot.next else None
             if values.get("answered") == mid and not snapshot.next:
                 # An earlier attempt checkpointed this reply, then died before `done`: re-send it.
@@ -212,10 +221,7 @@ def make_processor(
                 if paused != ref:
                     await writer.error("approval_not_pending", "no refund is awaiting approval")
                     return
-                # The gateway already checked both; enforce them again where the action is applied.
-                if env.user_id != values.get("user_id"):
-                    await writer.error("approval_forbidden", "only the requester can decide")
-                    return
+                # The gateway already checked expiry; enforce it again where the action is applied.
                 proposed = values.get("proposed_at")
                 deadline = proposed and datetime.fromisoformat(proposed) + timedelta(
                     seconds=approval_ttl_s
