@@ -118,6 +118,10 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   `docker run --rm -v chatbot_redis-data:/data:ro -v "$PWD":/backup redis:8.10.2 tar -C /data -cf /backup/redis.tar .`;
   restore by extracting into an empty `chatbot_redis-data` volume (`tar -C /data -xf`) before
   starting Redis again.
+- Dead-letter queue: `docker compose -f deploy/compose.yaml exec worker python -m worker.dlq list`
+  prints one JSON line per record (no message text); `... python -m worker.dlq replay --offset 3 7`
+  or `replay --all` re-produces the failed envelopes (SPEC §7). From the host, run it with
+  `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://127.0.0.1:16379/0 uv run python -m worker.dlq list`.
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.

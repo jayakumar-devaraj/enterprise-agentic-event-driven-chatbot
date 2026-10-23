@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
+import redis as redis_sync
 import redis.asyncio as aioredis
 from chat_common.schemas import Envelope
 from chat_common.settings import Settings
@@ -14,7 +15,8 @@ from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.aio import AIOConsumer, AIOProducer
 from conftest import KAFKA, REDIS_URL
-from worker.consumer import Worker
+from worker import dlq as dlq_tool
+from worker.consumer import TransientDependencyError, Worker
 from worker.streams import StreamWriter
 
 pytestmark = pytest.mark.integration
@@ -45,9 +47,11 @@ async def _produce(topic: str, values: list[bytes]) -> None:
     await producer.close()
 
 
-async def _run_worker(topic: str, dlq: str, process, expected_commits: int) -> None:
-    """Run a real Worker until it has committed `expected_commits` records (≤ 60 s)."""
-    group = f"it-{uuid.uuid4().hex[:8]}"
+async def _run_worker(
+    topic: str, dlq: str, process, expected_commits: int, group: str | None = None
+) -> None:
+    """Run a real Worker until `group` (default: new) has committed `expected_commits` (≤ 60 s)."""
+    group = group or f"it-{uuid.uuid4().hex[:8]}"
     consumer = AIOConsumer(
         {
             "bootstrap.servers": KAFKA,
@@ -176,3 +180,43 @@ async def test_a5_abandoned_lease_reprocessed_after_expiry(topics) -> None:
     assert len(processed_at) == 1
     assert processed_at[0] >= SETTINGS.dedupe_lease_s - 0.5
     assert [e["type"] for e in await _events(env.thread_id, env.message_id)] == ["done"]
+
+
+async def test_dlq_replay_reprocesses_a_dependency_failure(topics) -> None:
+    """A message dead-lettered for a dependency fault is replayed with the DLQ tool and completes.
+
+    The failed attempt left `ErrorEvent{dependency_unavailable}` in its stream; replay removes that
+    stream, else the worker would read it as an outcome already recorded and dead-letter it again.
+    """
+    req, dlq = topics
+    env = Envelope(message_id=uuid.uuid4(), thread_id="t-it", user_id="u", text="hi", trace_id="t")
+    group = f"it-{uuid.uuid4().hex[:8]}"
+
+    async def failing(e: Envelope, w: StreamWriter) -> None:
+        raise TransientDependencyError("qdrant down")
+
+    async def ok(e: Envelope, w: StreamWriter) -> None:
+        await w.token("back")
+        await w.done()
+
+    await _produce(req, [env.model_dump_json().encode()])
+    await _run_worker(req, dlq, failing, 1, group)
+    (record,) = dlq_tool.read(KAFKA, dlq)
+    assert (record.record["reason"], record.envelope) == ("dependency_unavailable", env)
+
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    sync = redis_sync.Redis.from_url(REDIS_URL, decode_responses=True)
+    try:
+        assert dlq_tool.replay([record], bootstrap=KAFKA, topic=req, redis=sync) == [
+            str(env.message_id)
+        ]
+        await _run_worker(req, dlq, ok, 2, group)
+        assert [(e["type"], e["seq"]) for e in await _events("t-it", env.message_id)] == [
+            ("token", 0),
+            ("done", 1),
+        ]
+        assert await redis.get(f"dedupe:{env.message_id}") == "done"
+        assert len(dlq_tool.read(KAFKA, dlq)) == 1  # not dead-lettered again
+    finally:
+        sync.close()
+        await redis.aclose()

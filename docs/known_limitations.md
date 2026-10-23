@@ -150,3 +150,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   audits it as `refund_abandoned`. A refund paused before `proposed_at` existed counts as expired.
   The check compares the gateway's and the worker's clocks, which are the same host clock under
   compose but would need synchronised clocks on separate hosts.
+- **DLQ replay tool (2026-10-23, section 2 of `docs/reports/full-score-recommendations.md`):**
+  `python -m worker.dlq` lists and replays dead-lettered envelopes. A naive re-produce was shown on
+  real Kafka and Redis to be dead-lettered again without processing, because the failed attempt's
+  `dependency_unavailable` stream read as an outcome already recorded. Replay therefore deletes that
+  stream first. Caveats: a replayed message joins its thread when it is replayed, after any later
+  turns. A replayed approval keeps its original acceptance time, so one replayed after the approval
+  window gets `approval_expired`. DLQ offsets are unambiguous only while the DLQ has one partition
+  (as `kafka-init` creates it).

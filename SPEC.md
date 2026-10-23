@@ -100,6 +100,13 @@ Infra fault (Qdrant / LLM / Redis) → bounded retries with backoff → `ErrorEv
 "dependency_unavailable"}` to the stream, record to the DLQ, then commit. Malformed envelope → DLQ
 immediately, no retry.
 
+DLQ records are inspected and replayed with `python -m worker.dlq list | replay --offset N... | --all`
+(worker image or `uv run`). Replay re-produces a record's envelope keyed by its thread. If the failed
+attempt's stream ends in `dependency_unavailable`, replay deletes it first, so the worker processes
+the message instead of recording the old outcome again. A replayed message joins its thread's order
+when it is replayed, not where it was first sent. Replay is idempotent (dedupe skips a completed
+message). Malformed records have no envelope and are not replayable.
+
 ## 8 · Routing and seeding
 
 Qdrant collection `intents` (384-dim, cosine), seeded by the one-shot `seed` service from
