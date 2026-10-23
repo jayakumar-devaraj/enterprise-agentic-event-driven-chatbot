@@ -52,3 +52,24 @@ because a worker outage longer than that would delete accepted but unconsumed re
 Consequences: `dedupe:*`, `accepted:*` and `delivered:*` keys live 9 days instead of 1, each one
 short string per message. The guarantee depends on the topic config that `kafka-init` applies. A
 topic changed by hand outside it is not checked at runtime.
+
+## Addendum 2026-10-23 · Recovering across the Redis and Kafka recovery points
+Redis and Kafka are restored independently. Restoring an older Redis backup while the worker group's
+committed offsets stay where they were silently lost everything processed since the backup: turns,
+streams, refund receipts and thread bindings. Kafka would never redeliver those records. History
+could also come back with no owner binding, so the next caller would claim it.
+
+Decision: recovery replays from Kafka. After a restore, the worker group is rewound to the earliest
+retained record. Dedupe markers outlive retention (addendum above), so the backup's finished messages
+are skipped and later ones are reprocessed once against the restored state. The worker re-binds
+ownership from the checkpointed history or the envelope (SPEC §3). Gateways stay stopped until the
+replay drains. The runbook is in the README, and the guarantee is in SPEC §12. It is verified by
+`tests/durability/test_restore_recovery.py`.
+
+Rejected: making Redis the only source of truth with more frequent backups. That narrows the loss
+window but never closes it. Rejected: replaying from the backup's timestamp instead of the earliest
+record. A message accepted before the backup but finished after it would be skipped and lost.
+
+Consequences: a backup older than `KAFKA_RETENTION_MS` cannot be fully recovered. Replay time grows
+with retained records (mostly `done` skips). Gateway-side records written after the backup are not
+rebuilt (SPEC §12).

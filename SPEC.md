@@ -40,7 +40,10 @@ user returns 403. The binding never expires, so it outlives every piece of threa
 checkpoints, token streams, pending approval and refund records. No deletion path exists. A
 `thread_id` stays bound to its first user and is never reusable by anyone else, and bindings grow by
 one short key per thread (ADR 0008). Deleting a thread would have to remove its data before its
-binding. The worker does not rely on the gateway alone for refund decisions (§10).
+binding. The worker checks ownership too, on every envelope it processes: a missing binding is
+restored to the user the thread's history belongs to (or the envelope's user for a new thread), and an
+envelope from anyone else gets `ErrorEvent{thread_owner_mismatch}` and changes nothing. A replay after a
+Redis restore therefore re-binds every thread it rebuilds (§12).
 
 ## 4 · Kafka
 
@@ -129,7 +132,7 @@ accepted by the gateway within that window. The gateway checks it at `/approve` 
 the worker checks it again before applying, against the acceptance time the envelope carries and the
 proposal time in the checkpoint (`proposed_at`). A decision accepted too late gets
 `ErrorEvent{approval_expired}`, is audited as `refund_expired`, and applies nothing. The worker also
-refuses a decision whose `user_id` is not the requester's (`approval_forbidden`). Both times come from
+refuses a decision whose `user_id` is not the thread owner's, which is the requester's (`thread_owner_mismatch`, §3). Both times come from
 the container clocks, which share the host clock under compose. When two different decisions are
 both accepted, the first one processed settles the refund and the second gets `approval_not_pending`.
 A new chat on the thread while a refund is pending abandons it (audited as
@@ -144,3 +147,30 @@ applications are written to the Redis stream `audit:events`.
 ## 11 · Config
 
 Every key has a default in `.env.example`; config comes from the environment.
+
+## 12 · Durability and recovery
+
+Failure model: one host. Redis writes an AOF with `appendfsync everysec` and Kafka a log with
+replication factor 1, each on a named volume. Objectives and measurements are in ADR 0008.
+
+| | Guarantee |
+|---|---|
+| RPO, process crash or container replacement | 0 for Redis and Kafka |
+| RPO, host or OS crash | Redis ≤ 1 s of acknowledged writes. Kafka bounded by the OS page-cache flush |
+| RTO | Redis 4.3 s, Kafka 16.5 s from SIGKILL to healthy (measured on the development machine, ADR 0008) |
+| Retention | `chat-requests` records `KAFKA_RETENTION_MS` (+ one `KAFKA_SEGMENT_MS`). Dedupe markers `DEDUPE_TTL_S` (§5). Token streams `STREAM_TTL_S`. Checkpoints `CHECKPOINT_TTL_MIN`, refreshed on read. Owner bindings and refund markers never expire. `audit:events` capped by `MAXLEN` |
+| Backup | Redis: tar of the stopped `redis-data` volume (README). Kafka: none |
+
+**Restoring a Redis backup.** The backup must be younger than `KAFKA_RETENTION_MS`. Stop the
+gateways and the workers, restore the volume, rewind the worker group to the earliest retained
+record, start the workers, and start the gateways once the group has no lag (README). Messages
+finished before the backup find their `done` marker and are skipped. Every message processed after
+it is processed again, in per-thread order, exactly once relative to the restored state: its turns,
+token stream, pending approval, refund receipt (`refunds` entry and marker) and thread binding (§3)
+are rebuilt. Not rebuilt: gateway-side records written after the backup (`accepted:`/`delivered:`
+markers, so a client retry of such a message is produced again and deduplicated, `*_accepted` audit
+entries, rate-limit counters). A real model's regenerated reply can differ from the one the client
+already saw. Gateways stay stopped until the replay finishes, because a thread whose binding was lost
+could otherwise be claimed before its replay restores it (the replay would then be refused,
+`thread_owner_mismatch`). Losing the Kafka volume loses the requests it held that no worker had
+finished, and their 202 acceptances.

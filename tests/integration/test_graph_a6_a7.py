@@ -59,7 +59,7 @@ async def _turn(router, engine, thread: str, text: str) -> list[dict]:
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(router, engine, get_scrubber().ascrub, 256).compile(checkpointer=saver)
-        await make_processor(graph)(env, writer)
+        await make_processor(graph, redis=redis)(env, writer)
     rows = await redis.xrange(writer.key)
     await redis.aclose()
     return [json.loads(f["data"]) for _, f in rows]
