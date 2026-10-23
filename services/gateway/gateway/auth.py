@@ -6,6 +6,8 @@ import hmac
 import secrets
 import sys
 
+from chat_common.schemas import owner_key  # noqa: F401  (re-exported: auth.owner_key)
+
 _N, _R, _P = 2**14, 8, 1
 
 
@@ -33,11 +35,6 @@ def verify(users: dict[str, str], username: str, password: str) -> bool:
     _, salt_b64, hash_b64 = encoded.split("$")
     candidate = hashlib.scrypt(password.encode(), salt=base64.b64decode(salt_b64), n=_N, r=_R, p=_P)
     return hmac.compare_digest(candidate, base64.b64decode(hash_b64)) and username in users
-
-
-def owner_key(thread_id: str) -> str:
-    """Redis key binding a thread to the user who opened it."""
-    return f"thread_owner:{thread_id}"
 
 
 if __name__ == "__main__":

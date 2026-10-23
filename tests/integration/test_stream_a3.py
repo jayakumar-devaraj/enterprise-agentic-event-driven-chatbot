@@ -70,7 +70,7 @@ async def _run_turn(thread: str, text: str) -> uuid.UUID:
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(_Router(), MockEngine(), get_scrubber().ascrub, 256)
-        await make_processor(graph.compile(checkpointer=saver))(env, writer)
+        await make_processor(graph.compile(checkpointer=saver), redis=redis)(env, writer)
     await redis.aclose()
     return env.message_id
 

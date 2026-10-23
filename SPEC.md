@@ -40,7 +40,10 @@ user returns 403. The binding never expires, so it outlives every piece of threa
 checkpoints, token streams, pending approval and refund records. No deletion path exists. A
 `thread_id` stays bound to its first user and is never reusable by anyone else, and bindings grow by
 one short key per thread (ADR 0008). Deleting a thread would have to remove its data before its
-binding. The worker does not rely on the gateway alone for refund decisions (§10).
+binding. The worker checks ownership too, on every envelope it processes: a missing binding is
+restored to the user the thread's history belongs to (or the envelope's user for a new thread), and an
+envelope from anyone else gets `ErrorEvent{thread_owner_mismatch}` and changes nothing. A replay after a
+Redis restore therefore re-binds every thread it rebuilds (§12).
 
 ## 4 · Kafka
 
@@ -129,7 +132,7 @@ accepted by the gateway within that window. The gateway checks it at `/approve` 
 the worker checks it again before applying, against the acceptance time the envelope carries and the
 proposal time in the checkpoint (`proposed_at`). A decision accepted too late gets
 `ErrorEvent{approval_expired}`, is audited as `refund_expired`, and applies nothing. The worker also
-refuses a decision whose `user_id` is not the requester's (`approval_forbidden`). Both times come from
+refuses a decision whose `user_id` is not the thread owner's, which is the requester's (`thread_owner_mismatch`, §3). Both times come from
 the container clocks, which share the host clock under compose. When two different decisions are
 both accepted, the first one processed settles the refund and the second gets `approval_not_pending`.
 A new chat on the thread while a refund is pending abandons it (audited as
