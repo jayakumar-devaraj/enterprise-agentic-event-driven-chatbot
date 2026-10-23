@@ -128,11 +128,12 @@ failed write never leaves a marker without its refund record. The marker never e
 stateDiagram-v2
   [*] --> route
   route --> refuse: injection margin ≥ INJECTION_MARGIN
-  route --> await_approval: intent=billing and "refund" in text
+  route --> propose_refund: intent=billing and "refund" in text
+  propose_refund --> await_approval: checkpoint proposed_at
   route --> billing: intent=billing
   route --> tech_support: intent=tech_support
   route --> general: score < ROUTE_THRESHOLD or intent=general
-  await_approval --> settle_refund: resumed by POST /approve (apply or reject)
+  await_approval --> settle_refund: resumed by the requester's decision, accepted in time
   billing --> [*]
   tech_support --> [*]
   general --> [*]
