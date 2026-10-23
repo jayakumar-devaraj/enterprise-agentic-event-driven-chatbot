@@ -124,8 +124,15 @@ output is scrubbed before it is checkpointed, streamed, logged or traced.
 ## 10 · Human approval gate
 
 A refund request proposed by the billing node is not applied until the thread owner approves it via
-`POST /approve`. Pending approvals expire after `APPROVAL_TTL_S`, checked when `/approve` is
-accepted. A new chat on the thread while a refund is pending abandons it (audited as
+`POST /approve`. Pending approvals expire `APPROVAL_TTL_S` after the proposal: a decision must be
+accepted by the gateway within that window. The gateway checks it at `/approve` (404 after it), and
+the worker checks it again before applying, against the acceptance time the envelope carries and the
+proposal time in the checkpoint (`proposed_at`). A decision accepted too late gets
+`ErrorEvent{approval_expired}`, is audited as `refund_expired`, and applies nothing. The worker also
+refuses a decision whose `user_id` is not the requester's (`approval_forbidden`). Both times come from
+the container clocks, which share the host clock under compose. When two different decisions are
+both accepted, the first one processed settles the refund and the second gets `approval_not_pending`.
+A new chat on the thread while a refund is pending abandons it (audited as
 `refund_abandoned`); a later `/approve` for it returns 404. A refund is applied at most once per
 originating message: the marker, the `refunds` stream entry and the `refund_applied` audit entry
 are written together or not at all (arguments and key types are checked before the first write), the
