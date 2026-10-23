@@ -36,7 +36,11 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 
 The first authenticated `POST /chat` on a `thread_id` binds it to that user
 (`thread_owner:{thread_id}`); every later chat, stream or approve call on that thread by another
-user returns 403. The binding never expires, so it outlives every piece of thread data.
+user returns 403. The binding never expires, so it outlives every piece of thread data: its
+checkpoints, token streams, pending approval and refund records. No deletion path exists. A
+`thread_id` stays bound to its first user and is never reusable by anyone else, and bindings grow by
+one short key per thread (ADR 0008). Deleting a thread would have to remove its data before its
+binding. The worker does not rely on the gateway alone for refund decisions (§10).
 
 ## 4 · Kafka
 
