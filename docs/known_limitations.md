@@ -167,3 +167,9 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   produce takes about 2 s even in isolation, and times out (503) inside the loaded gateway. Worker
   CPU outside traced spans and the queue delay are unexplained. No fix attempted; next experiments
   are in the report.
+  **Update, same day:** the produce floor and the 503s were fixed (`AIOProducer` unbatched with a
+  delivery-report task, ADR 0003 addendum). On the same load, mock errors went 9 → 0 and steady-state
+  POST p95 dropped to 181 ms. The first 20 requests after a gateway restart still take about 6–7 s
+  (cold start, cause unknown), so POST p95 over the whole run still fails. Worker-side queue delay
+  (p95 8.8 s) and real-model first-token latency still fail. The report's percentiles were
+  recomputed with the inclusive method, since the exclusive default extrapolated small samples.
