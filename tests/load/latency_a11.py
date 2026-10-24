@@ -77,16 +77,18 @@ async def one(client: httpx.AsyncClient, base: str) -> dict:
         return {**out, "error": f"{type(exc).__name__}"}
 
 
-def queue_delays(message_ids: set[str], since_s: float) -> list[float]:
+def queue_delays(
+    message_ids: set[str], since_s: float, until_s: float | None = None
+) -> list[float]:
     """Seconds from the record reaching the gateway's Kafka client to the worker's span start."""
     since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(since_s - 60))
-    until = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 60))
+    until = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime((until_s or time.time()) + 60))
     params = {
         "query.service_name": "worker",
         "query.operation_name": "worker.process",
         "query.start_time_min": since,
         "query.start_time_max": until,
-        "query.search_depth": str(len(message_ids) * 2),
+        "query.search_depth": str(len(message_ids) * 2),  # newest first: keep the window tight
     }
     found = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60).json()
     trace_ids = {
@@ -115,7 +117,7 @@ def queue_delays(message_ids: set[str], since_s: float) -> list[float]:
 
 def pct(values: list[float]) -> dict[str, float]:
     """p50/p95/p99 in milliseconds."""
-    q = statistics.quantiles(values, n=100)
+    q = statistics.quantiles(values, n=100, method="inclusive")  # never beyond the observed range
     return {f"p{n}": round(q[n - 1] * 1000, 1) for n in (50, 95, 99)}
 
 
