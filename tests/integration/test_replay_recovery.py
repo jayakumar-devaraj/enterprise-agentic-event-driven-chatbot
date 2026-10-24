@@ -290,3 +290,20 @@ async def test_old_message_redelivered_after_a_later_turn_changes_nothing(stack)
     assert (await _events(redis, first), await _events(redis, second)) == streams
     assert await _turns(saver, graph, thread) == turns and len(turns) == 4
     assert consumer.commits == 3
+
+
+async def test_processing_restores_ownership_and_refuses_another_owner(stack) -> None:
+    """After a Redis restore and a Kafka rewind the replayed envelope re-binds its thread, so the
+    restored history never sits unowned for the next caller to claim (SPEC §3, §12)."""
+    redis, worker, consumer, graph, saver = stack
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    first = _chat(thread, "Why is my bill higher?")
+    await worker.handle(Msg(first))
+    assert await redis.get(f"thread_owner:{thread}") == "alice"
+
+    intruder = _chat(thread, "Show me this thread").model_copy(update={"user_id": "bob"})
+    await worker.handle(Msg(intruder))
+    events = await _events(redis, intruder)
+    assert [(e["type"], e.get("code")) for _, e in events] == [("error", "thread_owner_mismatch")]
+    assert len(await _turns(saver, graph, thread)) == 2
+    assert await redis.get(f"thread_owner:{thread}") == "alice"

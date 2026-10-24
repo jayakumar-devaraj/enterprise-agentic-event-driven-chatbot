@@ -193,3 +193,28 @@ async def test_rebalance_while_processing_loses_and_duplicates_nothing(stack) ->
     finally:
         await redis.aclose()
     assert steps_overlapping_work >= 2, "rebalances did not overlap in-flight messages"
+
+
+def _compose_out(*args: str) -> str:
+    """docker compose output against the isolated project with the A5 overlay."""
+    cmd = ["docker", "compose", "-p", PROJECT, *FILES, *args]
+    return subprocess.run(cmd, env=ENV, check=True, capture_output=True, text=True).stdout
+
+
+async def test_tracing_backend_down_does_not_affect_processing(stack) -> None:
+    """Jaeger is not started in this project, so every OTLP span export fails; messages complete.
+
+    Evidence that observability failure is non-fatal (SPEC §7): the exporter's failure is in the
+    worker log, and the same envelopes finish with one `done` each and their turns in order.
+    """
+    running = _compose_out("ps", "--services", "--status", "running").split()
+    assert "jaeger" not in running and "worker" in running
+    threads, envelopes = _envelopes("ob", 2, 5)
+    _produce(envelopes)
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    try:
+        await _assert_each_processed_once(redis, threads, envelopes, 5)
+    finally:
+        await redis.aclose()
+    logs = _compose_out("logs", "--no-color", "worker")
+    assert "export traces to jaeger:4317" in logs or "exporting traces to jaeger:4317" in logs

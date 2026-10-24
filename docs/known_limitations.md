@@ -145,7 +145,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   `docs/reports/full-score-recommendations.md`):** before this change, the gateway alone checked the
   approval window and the decider's identity. On real Redis, the worker applied a refund for a
   decision accepted an hour after the window, and for a decision carrying another user's id. The
-  worker now refuses both (`approval_expired`, `approval_forbidden`; SPEC §10). Residuals: an
+  worker now refuses both (`approval_expired`; `thread_owner_mismatch` since 2026-10-23, which replaced
+  `approval_forbidden` once the worker checked ownership on every envelope; SPEC §10). Residuals: an
   expired decision leaves the refund paused in the checkpoint, so the next chat on the thread also
   audits it as `refund_abandoned`. A refund paused before `proposed_at` existed counts as expired.
   The check compares the gateway's and the worker's clocks, which are the same host clock under
