@@ -1,9 +1,12 @@
-"""A11: POST latency and time-to-first-token under concurrency, with the mock engine.
+"""A11: latency under concurrency: POST, queue delay, first token, completion, errors, throughput.
 
-Reports numbers only; SLOs are set by the lead after the first measurement.
-Run (stack up with MOCK_LLM=true, AUTH_USERS containing demo/demo-pw):
+Reports numbers; targets are pre-registered separately (`docs/reports/latency-targets-*.md`).
+Run (stack up, AUTH_USERS containing demo/demo-pw, Jaeger on 127.0.0.1:16686):
     uv run python tests/load/latency_a11.py --requests 200 --concurrency 20
-Writes docs/reports/a11-latency.json.
+    uv run python tests/load/latency_a11.py --requests 20 --concurrency 2 --engine ollama \
+        --out docs/reports/latency-ollama.json
+Queue delay comes from Jaeger: the worker's `worker.process` span start minus the end of the
+gateway's `kafka.produce` span start (the record handed to the Kafka client), same trace.
 """
 
 import argparse
@@ -18,6 +21,7 @@ from pathlib import Path
 import httpx
 
 AUTH = ("demo", "demo-pw")
+JAEGER = "http://127.0.0.1:16686"
 REPORT = Path(__file__).resolve().parents[2] / "docs" / "reports" / "a11-latency.json"
 
 
@@ -45,53 +49,110 @@ def gateways() -> list[str]:
     return urls
 
 
-async def one(client: httpx.AsyncClient, base: str) -> tuple[float, float]:
-    """Return (POST seconds, time-to-first-token seconds) for one fresh thread."""
-    body = {
-        "message": "Why was I charged twice this month?",
-        "thread_id": f"lt-{uuid.uuid4().hex[:10]}",
-        "message_id": str(uuid.uuid4()),
-    }
+async def one(client: httpx.AsyncClient, base: str) -> dict:
+    """One turn on a fresh thread: POST, first token and `done` times (s), or the error."""
+    thread = f"lt-{uuid.uuid4().hex[:10]}"
+    body = {"message": "Why was I charged twice this month?", "thread_id": thread,
+            "message_id": str(uuid.uuid4())}  # fmt: skip
+    out: dict = {"thread": thread, "message_id": body["message_id"]}
     start = time.perf_counter()
-    r = await client.post(f"{base}/chat", json=body, auth=AUTH)
-    posted = time.perf_counter()
-    r.raise_for_status()
-    async with client.stream("GET", f"{base}{r.json()['stream_url']}", auth=AUTH) as s:
-        async for line in s.aiter_lines():
-            if line.startswith("data:") and json.loads(line[5:])["type"] == "token":
-                return posted - start, time.perf_counter() - start
-    raise RuntimeError("stream ended without a token")
+    try:
+        r = await client.post(f"{base}/chat", json=body, auth=AUTH)
+        out["post"] = time.perf_counter() - start
+        if r.status_code != 202:
+            return {**out, "error": f"POST {r.status_code}"}
+        async with client.stream("GET", f"{base}{r.json()['stream_url']}", auth=AUTH) as s:
+            async for line in s.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                event = json.loads(line[5:])
+                if event["type"] == "token" and "ttft" not in out:
+                    out["ttft"] = time.perf_counter() - start
+                elif event["type"] == "done":
+                    return {**out, "done": time.perf_counter() - start}
+                elif event["type"] != "token":
+                    return {**out, "error": f"stream {event['type']} {event.get('code', '')}"}
+        return {**out, "error": "stream ended without done"}
+    except httpx.HTTPError as exc:
+        return {**out, "error": f"{type(exc).__name__}"}
 
 
-def pct(values: list[float], q: int) -> float:
-    """q-th percentile in milliseconds."""
-    return round(statistics.quantiles(values, n=100)[q - 1] * 1000, 1)
+def queue_delays(message_ids: set[str], since_s: float) -> list[float]:
+    """Seconds from the record reaching the gateway's Kafka client to the worker's span start."""
+    since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(since_s - 60))
+    until = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 60))
+    params = {
+        "query.service_name": "worker",
+        "query.operation_name": "worker.process",
+        "query.start_time_min": since,
+        "query.start_time_max": until,
+        "query.search_depth": str(len(message_ids) * 2),
+    }
+    found = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60).json()
+    trace_ids = {
+        span["traceId"]
+        for rs in found.get("result", {}).get("resourceSpans", [])
+        for ss in rs["scopeSpans"]
+        for span in ss["spans"]
+        if span["name"] == "worker.process"
+        and any(a["value"].get("stringValue") in message_ids for a in span.get("attributes", []))
+    }
+    delays = []
+    for trace_id in trace_ids:
+        full = httpx.get(f"{JAEGER}/api/v3/traces/{trace_id}", timeout=30).json()
+        spans = [
+            span
+            for rs in full["result"]["resourceSpans"]
+            for ss in rs["scopeSpans"]
+            for span in ss["spans"]
+        ]
+        handed = [int(s["startTimeUnixNano"]) for s in spans if s["name"] == "kafka.produce"]
+        worker = [int(s["startTimeUnixNano"]) for s in spans if s["name"] == "worker.process"]
+        if handed and worker:
+            delays.append((min(worker) - max(handed)) / 1e9)
+    return delays
 
 
-async def main(requests: int, concurrency: int) -> dict:
+def pct(values: list[float]) -> dict[str, float]:
+    """p50/p95/p99 in milliseconds."""
+    q = statistics.quantiles(values, n=100)
+    return {f"p{n}": round(q[n - 1] * 1000, 1) for n in (50, 95, 99)}
+
+
+async def main(requests: int, concurrency: int, engine: str) -> dict:
     """Run `requests` turns with at most `concurrency` in flight, round-robin over replicas."""
     bases = gateways()
     sem = asyncio.Semaphore(concurrency)
     async with httpx.AsyncClient(
-        timeout=60, limits=httpx.Limits(max_connections=concurrency * 2)
+        timeout=120, limits=httpx.Limits(max_connections=concurrency * 2)
     ) as client:
 
-        async def guarded(i: int) -> tuple[float, float]:
+        async def guarded(i: int) -> dict:
             async with sem:
                 return await one(client, bases[i % len(bases)])
 
-        started = time.perf_counter()
+        began, started = time.time(), time.perf_counter()
         results = await asyncio.gather(*(guarded(i) for i in range(requests)))
         wall = time.perf_counter() - started
-    post, ttft = [r[0] for r in results], [r[1] for r in results]
+    ok = [r for r in results if "error" not in r]
+    errors = [r["error"] for r in results if "error" in r]
+    await asyncio.sleep(10)  # let the batch span processors export
+    delays = queue_delays({r["message_id"] for r in ok}, began)
     return {
         "requests": requests,
         "concurrency": concurrency,
         "gateways": len(bases),
-        "engine": "mock",
+        "engine": engine,
         "wall_s": round(wall, 2),
-        "post_ms": {"p50": pct(post, 50), "p95": pct(post, 95)},
-        "ttft_ms": {"p50": pct(ttft, 50), "p95": pct(ttft, 95)},
+        "throughput_turns_per_s": round(len(ok) / wall, 2),
+        "errors": len(errors),
+        "error_kinds": sorted(set(errors)),
+        "post_ms": pct([r["post"] for r in ok]),
+        "queue_delay_ms": {**pct(delays), "traced": len(delays)} if len(delays) > 1 else None,
+        "empty_replies": sum(1 for r in ok if "ttft" not in r),  # `done` with no token
+        "ttft_ms": pct([r["ttft"] for r in ok if "ttft" in r]),
+        "completion_ms": pct([r["done"] for r in ok]),
+        "samples_s": [{k: v for k, v in r.items() if k != "thread"} for r in results],
     }
 
 
@@ -99,7 +160,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--requests", type=int, default=200)
     ap.add_argument("--concurrency", type=int, default=20)
+    ap.add_argument("--engine", default="mock")
+    ap.add_argument("--out", type=Path, default=REPORT)
     args = ap.parse_args()
-    report = asyncio.run(main(args.requests, args.concurrency))
-    REPORT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    report = asyncio.run(main(args.requests, args.concurrency, args.engine))
+    args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report))
