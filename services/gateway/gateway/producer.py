@@ -6,6 +6,9 @@ from typing import Protocol
 from chat_common.schemas import Envelope
 from confluent_kafka import KafkaException
 from confluent_kafka.aio import AIOProducer
+from opentelemetry import trace
+
+tracer = trace.get_tracer("gateway")
 
 
 class DependencyUnavailable(Exception):
@@ -40,13 +43,16 @@ class KafkaEnvelopeProducer:
     async def send(self, envelope: Envelope) -> None:
         """Deliver or raise DependencyUnavailable; never reports success before the ack."""
         try:
-            async with asyncio.timeout(self._timeout_s + 1):
-                delivery = await self._producer.produce(
-                    self._topic,
-                    value=envelope.model_dump_json().encode(),
-                    key=envelope.thread_id.encode(),
-                )
-                await delivery
+            # Ends at the broker ack, so a trace shows produce latency and, up to the worker's
+            # span, queue delay.
+            with tracer.start_as_current_span("kafka.produce"):
+                async with asyncio.timeout(self._timeout_s + 1):
+                    delivery = await self._producer.produce(
+                        self._topic,
+                        value=envelope.model_dump_json().encode(),
+                        key=envelope.thread_id.encode(),
+                    )
+                    await delivery
         except (KafkaException, TimeoutError) as exc:
             raise DependencyUnavailable(f"kafka: {exc}") from exc
 
