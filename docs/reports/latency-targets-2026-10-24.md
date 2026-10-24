@@ -10,6 +10,13 @@ gateway's `POST /chat` span. A single probe showed that span ending after the wo
 started, so it is not the enqueue time. It is now measured from a new `kafka.produce` span (the broker
 ack). The 500 ms threshold did not change.
 
+Second amendment, also before any load: the probe trace showed `kafka.produce` running 2077 ms
+while the worker started 1128 ms into it. The client learns of the broker ack about 1 s after the
+worker already has the record, so the span's end is not the enqueue either. Queue delay is now
+measured from the **start** of `kafka.produce`, when the gateway hands the record to its Kafka
+client, to the start of `worker.process`. That includes the producer's client-side buffering, which a
+user waits through. The 500 ms threshold did not change.
+
 ## Mock engine (`MOCK_LLM=true`)
 Load: 200 turns, each on a fresh thread, 20 in flight, round-robin over 2 gateway replicas
 (1 CPU / 1.5 GB each) and 2 worker replicas (2 CPU / 1.5 GB each). Development host: 12 logical
@@ -19,7 +26,7 @@ CPUs, 15.7 GB RAM, Docker VM 8.3 GB.
 |---|---|---|
 | Errors (non-202, stream `error` event, transport failure) | 0 of 200 | Nothing in this load is a caller fault or an injected outage |
 | `POST /chat` p95 | ≤ 1000 ms | 1 s is the usual limit for an interaction to feel uninterrupted. A 202 only acknowledges the enqueue |
-| Queue delay p95 (gateway `kafka.produce` span end, the broker ack → worker `worker.process` span start) | ≤ 500 ms | 20 users must not build a growing backlog on 2 workers |
+| Queue delay p95 (gateway `kafka.produce` span start → worker `worker.process` span start) | ≤ 500 ms | 20 users must not build a growing backlog on 2 workers |
 | Time to first token p95 (from POST start) | ≤ 2000 ms | No model latency with the mock, so this is pure system overhead |
 | Completion p95 (POST start → `done`) | ≤ 3000 ms | The mock reply is about 10 tokens, so completion should follow the first token closely |
 | Throughput | reported, no target | Bounded queue delay at the offered load is the capacity criterion |
