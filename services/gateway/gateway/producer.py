@@ -1,6 +1,13 @@
-"""Async Kafka producer for chat envelopes (confluent-kafka asyncio, ADR 0003)."""
+"""Async Kafka producer for chat envelopes (confluent-kafka asyncio, ADR 0003).
+
+`AIOProducer` runs unbatched with a delivery-report task (ADR 0003 addendum 2026-10-24). By
+default, its Python-side buffer flushes only after `buffer_timeout` of inactivity, and acks surface
+only on a later poll. That set a ~2 s floor on every send, and probably caused the timeouts (503)
+seen while requests kept arriving (`docs/reports/latency-2026-10-24.md`).
+"""
 
 import asyncio
+import contextlib
 from typing import Protocol
 
 from chat_common.schemas import Envelope
@@ -26,10 +33,15 @@ class EnvelopeSink(Protocol):
 
 
 class KafkaEnvelopeProducer:
-    """Produces keyed by `thread_id` and waits for the broker's delivery report."""
+    """Produces keyed by `thread_id` and waits for the broker's delivery report.
+
+    `batch_size=1` hands each record to librdkafka at once, and `buffer_timeout=0` turns off the
+    inactivity flush, which is then unused. Delivery reports arrive only through `poll()`, so a
+    task keeps polling. Without it, sends never resolve.
+    """
 
     def __init__(self, bootstrap: str, topic: str, timeout_s: float = 5.0) -> None:
-        """Configure idempotent delivery with a bounded delivery timeout."""
+        """Idempotent delivery with a bounded delivery timeout; needs a running event loop."""
         self._topic = topic
         self._timeout_s = timeout_s
         self._producer = AIOProducer(
@@ -37,8 +49,16 @@ class KafkaEnvelopeProducer:
                 "bootstrap.servers": bootstrap,
                 "enable.idempotence": True,
                 "message.timeout.ms": int(timeout_s * 1000),
-            }
+            },
+            batch_size=1,
+            buffer_timeout=0,
         )
+        self._reports = asyncio.get_running_loop().create_task(self._serve_reports())
+
+    async def _serve_reports(self) -> None:
+        """Resolve delivery futures as reports arrive, until close()."""
+        while True:
+            await self._producer.poll(0.1)
 
     async def send(self, envelope: Envelope) -> None:
         """Deliver or raise DependencyUnavailable; never reports success before the ack."""
@@ -54,7 +74,7 @@ class KafkaEnvelopeProducer:
                     )
                     await delivery
         except (KafkaException, TimeoutError) as exc:
-            raise DependencyUnavailable(f"kafka: {exc}") from exc
+            raise DependencyUnavailable(f"kafka: {type(exc).__name__}: {exc}") from exc
 
     async def ready(self) -> None:
         """Raise DependencyUnavailable unless the broker answers and the topic exists."""
@@ -67,6 +87,9 @@ class KafkaEnvelopeProducer:
             raise DependencyUnavailable(f"kafka: topic {self._topic} unavailable")
 
     async def close(self) -> None:
-        """Flush outstanding messages and release the client."""
+        """Flush outstanding messages, stop the report task, release the client."""
         await self._producer.flush()
+        self._reports.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await self._reports
         await self._producer.close()
