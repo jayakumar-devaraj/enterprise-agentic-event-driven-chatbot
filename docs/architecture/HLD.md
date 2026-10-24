@@ -127,7 +127,8 @@ flowchart TB
 | Gateway interrupted between claim and broker ack | `delivered:{id}` absent | Client retries the same body (the React client does once); gateway produces again; worker dedupes | 202 only for acknowledged work |
 | Prompt injection | Injection-collection similarity ≥ threshold | Refusal node; flagged in span + log | Refusal text |
 | Refund requested | Billing node | `interrupt()`; nothing applied until approval; expires after `APPROVAL_TTL_S` | `approval_required` event |
-| LangFuse unreachable | Exporter error | Logged; never fails the request | — |
+| LangFuse unreachable | Client error | Caught and logged as a warning; never fails the request (`tests/unit/test_observability.py`) | — |
+| Jaeger / OTLP unreachable | Background export error | Batch processor logs it and drops spans; never fails the request (`test_tracing_backend_down_does_not_affect_processing`) | — |
 
 ## 7 · Scaling model
 
