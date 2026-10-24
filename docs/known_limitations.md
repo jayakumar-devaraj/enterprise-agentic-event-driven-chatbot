@@ -159,3 +159,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   turns. A replayed approval keeps its original acceptance time, so one replayed after the approval
   window gets `approval_expired`. DLQ offsets are unambiguous only while the DLQ has one partition
   (as `kafka-init` creates it).
+- **Latency rerun fails every latency target (2026-10-24, `docs/reports/latency-2026-10-24.md`):**
+  against targets pre-registered before the run (proposals for the lead), the mock run of record
+  (200 turns, 20 in flight) had 9 `POST 503`s, POST p95 6.3 s, queue delay p95 44.7 s and
+  completion p95 46.8 s at 1.8 turns/s. The real model (20 turns, 2 in flight) had no errors and a
+  completion p95 of 33.1 s, but a first-token p95 of 27.2 s and 2 empty replies. The gateway's Kafka
+  produce takes about 2 s even in isolation, and times out (503) inside the loaded gateway. Worker
+  CPU outside traced spans and the queue delay are unexplained. No fix attempted; next experiments
+  are in the report.
