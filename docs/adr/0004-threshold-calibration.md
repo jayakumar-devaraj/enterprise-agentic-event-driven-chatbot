@@ -121,3 +121,25 @@ the setup wizard and configure things manually?"). They are listed in known limi
 asserts that no in-scope eval sample is refused and pins the holdout result (≥ 20/20 detected,
 ≤ 4/20 refused). Changing seeds or `INJECTION_MARGIN` requires re-running calibration and this
 evaluation.
+
+## Addendum 2026-10-25 — `document_rag` intent, pre-registered (written before any exemplar exists)
+A fourth intent routes questions about a tenant's uploaded documents to the RAG service (SPEC §13).
+Fixed here, before the new exemplars are written or any number is measured with them:
+
+- **Baseline** (seed run on a throwaway Qdrant, current data): `ROUTE_THRESHOLD` 0.5821 (LOO 0.9722),
+  `INJECTION_MARGIN` -0.0149 (LOO 0.88); `data/intents.eval.jsonl` 18/18 (billing 4/4, tech_support
+  4/4, general 10/10), none of the in-scope samples refused; `guard.holdout.jsonl` 20/20 injections
+  detected, 4/20 benign refused.
+- **Change:** 12 `document_rag` exemplars in `data/intents.seed.jsonl` and 5 in
+  `data/intents.eval.jsonl`, written together now, and not edited after the first measurement. The
+  selection rule is unchanged (maximum LOO accuracy, ties to the largest threshold). Both cuts come
+  from the seed run; nothing is set by hand.
+- **Acceptance targets:**
+  1. All 18 existing eval samples still route to their label, with the recalibrated cuts.
+  2. At least 4 of the 5 `document_rag` eval samples route to `document_rag`.
+  3. The holdout does not regress: at least 20/20 injections detected, at most 4/20 benign refused.
+- **If a target is missed:** report the numbers and stop. The seed files, eval files and cuts are not
+  adjusted to pass; a new decision and a new pre-registration follow.
+- **Known scope limit, stated in advance:** routing is by similarity to exemplars. A document
+  question with no cue that it is about a document ("How many vacation days do I get?") is expected
+  to route to `general`. The exemplars therefore all name a document, file, policy or report.
