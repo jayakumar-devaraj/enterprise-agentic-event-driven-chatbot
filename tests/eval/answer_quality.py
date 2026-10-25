@@ -55,16 +55,25 @@ def routed_intent(message_id: str) -> str | None:
         "query.search_depth": "200",
     }
     found = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=30).json()
-    for rs in found.get("result", {}).get("resourceSpans", []):
+    # Search results mix spans of many traces, so match the route span by trace id.
+    spans = [
+        s
+        for rs in found.get("result", {}).get("resourceSpans", [])
+        for ss in rs["scopeSpans"]
+        for s in ss["spans"]
+    ]
+    traces = {
+        s["traceId"]
+        for s in spans
+        if any(a["value"].get("stringValue") == message_id for a in s.get("attributes", []))
+    }
+    if len(traces) != 1:
+        return None
+    (trace_id,) = traces
+    full = httpx.get(f"{JAEGER}/api/v3/traces/{trace_id}", timeout=30).json()
+    for rs in full["result"]["resourceSpans"]:
         for ss in rs["scopeSpans"]:
-            spans = ss["spans"]
-            if not any(
-                a["value"].get("stringValue") == message_id
-                for s in spans
-                for a in s.get("attributes", [])
-            ):
-                continue
-            for s in spans:
+            for s in ss["spans"]:
                 for a in s.get("attributes", []):
                     if s["name"] == "route" and a["key"] == "route.intent":
                         return a["value"]["stringValue"]

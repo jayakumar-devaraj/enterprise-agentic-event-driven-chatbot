@@ -197,3 +197,9 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
   emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
   been tuned on this set; candidate recognizers need a fresh held-out set.
+- **Answer quality fails its targets (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):**
+  on 20 pre-registered support questions with the real 1B model, the mean rubric score was 3.4/5
+  (target 3.5) and 4 replies invented specifics such as hours, a discount and a URL (target ≤ 2). No
+  reply falsely claimed an action. Billing answers mostly deflect to "a human will review it", which
+  echoes the system prompt's refund rule. Scored by the build agent against a published rubric; not
+  an independent judge, and DeepEval is not used.
