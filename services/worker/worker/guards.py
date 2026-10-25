@@ -17,9 +17,9 @@ _HARD_MAX = 1000
 _SAFE_CUT = re.compile(r"(?<=[a-z]) (?=[a-z]+[\s,;:])")
 _MAX_OPEN_ECHO = 2000  # keep buffering while an echoed delimiter block is still open
 # Small models sometimes repeat the delimited prompt fields; drop them (and stray tags) from output.
-_ECHO_BLOCK = re.compile(r"<(user_message|history)>.*?</\1>", re.DOTALL)
-_STRAY_TAG = re.compile(r"</?(user_message|history)>")
-_OPEN_ECHO = re.compile(r"<(user_message|history)>(?![\s\S]*</\1>)")
+_ECHO_BLOCK = re.compile(r"<(user_message|history|documents)>.*?</\1>", re.DOTALL)
+_STRAY_TAG = re.compile(r"</?(user_message|history|documents)>")
+_OPEN_ECHO = re.compile(r"<(user_message|history|documents)>(?![\s\S]*</\1>)")
 _ECHO_PROBES = tuple(p[:40] for p in SYSTEM_PROMPTS.values())
 REDACTED = "[redacted]"
 
