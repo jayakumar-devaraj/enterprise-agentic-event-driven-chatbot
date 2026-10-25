@@ -205,3 +205,34 @@ already saw. Gateways stay stopped until the replay finishes, because a thread w
 could otherwise be claimed before its replay restores it (the replay would then be refused,
 `thread_owner_mismatch`). Losing the Kafka volume loses the requests it held that no worker had
 finished, and their 202 acceptances.
+
+## 13 · Document questions (RAG service)
+
+A message routed to `document_rag` (§8) is answered from the caller's tenant documents. The worker
+calls the RAG service's `POST /v1/retrieve`; the contract is
+[`docs/contracts/rag-openapi-v1.json`](docs/contracts/rag-openapi-v1.json), and a unit test fails if
+the worker's response models drift from it. The service is a separate container at `RAG_BASE_URL`,
+used at a pinned image tag and never as source.
+
+**Call.** Only the scrubbed, standalone question is sent, with `Authorization: Bearer <tenant
+token>` (`RAG_TENANT_TOKENS`, `token:tenant,...`), `traceparent`, `X-Request-ID` (the trace id) and
+`X-Timeout-Ms`. The tenant is `Envelope.tenant_id` (§3); the body carries none. The whole call has
+one deadline, `RAG_TIMEOUT_S`. Every document turn first streams a `status` event.
+
+**Errors.** A connection error, 503 or 504 is a dependency fault: bounded retries while no reply
+has started (§7), then `dependency_unavailable` and the DLQ. Anything else ends the turn at once
+with a fixed `ErrorEvent`, not retried and not sent to the DLQ: `no_tenant` (the envelope has no
+tenant), `rag_tenant_unknown` (no token for the tenant), `rag_unauthorized` (401), `rag_bad_request`
+(422), `rag_error` (500, any other status, or a body off-contract).
+
+**Answer.** When the service reports `insufficient`, the reply is a fixed "not found in your
+documents" sentence and no model is called. Otherwise the sections are placed in an escaped
+`<documents>` data block, never in the system prompt (§9), and the reply streams through the output
+guard. Each sentence is checked before it is scrubbed: a sentence with a number that occurs in no
+section (or the question) is dropped, and one fixed caveat follows the last sentence. After the last
+token the worker sends `citations`, then `done`.
+
+**Data.** Section text is never checkpointed, streamed, logged, traced or sent to the DLQ. The
+checkpoint keeps `doc_key`, `page_id`, `page_key` and `score` per section, reset every turn. The
+scrubbed reply is stored in `turns` like any other. Raw section text does reach the chat model
+provider (ADR 0010).

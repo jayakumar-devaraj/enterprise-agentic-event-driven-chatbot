@@ -1,0 +1,283 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "demo-rag",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/retrieve": {
+      "post": {
+        "summary": "Retrieve Context",
+        "description": "Run the self-correcting retrieval loop for the caller's tenant and return passages; no answer is written.",
+        "operationId": "retrieve",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-timeout-ms",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 120000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Caller's deadline in milliseconds for the whole call. Absent: the server default applies.",
+              "title": "X-Timeout-Ms"
+            },
+            "description": "Caller's deadline in milliseconds for the whole call. Absent: the server default applies."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrieveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetrieveResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Model provider or database unavailable, or no provider configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Model call timed out, or the caller's deadline elapsed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error (plain-text body)."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorBody": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorBody",
+        "description": "Body of every handled error response."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ParentSection": {
+        "properties": {
+          "page_id": {
+            "type": "integer",
+            "title": "Page Id"
+          },
+          "doc_key": {
+            "type": "string",
+            "title": "Doc Key"
+          },
+          "page_key": {
+            "type": "string",
+            "title": "Page Key"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "markdown": {
+            "type": "string",
+            "title": "Markdown"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "chunk_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Chunk Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page_id",
+          "doc_key",
+          "page_key",
+          "source_name",
+          "markdown",
+          "score",
+          "chunk_ids"
+        ],
+        "title": "ParentSection",
+        "description": "A full parent page/tab reassembled from its matching child chunks."
+      },
+      "RetrieveRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "RetrieveRequest",
+        "description": "Retrieval input; deliberately has no tenant field."
+      },
+      "RetrieveResponse": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ParentSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "insufficient": {
+            "type": "boolean",
+            "title": "Insufficient"
+          },
+          "queries_run": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queries Run"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sections",
+          "insufficient",
+          "queries_run",
+          "attempts"
+        ],
+        "title": "RetrieveResponse",
+        "description": "Parent sections the caller may answer from. `sections` is empty whenever `insufficient` is true."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
