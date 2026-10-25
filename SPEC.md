@@ -103,7 +103,9 @@ terminal is a partial attempt (§6, below), whatever type that event has.
 
 A reply never exceeds `LLM_MAX_TOKENS` tokens, one redaction token and a terminal event, and settings
 validation fails startup unless `STREAM_MAXLEN > LLM_MAX_TOKENS + 2`, so a stream is never trimmed and
-a resume never meets a gap. A stream that no longer exists, for a message that finished (dedupe
+a resume never meets a gap. A document reply adds a `status`, the `citations` and a fixed caveat of
+at most 20 tokens to `RAG_MAX_TOKENS` tokens, so startup also requires
+`STREAM_MAXLEN > RAG_MAX_TOKENS + 2 + 22`. A stream that no longer exists, for a message that finished (dedupe
 `done`), expired after `STREAM_TTL_S`: the response is a single terminal
 `ErrorEvent{seq: 0, code: "stream_expired"}` with no `id:`, sent at once whether or not
 `Last-Event-ID` is given. A missing stream for a message that is still queued or running is waited
