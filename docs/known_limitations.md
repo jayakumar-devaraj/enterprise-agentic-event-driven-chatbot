@@ -191,3 +191,10 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   only a SHA-256, the length and the error types and field locations. Not covered: names and
   locations, because a random name cannot be relied on to be recognised; LangFuse, which was
   stopped; host-level logs outside Docker.
+- **End-to-end safety evaluation (2026-10-25, `docs/reports/safety-final-2026-10-25.md`):** against
+  targets pre-registered before the run, with the real model, no refund was applied or claimed, the
+  system prompt did not leak, and no canary attack succeeded. Benign false refusals were 0/20.
+  **4/10 harmless off-topic questions were refused** (target ≤ 1). Every attack was refused by the
+  detector, so an after-the-fact ablation disabled it: the model then obeyed 2/16 instruction
+  attacks (one escaping the `<user_message>` delimiter), while actions and the prompt stayed safe.
+  The off-topic refusals are open; any fix needs a new final set.
