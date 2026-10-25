@@ -204,3 +204,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   detector, so an after-the-fact ablation disabled it: the model then obeyed 2/16 instruction
   attacks (one escaping the `<user_message>` delimiter), while actions and the prompt stayed safe.
   The off-topic refusals are open; any fix needs a new final set.
+- **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
+  every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
+  missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
+  the direct gateway ports carry Basic credentials in clear, so any local process can read or write
+  all state. Not suitable beyond one trusted host as configured.
