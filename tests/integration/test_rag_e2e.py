@@ -35,11 +35,8 @@ from worker.llm import OpenAICompatEngine
 from worker.rag_client import RagClient, parse_tenant_tokens
 from worker.router import Router
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.rag,
-    pytest.mark.asyncio(loop_scope="module"),
-]
+# `rag`, not `integration`: CI runs `-m integration`, which would pick these up without a rag-api.
+pytestmark = [pytest.mark.rag, pytest.mark.asyncio(loop_scope="module")]
 
 RAG_URL = os.getenv("IT_RAG_URL", "http://127.0.0.1:18000")
 RAG_TOKENS = os.getenv("IT_RAG_TOKENS", "tok-t1:T1,tok-t2:T2")
@@ -252,16 +249,12 @@ async def test_t2_asking_the_same_gets_not_found_and_none_of_t1s_text(stack: Sta
         assert t1_text.lower() not in everything.lower(), t1_text
 
 
-async def test_a_user_with_no_tenant_gets_a_fixed_error(stack: Stack) -> None:
+async def test_a_user_with_no_tenant_gets_a_plain_answer_and_no_search(stack: Stack) -> None:
     _, _, events, _ = await stack.ask("carol", QUESTION)
-    assert [e for _, e in events] == [
-        {
-            "type": "error",
-            "seq": 0,
-            "code": "no_tenant",
-            "detail": "Document search is not set up for your account.",
-        }
-    ]
+    types = _types(events)
+    assert types[-1] == "done" and "token" in types
+    assert "status" not in types and "citations" not in types
+    assert "handbook.txt" not in json.dumps([e for _, e in events])
 
 
 async def test_section_text_is_not_in_the_checkpoint(stack: Stack) -> None:

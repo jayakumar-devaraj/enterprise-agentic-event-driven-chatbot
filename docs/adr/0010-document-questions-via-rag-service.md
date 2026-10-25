@@ -22,7 +22,9 @@ been streamed. Each of those needed a decision.
 - **Tenancy.** `USER_TENANTS` maps a username to a tenant. The gateway sets `Envelope.tenant_id`
   from the authenticated username only. The worker maps tenant to the service's bearer token from
   `RAG_TENANT_TOKENS`, written in the service's own `token:tenant` format so the same value feeds
-  both. A document turn with no tenant ends with `ErrorEvent{no_tenant}`. The field is left out of
+  both. A message routed to `document_rag` from a user with no tenant is answered as `general`: the router
+  cannot tell who has documents, and a false positive on ordinary text must not turn into an error
+  (a durability test's plain messages hit exactly that). The field is left out of
   the Kafka value when unset, so an older worker accepts records from users without a tenant.
 - **D1 · Raw document text reaches the chat model provider.** Until now the provider saw only
   scrubbed text. Retrieved sections are not scrubbed before the model, because scrubbing rewrites
@@ -73,6 +75,8 @@ been streamed. Each of those needed a decision.
   renumbering `seq`, which the resume logic relies on.
 - Deploying a gateway with `USER_TENANTS` before the workers would make older workers dead-letter
   those users' records as malformed (`extra="forbid"`).
+- A user with no tenant never sees a document-related error; a real document question from them gets a
+  plain assistant answer, not "you have no documents".
 - The first message of a thread that mentions no document is answered by the plain assistant even
   from a user with a tenant. Making tenant users always search documents would remove that, at the
   cost of a search on every message.

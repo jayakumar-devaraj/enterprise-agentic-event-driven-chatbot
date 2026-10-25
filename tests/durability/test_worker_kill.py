@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 import redis.asyncio as aioredis
-from chat_common.schemas import Envelope
+from chat_common.schemas import TERMINAL_TYPES, Envelope
 from confluent_kafka import Producer
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker.graph import build_graph
@@ -79,7 +79,7 @@ async def _terminal_count(redis: aioredis.Redis, envelopes: list[Envelope]) -> i
     done = 0
     for env in envelopes:
         rows = await redis.xrevrange(f"tokens:{env.thread_id}:{env.message_id}", count=1)
-        if rows and json.loads(rows[0][1]["data"])["type"] != "token":
+        if rows and json.loads(rows[0][1]["data"])["type"] in TERMINAL_TYPES:
             done += 1
     return done
 

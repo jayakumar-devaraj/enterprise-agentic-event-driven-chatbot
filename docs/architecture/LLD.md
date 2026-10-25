@@ -292,7 +292,7 @@ sequenceDiagram
   G->>K: Envelope{text scrubbed, tenant_id}
   W->>K: poll; dedupe lease
   W->>Q: route → document_rag (an injection verdict wins)
-  W->>W: tenant_id absent ⇒ ErrorEvent no_tenant
+  W->>W: tenant_id absent ⇒ intent becomes general (no search)
   opt prior turns
     W->>L: condense (non-streaming)
     W->>W: ascrub(question) [scrub point 2]

@@ -132,7 +132,7 @@ flowchart TB
 | Gateway interrupted between claim and broker ack | `delivered:{id}` absent | Client retries the same body (the React client does once); gateway produces again; worker dedupes | 202 only for acknowledged work |
 | RAG service 503 / 504 / unreachable | Status or connection error | Bounded retries while no reply has started → `dependency_unavailable` + DLQ (the `status` note does not count as reply output) | SSE `status`, then `error` |
 | RAG service 401 / 422 / 500, or an unknown tenant | Status code / token lookup | Final: fixed `ErrorEvent`, no retry, no DLQ | SSE `error` (`rag_unauthorized`, `rag_bad_request`, `rag_error`, `rag_tenant_unknown`) |
-| Document question from a user with no tenant | `Envelope.tenant_id` unset | Fixed `ErrorEvent{no_tenant}` before any model or service call | SSE `error` |
+| Document question from a user with no tenant | `Envelope.tenant_id` unset | Routed as `general`; no search, status or citations | A plain assistant answer |
 | Model returns no text for a document question | Empty reply, nothing dropped | Treated as a dependency fault, retried | No empty answer is shown |
 | Prompt injection | Injection-collection similarity ≥ threshold | Refusal node; flagged in span + log | Refusal text |
 | Refund requested | Billing node | `interrupt()`; nothing applied until approval; expires after `APPROVAL_TTL_S` | `approval_required` event |

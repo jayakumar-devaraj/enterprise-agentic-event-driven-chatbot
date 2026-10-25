@@ -106,6 +106,8 @@ def build_graph(
                 }
             )
         intent = "refuse" if r.injection else r.intent
+        if intent == "document_rag" and not state.get("tenant_id"):
+            intent = "general"  # no documents to search for this user: the plain assistant answers
         if r.injection:
             log.warning(
                 "prompt injection detected; refusing",
@@ -158,8 +160,6 @@ def build_graph(
 
     async def condense(state: ChatState) -> dict[str, Any]:
         """Tenant check first, then one standalone question; skipped when there is no history."""
-        if not state.get("tenant_id"):
-            raise RagRejected("no_tenant", NO_DOCUMENTS_DETAIL)
         if rag is None:
             raise RagRejected("rag_tenant_unknown", NO_DOCUMENTS_DETAIL)
         question = state["pending"]

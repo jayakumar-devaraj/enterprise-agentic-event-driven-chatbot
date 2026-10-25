@@ -53,7 +53,8 @@ startup like `AUTH_USERS`; a malformed entry, a duplicate or a user missing from
 startup. The gateway sets `Envelope.tenant_id` from the username alone and never from a request body
 (`ChatRequest` forbids unknown fields). A user with no entry has `tenant_id` unset, and the field is
 left out of the Kafka value then, so a worker that predates it still accepts the record. A message
-that needs documents and carries no tenant ends with `ErrorEvent{code: "no_tenant"}`. Deploy
+routed to `document_rag` that carries no tenant has nothing to search, so the worker answers it as
+`general` (§8, §13). Deploy
 workers before gateways: a worker without the field rejects an envelope that has it
 (`extra="forbid"`) as malformed.
 
@@ -213,7 +214,8 @@ A message routed to `document_rag` (§8) is answered from the caller's tenant do
 calls the RAG service's `POST /v1/retrieve`; the contract is
 [`docs/contracts/rag-openapi-v1.json`](docs/contracts/rag-openapi-v1.json), and a unit test fails if
 the worker's response models drift from it. The service is a separate container at `RAG_BASE_URL`,
-used at a pinned image tag and never as source.
+used at a pinned image tag and never as source. A message routed to `document_rag` from a user with no
+tenant has nothing to search: the worker answers it as `general`, with no status, search or citations.
 
 **Call.** Only the scrubbed, standalone question is sent, with `Authorization: Bearer <tenant
 token>` (`RAG_TENANT_TOKENS`, `token:tenant,...`), `traceparent`, `X-Request-ID` (the trace id) and
@@ -222,8 +224,7 @@ one deadline, `RAG_TIMEOUT_S`. Every document turn first streams a `status` even
 
 **Errors.** A connection error, 503 or 504 is a dependency fault: bounded retries while no reply
 has started (§7), then `dependency_unavailable` and the DLQ. Anything else ends the turn at once
-with a fixed `ErrorEvent`, not retried and not sent to the DLQ: `no_tenant` (the envelope has no
-tenant), `rag_tenant_unknown` (no token for the tenant), `rag_unauthorized` (401), `rag_bad_request`
+with a fixed `ErrorEvent`, not retried and not sent to the DLQ: `rag_tenant_unknown` (no token for the tenant), `rag_unauthorized` (401), `rag_bad_request`
 (422), `rag_error` (500, any other status, or a body off-contract).
 
 **Answer.** When the service reports `insufficient`, the reply is a fixed "not found in your
