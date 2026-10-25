@@ -197,3 +197,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
   emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
   been tuned on this set; candidate recognizers need a fresh held-out set.
+- **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
+  every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
+  missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
+  the direct gateway ports carry Basic credentials in clear, so any local process can read or write
+  all state. Not suitable beyond one trusted host as configured.
