@@ -173,3 +173,12 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   (cold start, cause unknown), so POST p95 over the whole run still fails. Worker-side queue delay
   (p95 8.8 s) and real-model first-token latency still fail. The report's percentiles were
   recomputed with the inclusive method, since the exclusive default extrapolated small samples.
+- **Raw PII in DLQ records and logs (2026-10-25, section 3 of
+  `docs/reports/full-score-recommendations.md`):** a scan of the running stack
+  (`tests/stack/test_sensitive_data.py`, `-m stack`) found the gateway path clean in every sink:
+  SSE stream, container logs, `chat-requests`, the DLQ, Redis and the Jaeger trace. A malformed record
+  sent straight to Kafka was different: its DLQ record kept the raw bytes (base64 in `original_b64`,
+  plus the validation error text), and the worker log quoted part of the input. The worker now keeps
+  only a SHA-256, the length and the error types and field locations. Not covered: names and
+  locations, because a random name cannot be relied on to be recognised; LangFuse, which was
+  stopped; host-level logs outside Docker.

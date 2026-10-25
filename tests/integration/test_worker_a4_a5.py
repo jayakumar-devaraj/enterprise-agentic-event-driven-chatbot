@@ -139,7 +139,7 @@ async def test_a4_malformed_envelope_lands_in_dlq(topics) -> None:
 
     await _run_worker(req, dlq, never, expected_commits=1)
     (record,) = await _read_topic(dlq, 1)
-    assert record["reason"] == "malformed" and "original_b64" in record
+    assert record["reason"] == "malformed" and len(record["sha256"]) == 64 and record["length"] > 0
 
 
 async def test_a5_same_message_twice_one_done(topics) -> None:
