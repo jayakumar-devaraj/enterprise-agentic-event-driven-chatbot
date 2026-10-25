@@ -1,0 +1,175 @@
+{
+  "sentences": 60,
+  "spacy_model": "en_core_web_lg",
+  "per_type": {
+    "CREDIT_CARD": {
+      "labeled": 3,
+      "typed_recall": 0.6667,
+      "redaction_recall": 0.6667,
+      "redaction_recall_ci95": [
+        0.208,
+        0.939
+      ],
+      "detected_spans": 2,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.342,
+        1.0
+      ]
+    },
+    "EMAIL_ADDRESS": {
+      "labeled": 3,
+      "typed_recall": 0.3333,
+      "redaction_recall": 0.3333,
+      "redaction_recall_ci95": [
+        0.061,
+        0.792
+      ],
+      "detected_spans": 1,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.207,
+        1.0
+      ]
+    },
+    "IP_ADDRESS": {
+      "labeled": 2,
+      "typed_recall": 0.5,
+      "redaction_recall": 0.5,
+      "redaction_recall_ci95": [
+        0.095,
+        0.905
+      ],
+      "detected_spans": 2,
+      "precision": 0.5,
+      "precision_ci95": [
+        0.095,
+        0.905
+      ]
+    },
+    "LOCATION": {
+      "labeled": 30,
+      "typed_recall": 0.5,
+      "redaction_recall": 0.5333,
+      "redaction_recall_ci95": [
+        0.361,
+        0.698
+      ],
+      "detected_spans": 21,
+      "precision": 0.8095,
+      "precision_ci95": [
+        0.6,
+        0.923
+      ]
+    },
+    "PERSON": {
+      "labeled": 18,
+      "typed_recall": 0.6667,
+      "redaction_recall": 0.8889,
+      "redaction_recall_ci95": [
+        0.672,
+        0.969
+      ],
+      "detected_spans": 18,
+      "precision": 0.7222,
+      "precision_ci95": [
+        0.491,
+        0.875
+      ]
+    },
+    "PHONE_NUMBER": {
+      "labeled": 4,
+      "typed_recall": 1.0,
+      "redaction_recall": 1.0,
+      "redaction_recall_ci95": [
+        0.51,
+        1.0
+      ],
+      "detected_spans": 5,
+      "precision": 0.8,
+      "precision_ci95": [
+        0.376,
+        0.964
+      ]
+    },
+    "US_SSN": {
+      "labeled": 2,
+      "typed_recall": 1.0,
+      "redaction_recall": 1.0,
+      "redaction_recall_ci95": [
+        0.342,
+        1.0
+      ],
+      "detected_spans": 2,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.342,
+        1.0
+      ]
+    }
+  },
+  "by_category": {
+    "address": {
+      "sentences": 8,
+      "labeled": 17,
+      "redacted": 7
+    },
+    "ambiguous": {
+      "sentences": 10,
+      "labeled": 13,
+      "redacted": 11,
+      "false_positives": 4
+    },
+    "multilingual": {
+      "sentences": 10,
+      "labeled": 20,
+      "redacted": 16,
+      "false_positives": 3
+    },
+    "negative": {
+      "sentences": 20,
+      "false_positives": 2
+    },
+    "obfuscated": {
+      "sentences": 12,
+      "labeled": 12,
+      "redacted": 8,
+      "false_positives": 2
+    }
+  },
+  "misses": [
+    "multilingual LOCATION: Kraków",
+    "multilingual LOCATION: Valencia",
+    "multilingual LOCATION: Lyon",
+    "multilingual PERSON: Nguyễn Văn An",
+    "address LOCATION: 742 Evergreen Terrace",
+    "address LOCATION: 1600 Pennsylvania Avenue NW",
+    "address LOCATION: 221B Baker Street",
+    "address LOCATION: 55 Rue de Rivoli",
+    "address LOCATION: 10 Downing Street",
+    "address LOCATION: 350 Fifth Avenue",
+    "address LOCATION: 4 Privet Drive",
+    "address LOCATION: Little Whinging",
+    "address LOCATION: Surrey",
+    "address LOCATION: 120 Main St",
+    "obfuscated EMAIL_ADDRESS: jane dot doe at example dot com",
+    "obfuscated EMAIL_ADDRESS: john[at]example[dot]org",
+    "obfuscated CREDIT_CARD: four one one one, one one one one, one one one one, one one one one",
+    "obfuscated IP_ADDRESS: 192 . 168 . 1 . 20",
+    "ambiguous PERSON: Hope",
+    "ambiguous LOCATION: Reading"
+  ],
+  "false_positives": [
+    "multilingual LOCATION: Zoë Dubois",
+    "multilingual PERSON: Je m'appelle",
+    "multilingual PERSON: Hà Nội",
+    "obfuscated PERSON: Email",
+    "obfuscated PERSON: jane dot doe",
+    "ambiguous LOCATION: Paris Hilton",
+    "ambiguous LOCATION: Jordan",
+    "ambiguous LOCATION: Victoria",
+    "ambiguous PERSON: Mark",
+    "negative IP_ADDRESS: 2.4.1.9",
+    "negative PHONE_NUMBER: 404-555-1000"
+  ]
+}

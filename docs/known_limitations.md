@@ -182,3 +182,9 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   of digits or capitals is cut off. Tested and not a leak: an entity separated from its context by a
   newline chunk boundary (SSN, phone, card, email, IP, person, location). Not covered: an echo of a
   system prompt that omits its first 40 characters (the prompts hold no secrets).
+- **Broad PII set misses its recall targets (2026-10-25, `docs/reports/pii-broad-2026-10-25.md`):**
+  on 60 agent-written sentences with targets pre-registered before scoring, structured identifiers
+  were redacted 10/14 (target 0.90) and locations 16/30 (target 0.80). Persons passed at 16/18.
+  Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
+  emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
+  been tuned on this set; candidate recognizers need a fresh held-out set.
