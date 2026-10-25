@@ -1,0 +1,394 @@
+{
+  "scorer": "build agent (Claude), by reading each reply against the pre-registered rubric",
+  "totals": {
+    "C1": 10,
+    "C2": 7,
+    "C3": 20,
+    "C4": 16,
+    "C5": 15,
+    "score": 68
+  },
+  "mean_score": 3.4,
+  "items": [
+    {
+      "id": "Q01",
+      "text": "Why would my monthly bill be higher than last month?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Rambles about not being able to verify the user; names no cause of a higher bill.",
+      "deterministic": {
+        "words": 126,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q02",
+      "text": "I was charged twice this month. What should I do?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Deflects: 'contact the company you signed up with' (it is the company).",
+      "deterministic": {
+        "words": 21,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q03",
+      "text": "Where do I change the card that my plan is billed to?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Only 'Human will review your request.'; no pointer to payment settings.",
+      "deterministic": {
+        "words": 5,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q04",
+      "text": "What happens if I pay my bill a few days late?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Deflects to a payment provider or financial advisor; no late fee or impact.",
+      "deterministic": {
+        "words": 49,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q05",
+      "text": "Can I get a refund for a month I didn't use?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 0,
+      "score": 2,
+      "reason": "Empty: the deterministic refund rule stopped at approval_required, so no model reply (by design). Scored as written.",
+      "deterministic": {
+        "words": 0,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q06",
+      "text": "How do I download my past invoices?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Deflects ('A human will review it'); no pointer to invoice history.",
+      "deterministic": {
+        "words": 15,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q07",
+      "text": "Is there a discount if I pay yearly instead of monthly?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Only restates the question.",
+      "deterministic": {
+        "words": 20,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q08",
+      "text": "My Wi-Fi keeps dropping every few minutes. How can I fix it?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 1,
+      "C5": 0,
+      "score": 4,
+      "reason": "Good steps (restart, obstructions, channel, firmware, interference); 210 words.",
+      "deterministic": {
+        "words": 210,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q09",
+      "text": "Every time I tap Settings the app closes by itself.",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 0,
+      "score": 2,
+      "reason": "Echoes 'The user's message is: ...' and defers; no troubleshooting step.",
+      "deterministic": {
+        "words": 20,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q10",
+      "text": "What's the way to factory reset my router?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 5,
+      "reason": "Correct reset procedure (hold reset >= 10 s) and warns settings are erased.",
+      "deterministic": {
+        "words": 141,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q11",
+      "text": "My internet is slow in the evenings. Why?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 5,
+      "reason": "Mentions network congestion and closing bandwidth-heavy apps; suggests the provider.",
+      "deterministic": {
+        "words": 133,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q12",
+      "text": "Since I changed my password the login page keeps rejecting me.",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Template placeholder <knowledge_base_url>; no caps/reset/cache advice.",
+      "deterministic": {
+        "words": 37,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q13",
+      "text": "How can I enable 2FA on my account?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 1,
+      "C5": 0,
+      "score": 4,
+      "reason": "Correct 2FA steps via security settings; 191 words.",
+      "deterministic": {
+        "words": 191,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q14",
+      "text": "The modem lights are blinking orange. What does that mean?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 1,
+      "C5": 0,
+      "score": 4,
+      "reason": "Plausible causes, restart, contact provider; 223 words.",
+      "deterministic": {
+        "words": 223,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q15",
+      "text": "How do I change my Wi-Fi password?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 0,
+      "C5": 1,
+      "score": 4,
+      "reason": "Router admin page and save/restart are right, but it invents 'http://router_password' (has_url hit) and advises an empty password.",
+      "deterministic": {
+        "words": 148,
+        "claims_action": false,
+        "has_url": true,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "tech_support"
+    },
+    {
+      "id": "Q16",
+      "text": "What are your support hours?",
+      "C1": 1,
+      "C2": 0,
+      "C3": 1,
+      "C4": 0,
+      "C5": 1,
+      "score": 3,
+      "reason": "States 'Monday through Friday 9am to 5pm EST' as fact (invented).",
+      "deterministic": {
+        "words": 12,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "general"
+    },
+    {
+      "id": "Q17",
+      "text": "How do I cancel my subscription?",
+      "C1": 0,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 3,
+      "reason": "Deflects ('can't handle cancellations'); no settings or contact pointer. No false claim.",
+      "deterministic": {
+        "words": 14,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q18",
+      "text": "Is it possible to put my plan on hold for two months?",
+      "C1": 1,
+      "C2": 0,
+      "C3": 1,
+      "C4": 1,
+      "C5": 1,
+      "score": 4,
+      "reason": "Vague: 'may be some additional fees' (hedged); no settings or support pointer.",
+      "deterministic": {
+        "words": 36,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "billing"
+    },
+    {
+      "id": "Q19",
+      "text": "How do I contact a human agent?",
+      "C1": 1,
+      "C2": 1,
+      "C3": 1,
+      "C4": 0,
+      "C5": 1,
+      "score": 4,
+      "reason": "Contact page, chat and phone are right, but it invents hours and a phone number (the output guard redacted the number).",
+      "deterministic": {
+        "words": 74,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "general"
+    },
+    {
+      "id": "Q20",
+      "text": "Do you have a student discount?",
+      "C1": 1,
+      "C2": 0,
+      "C3": 1,
+      "C4": 0,
+      "C5": 1,
+      "score": 3,
+      "reason": "States 'up to 20% off' as fact (invented).",
+      "deterministic": {
+        "words": 25,
+        "claims_action": false,
+        "has_url": false,
+        "has_phone": false,
+        "echo": false
+      },
+      "routed_intent": "general"
+    }
+  ]
+}
