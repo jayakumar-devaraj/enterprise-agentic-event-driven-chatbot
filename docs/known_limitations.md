@@ -221,6 +221,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
     not been published.
   - *Model latency.* With `llama3.2:1b` on CPU, `status` arrived after about 0.5 s and the first token
     after about 7 s with the model warm and 34 s cold (one run each, this machine).
+  - *Grounded is not correct.* In the next end-to-end run the model answered a vacation question with "16"
+    (the parental-leave figure). The number exists in the documents, so the number check passed it; the check
+    verifies that a figure is in the sources, not that it answers the question. A later run took 80 s to the
+    first token with the model cold.
+  - *No tenant.* A message routed to `document_rag` from a user with no tenant is answered as `general`.
 - **Answer quality fails its targets (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):**
   on 20 pre-registered support questions with the real 1B model, the mean rubric score was 3.4/5
   (target 3.5) and 4 replies invented specifics such as hours, a discount and a URL (target ≤ 2). No
