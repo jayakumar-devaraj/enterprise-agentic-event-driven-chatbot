@@ -201,6 +201,10 @@ def build_graph(
                 documents = render_documents(sections, rag_context_chars)
                 deltas = engine.stream_documents(state["question"], history, documents)
                 reply = await stream_reply(deltas, limit=rag_max_tokens, gate=gate)
+                if (
+                    not reply.strip() and not gate.dropped
+                ):  # nothing came back: a fault, not an answer
+                    raise TransientDependencyError("llm: empty answer")
                 if gate.dropped:
                     for part in NUMERIC_CAVEAT.split():
                         await writer.token(part)

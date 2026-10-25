@@ -40,8 +40,9 @@ markers = [
     "llm: needs the compose stack with MOCK_LLM=false and the Ollama profile (A9)",
     "durability: starts its own compose project (redis, kafka) and kills/recreates it",
     "stack: needs the full compose stack up (gateway, worker, Jaeger) as in the README",
+    "rag: needs the compose rag profile (rag-db, rag-api, rag-seed) and Ollama",
 ]
-addopts = "-m 'not integration and not scale and not llm and not durability and not stack'"
+addopts = "-m 'not integration and not scale and not llm and not durability and not stack and not rag'"
 
 [tool.ruff]
 line-length = 100

@@ -368,3 +368,49 @@ async def test_a_checkpoint_written_before_this_change_still_loads_and_replays()
     assert "citations" not in _types(replayed)
     again = await rig.turn(_env("Any update?", thread="old", tenant=None))
     assert _text(again).startswith("[plain] intent=billing turns=2")
+
+
+async def test_a_retry_after_a_fault_in_the_answer_step_searches_again_and_answers() -> None:
+    """The model fails before its first token; the retry must not resume past the search.
+
+    Resuming at `rag_respond` would run it with no sections (they are not checkpointed) and
+    answer "not found" for a question the documents can answer.
+    """
+
+    class FailsOnce(ScriptedEngine):
+        async def stream_documents(self, question, history, documents):
+            self.document_calls.append({"question": question, "documents": documents})
+            if len(self.document_calls) == 1:
+                raise TransientDependencyError("llm: cold start")
+            yield self.reply
+            return
+
+    engine = FailsOnce()
+    rig = Rig(engine=engine)
+    env = _env()
+    w = _Retried(rig)
+    await w.worker.handle(FakeMsg(env.model_dump_json().encode()))
+    events = rig.events(env)
+    assert len(rig.rag.calls) == 2 and len(engine.document_calls) == 2
+    assert _types(events) == [
+        "status",
+        "token",
+        "token",
+        "token",
+        "token",
+        "token",
+        "citations",
+        "done",
+    ]
+    assert _text(events) == "Servers cost 4200 per quarter." and w.dlq.records == []
+
+
+async def test_a_model_that_returns_no_text_is_a_fault_not_an_empty_answer() -> None:
+    """Citations and `done` after zero tokens would present silence as an answer."""
+    rig = Rig(engine=ScriptedEngine(reply=""))
+    env = _env()
+    w = _Retried(rig)
+    await w.worker.handle(FakeMsg(env.model_dump_json().encode()))
+    events = rig.events(env)
+    assert "citations" not in _types(events) and events[-1]["code"] == "dependency_unavailable"
+    assert len(rig.rag.calls) == 3 and len(w.dlq.records) == 1  # retried, then dead-lettered
