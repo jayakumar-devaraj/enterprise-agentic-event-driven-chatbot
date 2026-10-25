@@ -210,3 +210,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   reply falsely claimed an action. Billing answers mostly deflect to "a human will review it", which
   echoes the system prompt's refund rule. Scored by the build agent against a published rubric; not
   an independent judge, and DeepEval is not used.
+- **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
+  every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
+  missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
+  the direct gateway ports carry Basic credentials in clear, so any local process can read or write
+  all state. Not suitable beyond one trusted host as configured.
