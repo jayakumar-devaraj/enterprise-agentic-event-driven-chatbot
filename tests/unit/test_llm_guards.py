@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 
+import pytest
 from chat_common.scrubber import get_scrubber
 from worker.guards import REDACTED, guarded_tokens
 from worker.llm import SYSTEM_PROMPTS, MockEngine, build_messages
@@ -112,3 +113,49 @@ async def test_guard_drops_echoed_delimiter_blocks() -> None:
     )
     out = await _collect(guarded_tokens(deltas, get_scrubber().ascrub, 50))
     assert " ".join(out) == "Restart it."
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "secret"),
+    [
+        ("ID-" + "X" * 995 + " jane.doe@exa", "mple.com is the address. Thanks.", "jane.doe"),
+        ("REF-" + "Z" * 994 + " card 4111 1111", " 1111 1111 on file. Bye.", "4111"),
+        ("Q" * 998 + " 212-555", "-0147 call me. Bye.", "0147"),
+    ],
+    ids=["email", "card", "phone"],
+)
+async def test_guard_never_flushes_half_an_entity_at_the_hard_maximum(
+    first: str, second: str, secret: str
+) -> None:
+    """1000 chars with no sentence end and no lowercase word gap, ending mid-entity.
+
+    Flushing the whole buffer scrubbed the entity's first half alone, and neither half was
+    recognised. With nowhere safe to cut, the guard redacts and ends the reply.
+    """
+    out = " ".join(
+        await _collect(guarded_tokens(_deltas(first, second), get_scrubber().ascrub, 5000))
+    )
+    assert secret not in out, out[-120:]
+    assert out.endswith(REDACTED)
+
+
+@pytest.mark.parametrize(
+    ("label", "intro", "value"),
+    [
+        ("ssn", "My social security number is:", "219-09-9999."),
+        ("phone", "Call me at", "212-555-0147 tomorrow."),
+        ("card", "My card is", "4111 1111 1111 1111."),
+        ("email", "Write to", "jane.doe@example.com today."),
+        ("ip", "The server is", "192.168.10.24 now."),
+        ("person", "The account holder is", "Priya Raman."),
+        ("location", "She lives in", "Lyon."),
+    ],
+)
+async def test_guard_scrubs_an_entity_cut_off_from_its_context_by_a_newline(
+    label: str, intro: str, value: str
+) -> None:
+    """A newline is a chunk boundary, so the entity is scrubbed without its context words."""
+    out = " ".join(
+        await _collect(guarded_tokens(_deltas(f"{intro}\n", value), get_scrubber().ascrub, 50))
+    )
+    assert value.split()[0].rstrip(".") not in out, (label, out)

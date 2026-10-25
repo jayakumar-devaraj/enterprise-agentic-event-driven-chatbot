@@ -173,6 +173,15 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   (cold start, cause unknown), so POST p95 over the whole run still fails. Worker-side queue delay
   (p95 8.8 s) and real-model first-token latency still fail. The report's percentiles were
   recomputed with the inclusive method, since the exclusive default extrapolated small samples.
+- **Output guard leaked at its hard limit (2026-10-24, section 3 of
+  `docs/reports/full-score-recommendations.md`):** with 1000 buffered characters, no sentence end and
+  no gap between two lowercase words, the guard flushed the whole buffer. If the latest model delta
+  stopped mid-entity, each half was scrubbed alone and neither was recognised. In tests an email,
+  a card number and a phone number came out in clear. The LLD had listed this as a residual risk. The
+  guard now emits `[redacted]` and ends the reply in that case, so a legitimate 1000-character run
+  of digits or capitals is cut off. Tested and not a leak: an entity separated from its context by a
+  newline chunk boundary (SSN, phone, card, email, IP, person, location). Not covered: an echo of a
+  system prompt that omits its first 40 characters (the prompts hold no secrets).
 - **Raw PII in DLQ records and logs (2026-10-25, section 3 of
   `docs/reports/full-score-recommendations.md`):** a scan of the running stack
   (`tests/stack/test_sensitive_data.py`, `-m stack`) found the gateway path clean in every sink:
