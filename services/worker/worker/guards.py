@@ -24,11 +24,16 @@ REDACTED = "[redacted]"
 
 
 def _forced_cut(buffer: str) -> int:
-    """Where to cut an over-long chunk: the last safe space; 0 means keep buffering."""
+    """Where to cut an over-long chunk: the last safe space; 0 means keep buffering.
+
+    -1 means the buffer reached _HARD_MAX with no safe space. Its end may be the first half of an
+    entity whose second half has not arrived, and a half is not recognised, so nothing in it can be
+    flushed safely.
+    """
     cuts = [m.start() for m in _SAFE_CUT.finditer(buffer)]
     if cuts:
         return cuts[-1]
-    return len(buffer) if len(buffer) >= _HARD_MAX else 0
+    return -1 if len(buffer) >= _HARD_MAX else 0
 
 
 async def guarded_tokens(
@@ -70,6 +75,9 @@ async def guarded_tokens(
             cut = _forced_cut(buffer)
         else:
             continue
+        if cut < 0:  # fail closed: redact the rest rather than flush half an entity
+            yield REDACTED
+            return
         if cut:
             async for token in drain(buffer[:cut]):
                 yield token
