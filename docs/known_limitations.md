@@ -191,3 +191,9 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   only a SHA-256, the length and the error types and field locations. Not covered: names and
   locations, because a random name cannot be relied on to be recognised; LangFuse, which was
   stopped; host-level logs outside Docker.
+- **Broad PII set misses its recall targets (2026-10-25, `docs/reports/pii-broad-2026-10-25.md`):**
+  on 60 agent-written sentences with targets pre-registered before scoring, structured identifiers
+  were redacted 10/14 (target 0.90) and locations 16/30 (target 0.80). Persons passed at 16/18.
+  Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
+  emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
+  been tuned on this set; candidate recognizers need a fresh held-out set.
