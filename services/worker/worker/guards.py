@@ -4,6 +4,7 @@ import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from worker.llm import SYSTEM_PROMPTS
+from worker.numeric import numeric_groundedness
 
 # A sentence ends at punctuation followed by whitespace, or at a newline: a dot inside "jane.doe",
 # "212.555" or "192.168" is not an end, so a streamed entity is never flushed in fragments. The
@@ -23,6 +24,38 @@ _ECHO_PROBES = tuple(p[:40] for p in SYSTEM_PROMPTS.values())
 REDACTED = "[redacted]"
 
 
+class GroundingGate:
+    """Keeps a sentence only if every number in it occurs in `sources`; counts what it drops.
+
+    The sources are raw document text (and the question), so the gate must see a sentence before
+    it is scrubbed: scrubbing rewrites numbers it takes for identifiers. Sentences already streamed
+    cannot be taken back, which is why this drops one sentence instead of replacing the answer.
+    """
+
+    def __init__(self, sources: list[str]) -> None:
+        """Hold the texts a number may be found in."""
+        self._sources = sources
+        self.dropped = 0
+
+    def keep(self, sentence: str) -> bool:
+        """True when the sentence has no number absent from every source."""
+        _, unsupported = numeric_groundedness(sentence, self._sources)
+        if unsupported:
+            self.dropped += 1
+        return not unsupported
+
+
+def _sentences(chunk: str) -> list[str]:
+    """Split at the boundaries the guard buffers on; each part keeps its trailing whitespace."""
+    parts, start = [], 0
+    for m in _BOUNDARY.finditer(chunk):
+        parts.append(chunk[start : m.end()])
+        start = m.end()
+    if start < len(chunk):
+        parts.append(chunk[start:])
+    return parts
+
+
 def _forced_cut(buffer: str) -> int:
     """Where to cut an over-long chunk: the last safe space; 0 means keep buffering.
 
@@ -37,12 +70,16 @@ def _forced_cut(buffer: str) -> int:
 
 
 async def guarded_tokens(
-    deltas: AsyncIterator[str], scrub: Callable[[str], Awaitable[str]], max_tokens: int
+    deltas: AsyncIterator[str],
+    scrub: Callable[[str], Awaitable[str]],
+    max_tokens: int,
+    gate: GroundingGate | None = None,
 ) -> AsyncIterator[str]:
     """Buffer to a sentence boundary, scrub, check for echoes, then yield space-split tokens.
 
     Nothing unscrubbed is ever yielded, so nothing unscrubbed reaches the stream, checkpoint,
     logs or traces downstream. A system-prompt echo ends the reply with a single REDACTED token.
+    With a `gate`, each sentence is checked before it is scrubbed and an ungrounded one is dropped.
     """
     emitted = 0
     buffer = ""
@@ -51,6 +88,8 @@ async def guarded_tokens(
     async def drain(chunk: str) -> AsyncIterator[str]:
         nonlocal emitted, done
         chunk = _STRAY_TAG.sub("", _ECHO_BLOCK.sub("", chunk))
+        if gate is not None:
+            chunk = "".join(s for s in _sentences(chunk) if gate.keep(s))
         clean = await scrub(chunk) if chunk.strip() else ""
         if any(probe in clean for probe in _ECHO_PROBES):
             done = True
