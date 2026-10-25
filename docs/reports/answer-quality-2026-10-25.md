@@ -20,7 +20,8 @@ Per criterion: C1 answers 10/20, C2 relevant action 7/20, C3 20/20, C4 16/20, C5
 went to `billing`, not the expected `general`.
 
 ## What the replies show
-- **Billing answers deflect.** 6 of 7 billing questions got no useful step: "A human will review
+- **Billing answers deflect.** None of the 7 billing questions earned C2 (one was stopped by the
+  refund gate, by design). The others got no useful step: "A human will review
   your request.", "contact the company you signed up with", or a restatement of the question. The
   system prompt says "Never approve refunds or claim an account action was taken; say a human will
   review it", and the 1B model applies that to every billing question, including "where do I
@@ -32,7 +33,8 @@ went to `billing`, not the expected `general`.
   reply also advised setting an empty router password.
 - **No false action claims** in any reply (C3 20/20). That matches the safety evaluation.
 - **Other artefacts:** one reply echoed "The user's message is: …", one left a template placeholder
-  `<knowledge_base_url>`, and the output guard turned the product name "Authy" into `<PERSON>`.
+  `<knowledge_base_url>`, and in a list of authenticator apps the output guard replaced one name
+  with `<PERSON>` (the original word is not recoverable from the reply).
 
 ## Disposition
 Answer quality fails its targets. The evidence points to two separate causes: the prompt's
