@@ -144,7 +144,8 @@ from `data/injection.seed.jsonl`; benign look-alikes in `benign_patterns` from
 loud if the model or collection is missing. `data/intents.eval.jsonl` (≥ 3 per intent + ≥ 5
 off-topic) is never loaded into Qdrant. Top-1 score < `ROUTE_THRESHOLD` ⇒ `general`.
 `ROUTE_THRESHOLD` and `INJECTION_MARGIN` are set by leave-one-out over the seed files (max-accuracy
-cut), recorded in ADR 0004; changing either requires an ADR update. `data/guard.holdout.jsonl` and
+cut), recorded in ADR 0004. Intents are `billing`, `tech_support`, `general` and `document_rag`
+(a question about the user's own documents, answered per §13); changing either requires an ADR update. `data/guard.holdout.jsonl` and
 `data/guard.eval.jsonl` are never loaded into Qdrant.
 
 ## 9 · Inference and prompts

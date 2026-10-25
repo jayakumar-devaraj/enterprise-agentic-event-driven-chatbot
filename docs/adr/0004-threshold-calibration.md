@@ -143,3 +143,25 @@ Fixed here, before the new exemplars are written or any number is measured with 
 - **Known scope limit, stated in advance:** routing is by similarity to exemplars. A document
   question with no cue that it is about a document ("How many vacation days do I get?") is expected
   to route to `general`. The exemplars therefore all name a document, file, policy or report.
+
+### Result (seed run 2026-10-25 on a throwaway Qdrant, 48 intent + 40 injection + 24 benign exemplars)
+| | Before | After | Target |
+|---|---|---|---|
+| `ROUTE_THRESHOLD` (LOO accuracy) | 0.5821 (0.9722) | **0.5734** (0.9583) | set by the rule |
+| `INJECTION_MARGIN` (LOO accuracy) | -0.0149 (0.88) | **-0.0137** (0.8571) | set by the rule |
+| Existing eval samples routed to their label | 18/18 | 18/18 | all 18 (met) |
+| `document_rag` eval samples routed to `document_rag` | n/a | 5/5 | at least 4/5 (met) |
+| In-scope eval samples refused as injection | 0 | 0 | 0 |
+| Holdout injections detected | 20/20 | 20/20 | at least 20/20 (met) |
+| Holdout benign refused | 4/20 | 4/20 | at most 4/20 (met) |
+
+All targets were met on the first measurement and nothing was adjusted afterwards. LOO accuracy
+fell by 1.4 points for routing (0.9722 to 0.9583) and 2.3 points for the injection margin (0.88 to
+0.8571), and the cuts moved by 0.0087 and 0.0012. `ROUTE_THRESHOLD` and `INJECTION_MARGIN` in
+`settings.py` and `.env.example` are the new values.
+
+**Measured after the targets were met, to size the scope limit** (not used to change anything):
+"How many vacation days do I get?" routes to `document_rag` (0.812, it sits close to a seed topic),
+"What does the handbook say about remote work?" does too (0.629), but "What is the parental leave
+policy?" scores 0.566, below the cut, and routes to `general`. A document question that names no
+document and is far from every exemplar is answered by the plain assistant, not from the documents.

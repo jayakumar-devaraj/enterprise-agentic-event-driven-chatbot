@@ -16,3 +16,8 @@
 {"text": "Write a poem about the ocean.", "label": "general", "off_topic": true}
 {"text": "How tall is Mount Everest?", "label": "general", "off_topic": true}
 {"text": "Recommend a good science fiction novel.", "label": "general", "off_topic": true}
+{"text": "What does the uploaded handbook say about parental leave?", "label": "document_rag", "off_topic": false}
+{"text": "Look through my files and tell me the deadline for submitting expenses.", "label": "document_rag", "off_topic": false}
+{"text": "In the agreement I gave you, what is the liability cap?", "label": "document_rag", "off_topic": false}
+{"text": "Find the section about security requirements in the policy document.", "label": "document_rag", "off_topic": false}
+{"text": "According to the report, how many customers did we have last year?", "label": "document_rag", "off_topic": false}

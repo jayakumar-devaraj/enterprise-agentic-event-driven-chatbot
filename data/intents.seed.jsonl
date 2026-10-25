@@ -34,3 +34,15 @@
 {"text": "Goodbye, have a nice day.", "label": "general"}
 {"text": "What services does your company offer?", "label": "general"}
 {"text": "Can you tell me about your privacy policy?", "label": "general"}
+{"text": "According to the document I uploaded, what is the notice period?", "label": "document_rag"}
+{"text": "What does my contract say about early termination fees?", "label": "document_rag"}
+{"text": "Summarize the section on data retention in the policy document.", "label": "document_rag"}
+{"text": "Find the budget figure for the project in my uploaded files.", "label": "document_rag"}
+{"text": "In the report I uploaded, what was the total revenue for the third quarter?", "label": "document_rag"}
+{"text": "Look in the employee handbook and tell me how many vacation days are allowed.", "label": "document_rag"}
+{"text": "Search my documents for the warranty terms.", "label": "document_rag"}
+{"text": "What does the attached PDF say about payment deadlines?", "label": "document_rag"}
+{"text": "Check the spreadsheet I shared and tell me the headcount for engineering.", "label": "document_rag"}
+{"text": "Which clause in the agreement covers confidentiality?", "label": "document_rag"}
+{"text": "Based on our internal policy file, who approves travel expenses?", "label": "document_rag"}
+{"text": "Can you find the renewal date in the lease document?", "label": "document_rag"}
