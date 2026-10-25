@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 20
     cors_origins: str = "http://localhost:5173"
     auth_users: SecretStr = SecretStr("")
+    user_tenants: str = ""  # `user:tenant,...`; a user not listed has no document tenant (SPEC §3)
 
     approval_ttl_s: int = 3600
 

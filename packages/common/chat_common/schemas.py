@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 ThreadId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 """UUID or `[A-Za-z0-9_-]{1,64}`; a canonical UUID already satisfies the pattern."""
 
+TenantId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+"""Document-store tenant a user belongs to (SPEC §3); set by the gateway, never by a request."""
+
 
 class _Strict(BaseModel):
     """Base for wire models: unknown fields are rejected, instances are immutable."""
@@ -51,6 +54,7 @@ class Envelope(_Strict):
     kind: Literal["chat", "approval"] = "chat"
     ref_message_id: UUID | None = None
     approved: bool | None = None
+    tenant_id: TenantId | None = None
 
     @model_validator(mode="after")
     def _approval_fields(self) -> "Envelope":

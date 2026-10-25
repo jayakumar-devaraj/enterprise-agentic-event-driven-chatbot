@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 import redis.asyncio as aioredis
@@ -49,6 +49,7 @@ class Deps:
     producer: EnvelopeSink
     scrub: Callable[[str], Awaitable[str]]
     users: dict[str, str]
+    tenants: dict[str, str] = field(default_factory=dict)  # username → document tenant (SPEC §3)
 
     @property
     def audit(self) -> AuditLog:
@@ -169,12 +170,14 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         configure_logging(settings.log_level)
         setup_tracing("gateway", settings.otel_exporter_otlp_endpoint)
         scrubber = get_scrubber(settings.spacy_model)
+        users = auth.parse_users(settings.auth_users.get_secret_value())
         return Deps(
             settings=settings,
             redis=make_redis(settings),
             producer=KafkaEnvelopeProducer(settings.kafka_bootstrap_servers, settings.kafka_topic),
             scrub=scrubber.ascrub,
-            users=auth.parse_users(settings.auth_users.get_secret_value()),
+            users=users,
+            tenants=auth.parse_user_tenants(settings.user_tenants, users),
         )
 
     @asynccontextmanager
@@ -305,6 +308,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
             user_id=user,
             text=scrubbed,
             trace_id=current_traceparent() or uuid.uuid4().hex,  # ADR 0003: context rides here
+            tenant_id=deps.tenants.get(user),  # from the username only, never from the request
         )
         return await enqueue(deps, envelope, user)
 

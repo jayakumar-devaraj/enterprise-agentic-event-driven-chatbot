@@ -10,7 +10,7 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 |---|---|
 | `ChatRequest` | `message: str`, `thread_id: str`, `message_id: UUID` |
 | `ChatAccepted` | `message_id`, `thread_id`, `stream_url` |
-| `Envelope` (Kafka value) | `message_id`, `thread_id`, `user_id`, `text` (scrubbed), `ts`, `trace_id`, `kind: "chat" \| "approval"`, `ref_message_id?`, `approved?` |
+| `Envelope` (Kafka value) | `message_id`, `thread_id`, `user_id`, `text` (scrubbed), `ts`, `trace_id`, `kind: "chat" \| "approval"`, `ref_message_id?`, `approved?`, `tenant_id?` |
 | `TokenEvent` | `seq`, `token` |
 | `DoneEvent` | `seq` |
 | `ErrorEvent` | `seq`, `code`, `detail` |
@@ -44,6 +44,16 @@ binding. The worker checks ownership too, on every envelope it processes: a miss
 restored to the user the thread's history belongs to (or the envelope's user for a new thread), and an
 envelope from anyone else gets `ErrorEvent{thread_owner_mismatch}` and changes nothing. A replay after a
 Redis restore therefore re-binds every thread it rebuilds (§12).
+
+**Tenant.** `USER_TENANTS` (`user:tenant,...`, a `TenantId` of `[A-Za-z0-9_-]{1,64}`) maps an
+authenticated username to the document tenant its requests run under. It is parsed at gateway
+startup like `AUTH_USERS`; a malformed entry, a duplicate or a user missing from `AUTH_USERS` fails
+startup. The gateway sets `Envelope.tenant_id` from the username alone and never from a request body
+(`ChatRequest` forbids unknown fields). A user with no entry has `tenant_id` unset, and the field is
+left out of the Kafka value then, so a worker that predates it still accepts the record. A message
+that needs documents and carries no tenant ends with `ErrorEvent{code: "no_tenant"}`. Deploy
+workers before gateways: a worker without the field rejects an envelope that has it
+(`extra="forbid"`) as malformed.
 
 ## 4 · Kafka
 
