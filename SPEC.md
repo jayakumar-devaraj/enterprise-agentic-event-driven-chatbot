@@ -233,6 +233,9 @@ guard. Each sentence is checked before it is scrubbed: a sentence with a number 
 section (or the question) is dropped, and one fixed caveat follows the last sentence. After the last
 token the worker sends `citations`, then `done`.
 
+A model that returns no text is a dependency fault (§7), not an empty answer: it is retried while
+no reply has started, and no `citations` event is sent for it.
+
 **Data.** Section text is never checkpointed, streamed, logged, traced or sent to the DLQ. The
 checkpoint keeps `doc_key`, `page_id`, `page_key` and `score` per section, reset every turn. The
 scrubbed reply is stored in `turns` like any other. Raw section text does reach the chat model

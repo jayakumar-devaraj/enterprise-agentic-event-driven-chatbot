@@ -7,14 +7,14 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 
 | Module | Owns |
 |---|---|
-| `chat_common.schemas` | Pydantic v2 models: `ChatRequest`, `ChatAccepted`, `Envelope`, `TokenEvent`, `DoneEvent`, `ErrorEvent`, `ApprovalRequiredEvent`, `ApprovalRequest` |
+| `chat_common.schemas` | Pydantic v2 models: `ChatRequest`, `ChatAccepted`, `Envelope`, `TokenEvent`, `DoneEvent`, `ErrorEvent`, `ApprovalRequiredEvent`, `StatusEvent`, `CitationsEvent`, `ApprovalRequest`; `Envelope.tenant_id` |
 | `chat_common.settings` | `Settings` (pydantic-settings, env); dedupe-lease formula validator |
 | `chat_common.scrubber` | Presidio analyzer/anonymizer; `scrub()` sync, `ascrub()` via `asyncio.to_thread` |
 | `chat_common.logjson` | stdlib `logging` JSON formatter carrying `trace_id`, `thread_id`, `message_id` |
 | `chat_common.audit` | `audit:events` writer and reader |
 | `chat_common.tracing` | OpenTelemetry setup; W3C trace context carried in `Envelope.trace_id` (ADR 0003) |
 | `gateway.app` | FastAPI app, routes, exception → status mapping, owner binding, per-thread rate limit, idempotent enqueue |
-| `gateway.auth` | HTTP Basic verification (scrypt, called via `asyncio.to_thread`), thread ownership |
+| `gateway.auth` | HTTP Basic verification (scrypt, called via `asyncio.to_thread`), thread ownership, `USER_TENANTS` parsing |
 | `gateway.producer` | confluent-kafka asyncio producer wrapper |
 | `gateway.sse` | Redis stream → SSE relay |
 | `worker.consumer` | Poll loop, dedupe lease, retries, DLQ, commit |
@@ -25,7 +25,9 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `worker.main` | Process wiring: clients, checkpointer, graph, consumer loop |
 | `worker.router` | Qdrant top-1 intent + contrastive injection margin (ADR 0004) |
 | `worker.llm` | OpenAI-compatible client and deterministic mock; prompt assembly |
-| `worker.guards` | L5 output guard: scrub per sentence chunk, block prompt echoes, token cap |
+| `worker.guards` | L5 output guard: scrub per sentence chunk, block prompt echoes, token cap; `GroundingGate` drops ungrounded sentences before the scrub |
+| `worker.rag_client` | `/v1/retrieve` client: one pool, one deadline, status mapping, contract models |
+| `worker.numeric` | `numeric_groundedness`, copied from the RAG service with a parity test |
 | `worker.approval` | Refund proposal, interrupt/resume, apply |
 | `seed.main` / `seed.calibrate` | Load collections; leave-one-out threshold calibration |
 | `frontend/src/api.ts` | `postChat`, `postApprove`, `streamMessage` (fetch + SSE parser, Basic header, `Last-Event-ID` resume) |
@@ -133,6 +135,10 @@ stateDiagram-v2
   route --> billing: intent=billing
   route --> tech_support: intent=tech_support
   route --> general: score < ROUTE_THRESHOLD or intent=general
+  route --> condense: intent=document_rag
+  condense --> rag_retrieve: tenant present, question made standalone
+  rag_retrieve --> rag_respond: status event, then the RAG service
+  rag_respond --> [*]: tokens, citations (fixed reply if nothing found)
   await_approval --> settle_refund: resumed by the requester's decision, accepted in time
   billing --> [*]
   tech_support --> [*]
@@ -144,7 +150,9 @@ stateDiagram-v2
 `billing`, `tech_support`, `general` and `refuse` all run `respond` (stream through the output
 guard, append the user+assistant pair). State (`ChatState`, `worker/graph.py`): `turns:
 list[{role, text}]` (scrubbed, appended), `pending` (scrubbed text of the current turn),
-`message_id`, `user_id`, `intent`, `route_score`, `injection_score`, `decision` (approval resume
+`message_id`, `user_id`, `intent`, `route_score`, `injection_score`, `tenant_id`, `question` (the
+scrubbed standalone question), `doc_refs` (`doc_key`, `page_id`, `page_key`, `score`), `insufficient`
+(these four are set from the envelope every turn; none holds section text), `decision` (approval resume
 payload), `answered` (message_id whose reply is the last turn). Before invoking, the processor reads
 the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this message ⇒ re-announce
 `approval_required`; paused on another message and a chat arrives ⇒ abandon it (`refund_abandoned`).
@@ -200,6 +208,10 @@ The system prompt instructs the model to treat everything inside the tags as dat
 system prompt is byte-identical to the baseline and that injected text appears only inside
 `<user_message>`.
 
+A document turn uses a second constant system prompt and a `<documents>` block before the usual
+`<user_message>` and `<history>` fields. Section text is escaped, capped at `RAG_CONTEXT_CHARS`,
+and never in the system prompt; the condense call uses the same delimited fields.
+
 ## 10 · Output guard and streaming
 
 The worker buffers model deltas and cuts after the last sentence end, meaning `.`/`!`/`?` followed
@@ -214,6 +226,10 @@ to 2000 chars). This trades a little time-to-first-token for the guarantee that 
 never reaches the stream, checkpoint, logs or traces. Residual risks: a lowercase multi-word entity
 at a forced cut. An echo of a system prompt is caught only if it includes the prompt's first 40
 characters (the prompts hold role and safety rules, no secrets).
+
+For a document reply the guard also takes a `GroundingGate`: each sentence is checked against the
+raw sections and the question before it is scrubbed, and an ungrounded one is dropped (a fixed
+caveat follows the last sentence). The same stripping removes an echoed `<documents>` block.
 
 ## 11 · React chat window
 
@@ -257,3 +273,46 @@ stateDiagram-v2
 The worker uses `AsyncQdrantClient(host, grpc_port=6334, prefer_grpc=True)` for search (lead
 choice, ADR 0006). The seed service and compose healthcheck keep REST on :6333. Both ports are
 published only inside the compose network.
+
+## 13 · Sequence: document question
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant G as Gateway
+  participant K as Kafka
+  participant W as Worker
+  participant Q as Qdrant
+  participant A as RAG service
+  participant L as LLM
+  participant R as Redis
+  C->>G: POST /chat (Basic auth)
+  G->>G: username → tenant (USER_TENANTS); ascrub(message) [scrub point 1]
+  G->>K: Envelope{text scrubbed, tenant_id}
+  W->>K: poll; dedupe lease
+  W->>Q: route → document_rag (an injection verdict wins)
+  W->>W: tenant_id absent ⇒ ErrorEvent no_tenant
+  opt prior turns
+    W->>L: condense (non-streaming)
+    W->>W: ascrub(question) [scrub point 2]
+  end
+  W->>R: XADD StatusEvent
+  Note over W,A: retry boundary: connection error, 503, 504 retried while no reply has started<br/>one deadline RAG_TIMEOUT_S, sent as X-Timeout-Ms
+  W->>A: POST /v1/retrieve {question} Bearer(tenant token), traceparent, X-Request-ID
+  A-->>W: sections (raw text, held in memory only) or insufficient
+  alt insufficient
+    W->>R: XADD fixed "not found" tokens (no model call)
+  else found
+    W->>L: <documents> (escaped) + question, system prompt constant
+    loop each sentence
+      W->>W: number check against raw sections [before scrub]
+      W->>W: ascrub(sentence) [scrub point 3]; ungrounded ⇒ dropped
+      W->>R: XADD TokenEvent (retries now blocked)
+    end
+    W->>R: XADD caveat tokens if any were dropped
+    W->>R: XADD CitationsEvent
+  end
+  W->>R: checkpoint (scrubbed turn, doc_refs only), fenced XADD DoneEvent
+  W->>K: commit offset
+```
