@@ -204,13 +204,16 @@ system prompt is byte-identical to the baseline and that injected text appears o
 
 The worker buffers model deltas and cuts after the last sentence end, meaning `.`/`!`/`?` followed
 by whitespace, or a newline. A dot inside `jane.doe` or `192.168` is not a sentence end. Past 200
-chars without one, it cuts only at a space between two complete lowercase words, or at 1000 chars.
+chars without one, it cuts only at a space between two complete lowercase words. With no such
+space by 1000 chars it emits `[redacted]` and ends the reply, because the buffer may end in half an
+entity and a half is not recognised.
 Each chunk is scrubbed off-loop and checked for a system-prompt echo, then its tokens are XADDed.
 Echoed `<user_message>` / `<history>` blocks and stray delimiter tags are removed first, and cuts
 never fall inside an echoed block; while such a block is still open the guard keeps buffering (up
 to 2000 chars). This trades a little time-to-first-token for the guarantee that unscrubbed output
-never reaches the stream, checkpoint, logs or traces. Residual risk: an entity spanning a cut made
-at the 1000-char hard limit, or a lowercase multi-word entity at a forced cut.
+never reaches the stream, checkpoint, logs or traces. Residual risks: a lowercase multi-word entity
+at a forced cut. An echo of a system prompt is caught only if it includes the prompt's first 40
+characters (the prompts hold role and safety rules, no secrets).
 
 ## 11 · React chat window
 
