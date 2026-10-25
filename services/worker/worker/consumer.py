@@ -1,7 +1,7 @@
 """Kafka consumer loop: dedupe lease, bounded retries, DLQ, manual commit (SPEC.md §4, §5, §7)."""
 
 import asyncio
-import base64
+import hashlib
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -91,9 +91,11 @@ class Worker:
             "ts": datetime.now(UTC).isoformat(),
         }
         if env is not None:
-            record["envelope"] = json.loads(env.model_dump_json())
+            record["envelope"] = json.loads(env.model_dump_json())  # scrubbed by the gateway
         else:
-            record["original_b64"] = base64.b64encode(msg.value() or b"").decode()
+            raw = msg.value() or b""  # unscrubbed: identify it, never keep it
+            record["sha256"] = hashlib.sha256(raw).hexdigest()
+            record["length"] = len(raw)
         delivery = await self._dlq.produce(
             self._dlq_topic, value=json.dumps(record).encode(), key=msg.key()
         )
@@ -120,8 +122,20 @@ class Worker:
         try:
             env = Envelope.model_validate_json(msg.value() or b"")
         except ValidationError as exc:
-            log.warning("malformed envelope to DLQ", extra={"error": str(exc)[:500]})
-            await self._to_dlq(msg, "malformed", str(exc)[:2000], None)
+            # These bytes skipped the gateway's scrubber and may hold raw PII, so neither the log
+            # nor the DLQ keeps any of them, only error types and Envelope field names (SPEC §7).
+            fields = set(Envelope.model_fields)
+            problems = json.dumps(
+                [
+                    {
+                        "type": e["type"],
+                        "loc": [p if p in fields or isinstance(p, int) else "?" for p in e["loc"]],
+                    }
+                    for e in exc.errors(include_url=False, include_input=False)
+                ]
+            )
+            log.warning("malformed envelope to DLQ", extra={"error": problems[:500]})
+            await self._to_dlq(msg, "malformed", problems[:2000], None)
             await self._commit(msg)
             return
 

@@ -1,6 +1,8 @@
 """Worker.handle outcomes with Kafka and Redis test doubles (no broker)."""
 
+import hashlib
 import json
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -199,4 +201,22 @@ async def test_redelivery_after_streamed_dependency_error_still_reaches_dlq() ->
     await w.handle(FakeMsg(env.model_dump_json().encode()))
     assert calls == [] and dlq.records[0]["reason"] == "dependency_unavailable"
     assert await redis.get(f"dedupe:{env.message_id}") is None
+    assert len(consumer.commits) == 1
+
+
+async def test_malformed_input_is_never_stored_or_logged(caplog) -> None:
+    """A malformed record skipped the gateway's scrubber, so its bytes may hold raw PII.
+
+    The DLQ keeps only its digest, length and the validation error types and locations.
+    """
+    raw = b'{"text": "card 4111111111111111 for jane.doe@example.com"'
+    w, consumer, dlq, _ = _worker(lambda e, wr: None)
+    with caplog.at_level(logging.DEBUG):
+        await w.handle(FakeMsg(raw))
+    (record,) = dlq.records
+    stored = json.dumps(record) + caplog.text
+    for secret in ("4111111111111111", "jane.doe@example.com", "card"):
+        assert secret not in stored, secret
+    assert record["reason"] == "malformed" and record["length"] == len(raw)
+    assert record["sha256"] == hashlib.sha256(raw).hexdigest()
     assert len(consumer.commits) == 1
