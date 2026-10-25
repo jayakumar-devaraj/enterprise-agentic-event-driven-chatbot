@@ -63,3 +63,17 @@ test("a stream restarted at seq 0 discards the partial attempt", async () => {
   expect(restarts).toBe(1);
   expect(seen).toEqual(["full", "answer", "done"]);
 });
+
+test("a status event is progress: the stream is read on to its terminal event", async () => {
+  const events = [
+    { type: "status", seq: 0, detail: "Searching your documents..." },
+    { type: "token", seq: 1, token: "hi" },
+    { type: "citations", seq: 2, citations: [{ doc_key: "a.txt", page_key: "page:1" }] },
+    { type: "done", seq: 3 },
+  ];
+  const body = events.map((e, i) => `id: ${i + 1}-0\ndata: ${JSON.stringify(e)}\n\n`).join("");
+  const fetchImpl = (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+  const seen: string[] = [];
+  await streamMessage(fetchImpl, "Basic x", "/stream/t1/m1", (e: StreamEvent) => seen.push(e.type));
+  expect(seen).toEqual(["status", "token", "citations", "done"]);
+});

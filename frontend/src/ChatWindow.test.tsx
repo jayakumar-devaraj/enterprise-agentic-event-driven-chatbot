@@ -101,3 +101,45 @@ test("parseFrames keeps an incomplete frame for the next chunk", () => {
   expect(frames).toEqual([{ id: "1-0", data: '{"a":1}' }]);
   expect(rest).toBe('id: 2-0\ndata: {"b"');
 });
+
+test("shows the status note until the first token, then the sources after the last", async () => {
+  const { fetchImpl, step } = fakeFetch(
+    sse([
+      { type: "status", seq: 0, detail: "Searching your documents..." },
+      { type: "token", seq: 1, token: "Servers" },
+      { type: "token", seq: 2, token: "cost" },
+      { type: "citations", seq: 3, citations: [{ doc_key: "handbook.txt", page_key: "page:1" }] },
+      { type: "done", seq: 4 },
+    ]),
+  );
+  render(<ChatWindow auth="Basic x" fetchImpl={fetchImpl} />);
+  await send("what do servers cost?");
+
+  await act(step);
+  expect((await screen.findByRole("status")).textContent).toContain("Searching your documents");
+
+  await act(step);
+  await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  await act(step);
+  await act(step);
+  const sources = await screen.findByLabelText("sources");
+  expect(sources.textContent).toContain("handbook.txt (page:1)");
+  await act(step);
+  await waitFor(() => expect((screen.getByText("Send") as HTMLButtonElement).disabled).toBe(false));
+});
+
+test("an event type this client does not know is read past, not treated as the end", async () => {
+  const { fetchImpl, step } = fakeFetch(
+    sse([
+      { type: "heartbeat", seq: 0 },
+      { type: "token", seq: 1, token: "Hello" },
+      { type: "done", seq: 2 },
+    ]),
+  );
+  render(<ChatWindow auth="Basic x" fetchImpl={fetchImpl} />);
+  await send("hi");
+  await act(step);
+  await act(step);
+  await waitFor(() => expect(screen.getAllByRole("listitem").at(-1)!.textContent).toContain("Hello"));
+  expect(screen.queryByText("Approve refund")).toBeNull();
+});

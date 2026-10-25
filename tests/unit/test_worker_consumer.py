@@ -220,3 +220,64 @@ async def test_malformed_input_is_never_stored_or_logged(caplog) -> None:
     assert record["reason"] == "malformed" and record["length"] == len(raw)
     assert record["sha256"] == hashlib.sha256(raw).hexdigest()
     assert len(consumer.commits) == 1
+
+
+async def test_status_note_does_not_block_a_retry() -> None:
+    """A status event is not reply output: a transient fault after it is still retried.
+
+    The retried attempt does not repeat the note, and the stream stays seq-contiguous.
+    """
+    attempts = []
+
+    async def flaky(env: Envelope, writer: StreamWriter) -> None:
+        attempts.append(1)
+        await writer.status("searching your documents")
+        if len(attempts) == 1:
+            raise TransientDependencyError("rag-api 503")
+        await _ok(env, writer)
+
+    w, _, dlq, redis = _worker(flaky)
+    env = _env()
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    events = [json.loads(f["data"]) for _, f in redis.streams[f"tokens:t1:{env.message_id}"]]
+    assert len(attempts) == 2 and dlq.records == []
+    assert [e["type"] for e in events] == ["status", "token", "token", "done"]
+    assert [e["seq"] for e in events] == [0, 1, 2, 3]
+
+
+async def test_no_retry_after_the_first_token_even_if_a_status_came_first() -> None:
+    """The no-retry-after-first-token rule is unchanged by the status event."""
+    attempts = []
+
+    async def partial(env: Envelope, writer: StreamWriter) -> None:
+        attempts.append(1)
+        await writer.status("searching your documents")
+        await writer.token("half")
+        raise TransientDependencyError("llm dropped")
+
+    w, _, dlq, _ = _worker(partial)
+    await w.handle(FakeMsg(_env().model_dump_json().encode()))
+    assert len(attempts) == 1 and dlq.records[0]["reason"] == "dependency_unavailable"
+
+
+async def test_redelivery_after_a_crash_following_a_status_note_reprocesses() -> None:
+    """`status` and `citations` are not terminal: a stream ending in one is a partial attempt.
+
+    Treating any non-token event as terminal would skip the work and leave the client waiting.
+    """
+    calls = []
+
+    async def process(env: Envelope, writer: StreamWriter) -> None:
+        calls.append(1)
+        await _ok(env, writer)
+
+    w, consumer, _, redis = _worker(process)
+    env = _env()
+    writer = await _crashed_writer(redis, env)
+    await writer.status("searching your documents")
+    await redis.delete(writer.lease.key)
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    events = [
+        json.loads(f["data"])["type"] for _, f in redis.streams[f"tokens:t1:{env.message_id}"]
+    ]
+    assert calls == [1] and events == ["token", "token", "done"] and len(consumer.commits) == 1

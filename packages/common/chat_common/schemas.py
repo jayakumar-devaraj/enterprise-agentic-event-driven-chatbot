@@ -101,8 +101,32 @@ class ApprovalRequiredEvent(_Strict):
     detail: str
 
 
+class StatusEvent(_Strict):
+    """Non-terminal progress note, sent before a slow step (SPEC §6). Carries no reply text."""
+
+    type: Literal["status"] = "status"
+    seq: int = Field(ge=0)
+    detail: str
+
+
+class Citation(_Strict):
+    """Where an answer came from: a document and its page or tab. Never any document text."""
+
+    doc_key: str
+    page_key: str
+
+
+class CitationsEvent(_Strict):
+    """Non-terminal: the sources of a document answer, sent after its last token, before `done`."""
+
+    type: Literal["citations"] = "citations"
+    seq: int = Field(ge=0)
+    citations: list[Citation]
+
+
 StreamEvent = Annotated[
-    TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent, Field(discriminator="type")
+    TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent | StatusEvent | CitationsEvent,
+    Field(discriminator="type"),
 ]
 TERMINAL_TYPES = frozenset({"done", "error", "approval_required"})
 

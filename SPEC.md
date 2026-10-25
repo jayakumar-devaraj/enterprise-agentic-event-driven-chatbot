@@ -15,6 +15,8 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 | `DoneEvent` | `seq` |
 | `ErrorEvent` | `seq`, `code`, `detail` |
 | `ApprovalRequiredEvent` | `seq`, `action: "refund_request"`, `detail` |
+| `StatusEvent` (not terminal) | `seq`, `detail` |
+| `CitationsEvent` (not terminal) | `seq`, `citations: [{doc_key, page_key}]` (locations, never document text) |
 | `ApprovalRequest` (body of `/approve`) | `message_id: UUID` (new), `approved: bool` |
 
 `thread_id`: UUID or `[A-Za-z0-9_-]{1,64}`. `message_id`: client-generated UUID.
@@ -92,6 +94,12 @@ One Redis Stream per message, `tokens:{thread_id}:{message_id}`; `seq` starts at
 from config. SSE `id:` is the Redis entry id; the payload carries `seq`. Read from `0`, or from
 `Last-Event-ID` (exclusive) when sent. Close after `done`, `error` or `approval_required`. A client
 disconnect stops the relay without error logs.
+
+`status` and `citations` are progress, not terminal. A reply that searches documents sends one
+`status` before the search and one `citations` after its last token and before `done`. A client reads
+past every type it does not know. A `status` is not reply output: a transient fault after it is still
+retried (§7), and the retried attempt does not send it again. A stream whose last event is not
+terminal is a partial attempt (§6, below), whatever type that event has.
 
 A reply never exceeds `LLM_MAX_TOKENS` tokens, one redaction token and a terminal event, and settings
 validation fails startup unless `STREAM_MAXLEN > LLM_MAX_TOKENS + 2`, so a stream is never trimmed and

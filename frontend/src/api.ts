@@ -1,11 +1,21 @@
 // Gateway client: POST /chat, POST /approve, and an SSE reader built on fetch (EventSource cannot
 // send the Basic Authorization header or a Last-Event-ID on the first request).
 
+export interface Citation {
+  doc_key: string;
+  page_key: string;
+}
+
 export type StreamEvent =
   | { type: "token"; seq: number; token: string }
   | { type: "done"; seq: number }
   | { type: "error"; seq: number; code: string; detail: string }
-  | { type: "approval_required"; seq: number; action: string; detail: string };
+  | { type: "approval_required"; seq: number; action: string; detail: string }
+  | { type: "status"; seq: number; detail: string }
+  | { type: "citations"; seq: number; citations: Citation[] };
+
+/** Only these end a stream. Any other type, known or not, is progress and is read past. */
+const TERMINAL = new Set(["done", "error", "approval_required"]);
 
 export interface Accepted {
   message_id: string;
@@ -125,7 +135,7 @@ export async function streamMessage(
           if (event.seq !== nextSeq) continue;
           nextSeq += 1;
           onEvent(event);
-          if (event.type !== "token") return;
+          if (TERMINAL.has(event.type)) return;
         }
       }
       throw new Error("stream ended before a terminal event");

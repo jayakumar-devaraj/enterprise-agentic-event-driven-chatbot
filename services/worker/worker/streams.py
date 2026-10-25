@@ -6,8 +6,12 @@ from uuid import UUID
 
 from chat_common.schemas import (
     ApprovalRequiredEvent,
+    Citation,
+    CitationsEvent,
     DoneEvent,
     ErrorEvent,
+    StatusEvent,
+    StreamEvent,
     TokenEvent,
     stream_key,
 )
@@ -45,6 +49,12 @@ class StreamWriter:
         self._maxlen = maxlen
         self._ttl_s = ttl_s
         self.seq = 0
+        self._statuses = 0
+
+    @property
+    def reply_started(self) -> bool:
+        """True once anything but a status note was written: a retry would then repeat output."""
+        return self.seq > self._statuses
 
     async def last_event(self) -> dict[str, Any] | None:
         """The newest event already in the stream, if any (left by an earlier attempt)."""
@@ -55,8 +65,9 @@ class StreamWriter:
         """Drop events from an attempt that never finished (lease expired after a crash)."""
         await self.lease.run(self._redis, _RESET, [self.key], [])
         self.seq = 0
+        self._statuses = 0
 
-    async def _add(self, event: TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent) -> str:
+    async def _add(self, event: StreamEvent) -> str:
         """XADD one event as JSON under field `data` and refresh the TTL, in one fenced script."""
         entry_id = await self.lease.run(
             self._redis, _ADD, [self.key], [self._maxlen, event.model_dump_json(), self._ttl_s]
@@ -79,3 +90,15 @@ class StreamWriter:
     async def approval_required(self, detail: str) -> str:
         """Append the terminal ApprovalRequiredEvent."""
         return await self._add(ApprovalRequiredEvent(seq=self.seq, detail=detail))
+
+    async def status(self, detail: str) -> str | None:
+        """Append a StatusEvent once per attempt; a retry must not repeat the note."""
+        if self._statuses:
+            return None
+        entry_id = await self._add(StatusEvent(seq=self.seq, detail=detail))
+        self._statuses += 1
+        return entry_id
+
+    async def citations(self, citations: list[Citation]) -> str:
+        """Append a CitationsEvent; sent after the last token and before `done`."""
+        return await self._add(CitationsEvent(seq=self.seq, citations=citations))
