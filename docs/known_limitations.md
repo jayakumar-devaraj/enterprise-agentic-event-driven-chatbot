@@ -182,6 +182,15 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   of digits or capitals is cut off. Tested and not a leak: an entity separated from its context by a
   newline chunk boundary (SSN, phone, card, email, IP, person, location). Not covered: an echo of a
   system prompt that omits its first 40 characters (the prompts hold no secrets).
+- **Raw PII in DLQ records and logs (2026-10-25, section 3 of
+  `docs/reports/full-score-recommendations.md`):** a scan of the running stack
+  (`tests/stack/test_sensitive_data.py`, `-m stack`) found the gateway path clean in every sink:
+  SSE stream, container logs, `chat-requests`, the DLQ, Redis and the Jaeger trace. A malformed record
+  sent straight to Kafka was different: its DLQ record kept the raw bytes (base64 in `original_b64`,
+  plus the validation error text), and the worker log quoted part of the input. The worker now keeps
+  only a SHA-256, the length and the error types and field locations. Not covered: names and
+  locations, because a random name cannot be relied on to be recognised; LangFuse, which was
+  stopped; host-level logs outside Docker.
 - **Broad PII set misses its recall targets (2026-10-25, `docs/reports/pii-broad-2026-10-25.md`):**
   on 60 agent-written sentences with targets pre-registered before scoring, structured identifiers
   were redacted 10/14 (target 0.90) and locations 16/30 (target 0.80). Persons passed at 16/18.

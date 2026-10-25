@@ -101,7 +101,9 @@ after later events discards what it has shown for that message.
 
 Infra fault (Qdrant / LLM / Redis) → bounded retries with backoff → `ErrorEvent{code:
 "dependency_unavailable"}` to the stream, record to the DLQ, then commit. Malformed envelope → DLQ
-immediately, no retry. A tracing backend that is down or unreachable (Jaeger via OTLP, LangFuse) is
+immediately, no retry. Its bytes skipped the gateway's scrubber, so neither the DLQ record nor the log
+keeps any of them: the record holds their SHA-256, their length and the validation error types
+with `Envelope` field locations (other location parts become `?`). A tracing backend that is down or unreachable (Jaeger via OTLP, LangFuse) is
 not a dependency: span export runs in the background and LangFuse calls are caught. Both log the
 failure and drop the trace data, and requests complete as usual.
 

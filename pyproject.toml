@@ -39,8 +39,9 @@ markers = [
     "scale: needs the stack scaled to 2 gateways + 2 workers (A10)",
     "llm: needs the compose stack with MOCK_LLM=false and the Ollama profile (A9)",
     "durability: starts its own compose project (redis, kafka) and kills/recreates it",
+    "stack: needs the full compose stack up (gateway, worker, Jaeger) as in the README",
 ]
-addopts = "-m 'not integration and not scale and not llm and not durability'"
+addopts = "-m 'not integration and not scale and not llm and not durability and not stack'"
 
 [tool.ruff]
 line-length = 100
