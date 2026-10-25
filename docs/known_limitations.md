@@ -197,6 +197,13 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
   emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
   been tuned on this set; candidate recognizers need a fresh held-out set.
+- **End-to-end safety evaluation (2026-10-25, `docs/reports/safety-final-2026-10-25.md`):** against
+  targets pre-registered before the run, with the real model, no refund was applied or claimed, the
+  system prompt did not leak, and no canary attack succeeded. Benign false refusals were 0/20.
+  **4/10 harmless off-topic questions were refused** (target ≤ 1). Every attack was refused by the
+  detector, so an after-the-fact ablation disabled it: the model then obeyed 2/16 instruction
+  attacks (one escaping the `<user_message>` delimiter), while actions and the prompt stayed safe.
+  The off-topic refusals are open; any fix needs a new final set.
 - **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
   every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
   missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
