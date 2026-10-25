@@ -1,0 +1,60 @@
+{"category": "multilingual", "text": "Please update the account for José García in Sevilla.", "entities": [{"type": "PERSON", "value": "José García"}, {"type": "LOCATION", "value": "Sevilla"}]}
+{"category": "multilingual", "text": "Jürgen Müller moved to München last spring.", "entities": [{"type": "PERSON", "value": "Jürgen Müller"}, {"type": "LOCATION", "value": "München"}]}
+{"category": "multilingual", "text": "The card holder is Zoë Dubois from Québec.", "entities": [{"type": "PERSON", "value": "Zoë Dubois"}, {"type": "LOCATION", "value": "Québec"}]}
+{"category": "multilingual", "text": "Send the invoice to Łukasz Nowak in Kraków.", "entities": [{"type": "PERSON", "value": "Łukasz Nowak"}, {"type": "LOCATION", "value": "Kraków"}]}
+{"category": "multilingual", "text": "Ananya Krishnamurthy called from Bengaluru about her bill.", "entities": [{"type": "PERSON", "value": "Ananya Krishnamurthy"}, {"type": "LOCATION", "value": "Bengaluru"}]}
+{"category": "multilingual", "text": "Mi nombre es Lucía Fernández y vivo en Valencia.", "entities": [{"type": "PERSON", "value": "Lucía Fernández"}, {"type": "LOCATION", "value": "Valencia"}]}
+{"category": "multilingual", "text": "Je m'appelle Hélène Martin, j'habite à Lyon.", "entities": [{"type": "PERSON", "value": "Hélène Martin"}, {"type": "LOCATION", "value": "Lyon"}]}
+{"category": "multilingual", "text": "Nguyễn Văn An reported the outage in Hà Nội.", "entities": [{"type": "PERSON", "value": "Nguyễn Văn An"}, {"type": "LOCATION", "value": "Hà Nội"}]}
+{"category": "multilingual", "text": "Kenji Watanabe in Osaka cannot log in.", "entities": [{"type": "PERSON", "value": "Kenji Watanabe"}, {"type": "LOCATION", "value": "Osaka"}]}
+{"category": "multilingual", "text": "Oluwaseun Adeyemi from Lagos asked for a refund.", "entities": [{"type": "PERSON", "value": "Oluwaseun Adeyemi"}, {"type": "LOCATION", "value": "Lagos"}]}
+{"category": "address", "text": "Ship it to 742 Evergreen Terrace, Springfield.", "entities": [{"type": "LOCATION", "value": "742 Evergreen Terrace"}, {"type": "LOCATION", "value": "Springfield"}]}
+{"category": "address", "text": "My billing address is 1600 Pennsylvania Avenue NW, Washington.", "entities": [{"type": "LOCATION", "value": "1600 Pennsylvania Avenue NW"}, {"type": "LOCATION", "value": "Washington"}]}
+{"category": "address", "text": "I live at 221B Baker Street in London.", "entities": [{"type": "LOCATION", "value": "221B Baker Street"}, {"type": "LOCATION", "value": "London"}]}
+{"category": "address", "text": "The router is installed at 55 Rue de Rivoli, Paris.", "entities": [{"type": "LOCATION", "value": "55 Rue de Rivoli"}, {"type": "LOCATION", "value": "Paris"}]}
+{"category": "address", "text": "Use 10 Downing Street, London as the delivery address.", "entities": [{"type": "LOCATION", "value": "10 Downing Street"}, {"type": "LOCATION", "value": "London"}]}
+{"category": "address", "text": "Our office is on 350 Fifth Avenue in New York.", "entities": [{"type": "LOCATION", "value": "350 Fifth Avenue"}, {"type": "LOCATION", "value": "New York"}]}
+{"category": "address", "text": "Please mail it to 4 Privet Drive, Little Whinging, Surrey.", "entities": [{"type": "LOCATION", "value": "4 Privet Drive"}, {"type": "LOCATION", "value": "Little Whinging"}, {"type": "LOCATION", "value": "Surrey"}]}
+{"category": "address", "text": "Deliver to apartment 5C, 120 Main St, Boston.", "entities": [{"type": "LOCATION", "value": "120 Main St"}, {"type": "LOCATION", "value": "Boston"}]}
+{"category": "obfuscated", "text": "Email me at jane dot doe at example dot com.", "entities": [{"type": "EMAIL_ADDRESS", "value": "jane dot doe at example dot com"}]}
+{"category": "obfuscated", "text": "My address is john[at]example[dot]org for receipts.", "entities": [{"type": "EMAIL_ADDRESS", "value": "john[at]example[dot]org"}]}
+{"category": "obfuscated", "text": "Card number 4111-1111-1111-1111 was charged twice.", "entities": [{"type": "CREDIT_CARD", "value": "4111-1111-1111-1111"}]}
+{"category": "obfuscated", "text": "The card is 4111 1111 1111 1111 expiring soon.", "entities": [{"type": "CREDIT_CARD", "value": "4111 1111 1111 1111"}]}
+{"category": "obfuscated", "text": "Card four one one one, one one one one, one one one one, one one one one.", "entities": [{"type": "CREDIT_CARD", "value": "four one one one, one one one one, one one one one, one one one one"}]}
+{"category": "obfuscated", "text": "Call 2 1 2 5 5 5 0 1 4 7 after five.", "entities": [{"type": "PHONE_NUMBER", "value": "2 1 2 5 5 5 0 1 4 7"}]}
+{"category": "obfuscated", "text": "My number is 212.555.0147 if you need it.", "entities": [{"type": "PHONE_NUMBER", "value": "212.555.0147"}]}
+{"category": "obfuscated", "text": "SSN 219 09 9999 is on the form.", "entities": [{"type": "US_SSN", "value": "219 09 9999"}]}
+{"category": "obfuscated", "text": "My SSN is 219099999 without dashes.", "entities": [{"type": "US_SSN", "value": "219099999"}]}
+{"category": "obfuscated", "text": "The device IP is 192 . 168 . 1 . 20 apparently.", "entities": [{"type": "IP_ADDRESS", "value": "192 . 168 . 1 . 20"}]}
+{"category": "obfuscated", "text": "Contact JANE.DOE@EXAMPLE.COM about the renewal.", "entities": [{"type": "EMAIL_ADDRESS", "value": "JANE.DOE@EXAMPLE.COM"}]}
+{"category": "obfuscated", "text": "Reach me on +1 (212) 555-0147 ext. 9.", "entities": [{"type": "PHONE_NUMBER", "value": "+1 (212) 555-0147"}]}
+{"category": "ambiguous", "text": "Grace Hopper asked why her plan changed.", "entities": [{"type": "PERSON", "value": "Grace Hopper"}]}
+{"category": "ambiguous", "text": "Will Smith says the modem keeps rebooting.", "entities": [{"type": "PERSON", "value": "Will Smith"}]}
+{"category": "ambiguous", "text": "Paris Hilton wants to cancel her subscription.", "entities": [{"type": "PERSON", "value": "Paris Hilton"}]}
+{"category": "ambiguous", "text": "Jordan from Jordan disputed the charge.", "entities": [{"type": "PERSON", "value": "Jordan"}, {"type": "LOCATION", "value": "Jordan"}]}
+{"category": "ambiguous", "text": "My name is Hope and I was billed twice.", "entities": [{"type": "PERSON", "value": "Hope"}]}
+{"category": "ambiguous", "text": "Victoria in Victoria cannot reach support.", "entities": [{"type": "PERSON", "value": "Victoria"}, {"type": "LOCATION", "value": "Victoria"}]}
+{"category": "ambiguous", "text": "Mark my account for review, signed Mark Lee.", "entities": [{"type": "PERSON", "value": "Mark Lee"}]}
+{"category": "ambiguous", "text": "The router in Reading drops the connection.", "entities": [{"type": "LOCATION", "value": "Reading"}]}
+{"category": "ambiguous", "text": "ip 10.0.0.7 keeps timing out", "entities": [{"type": "IP_ADDRESS", "value": "10.0.0.7"}]}
+{"category": "ambiguous", "text": "text sam at 415-555-0132 tonight", "entities": [{"type": "PHONE_NUMBER", "value": "415-555-0132"}, {"type": "PERSON", "value": "sam"}]}
+{"category": "negative", "text": "Upgrade to version 2.4.1.9 to fix the bug.", "entities": []}
+{"category": "negative", "text": "Your order number is 1234567812345678.", "entities": []}
+{"category": "negative", "text": "The outage started on 2024-05-06 at 14:30.", "entities": []}
+{"category": "negative", "text": "Error code 404-555-1000 means the page is missing.", "entities": []}
+{"category": "negative", "text": "Restart the router and wait 30 seconds.", "entities": []}
+{"category": "negative", "text": "Apple Pay and Google Pay are both accepted.", "entities": []}
+{"category": "negative", "text": "Our premium plan costs 19.99 per month.", "entities": []}
+{"category": "negative", "text": "Set the MTU to 1500 and the DNS TTL to 300.", "entities": []}
+{"category": "negative", "text": "Invoice INV-2024-0042 is attached.", "entities": []}
+{"category": "negative", "text": "Please reset my password, I forgot it.", "entities": []}
+{"category": "negative", "text": "The firmware build is 192.168.0 beta.", "entities": []}
+{"category": "negative", "text": "Ticket #555-0147 was closed yesterday.", "entities": []}
+{"category": "negative", "text": "Why was I charged twice this month?", "entities": []}
+{"category": "negative", "text": "Can you explain the late fee policy?", "entities": []}
+{"category": "negative", "text": "The app crashes when I open settings.", "entities": []}
+{"category": "negative", "text": "Support hours are 9 to 5 on weekdays.", "entities": []}
+{"category": "negative", "text": "Use promo code SPRING2024 at checkout.", "entities": []}
+{"category": "negative", "text": "My internet speed is only 12 Mbps.", "entities": []}
+{"category": "negative", "text": "Is there a discount for annual billing?", "entities": []}
+{"category": "negative", "text": "The tracking number is 1Z999AA10123456784.", "entities": []}

@@ -33,3 +33,20 @@ def test_hard_fixture_covers_every_scrubbed_entity_type() -> None:
         "US_SSN",
     }
     assert isinstance(report["missed"], list)
+
+
+def test_broad_scoring_counts_false_positives_and_redaction(tmp_path: Path) -> None:
+    """A labelled email is recalled at precision 1.0; an unlabelled phone is one false positive."""
+    fixture = tmp_path / "tiny.jsonl"
+    fixture.write_text(
+        '{"category": "pos", "text": "Write to jane.doe@example.com today.",'
+        ' "entities": [{"type": "EMAIL_ADDRESS", "value": "jane.doe@example.com"}]}\n'
+        '{"category": "neg", "text": "Call 212-555-0147 tomorrow.", "entities": []}\n',
+        encoding="utf-8",
+    )
+    report = pii_recall.measure_broad(fixture)
+    email, phone = report["per_type"]["EMAIL_ADDRESS"], report["per_type"]["PHONE_NUMBER"]
+    assert (email["typed_recall"], email["redaction_recall"], email["precision"]) == (1.0, 1.0, 1.0)
+    assert (phone["labeled"], phone["detected_spans"], phone["precision"]) == (0, 1, 0.0)
+    assert report["false_positives"] == ["neg PHONE_NUMBER: 212-555-0147"]
+    assert pii_recall.wilson(0, 0) is None and pii_recall.wilson(5, 5)[1] == 1.0
