@@ -1,6 +1,7 @@
 # 0011 · Cross-service auth, audit and contract with the RAG service
 
-Status: **Proposed (Round 1 of 2).** Round 2 records the lead's critique and the final decision.
+Status: **Accepted (Round 2 of 2, 2026-10-28).** Round 1 below is kept as written; the final
+decision is "Decision (Round 2)".
 The matching record in the RAG repository is its ADR 0002 (same title).
 
 ## Context
@@ -54,7 +55,29 @@ Proposed for critique:
 - **C. Audit retention period and recovery-point objective.** Needed to size the table and the
   exporter lag alarm.
 
-## Consequences
+## Decision (Round 2)
+
+The lead reviewed Round 1 and the agent's recommendations in chat on 2026-10-28 and agreed to them.
+Points 1–2 of Round 1 stand. Points 3–7 are accepted, with these answers to the open questions:
+
+- **A. Token shape: per-tenant client credentials now; token exchange later.** The worker holds one
+  OIDC client per tenant, from a secrets manager, never from environment files. The identity provider
+  fixes each client's `tenant` claim and `rag:query` scope, so a leaked secret exposes one tenant and
+  the worker cannot name an arbitrary one. This supersedes the "token exchange" lean in Round 1:
+  exchange needs a user token as the subject, and the gateway authenticates users with HTTP Basic, so
+  it has none to exchange. Token exchange (RFC 8693) is adopted when users move to OIDC (B); the
+  chosen identity provider must be confirmed to support it first.
+- **B. The gateway keeps HTTP Basic for end users.** This is a known gap, not an endorsement. A
+  separate ADR moves the gateway to OIDC.
+- **C. Audit tiers.** Events that must not be lost (refund proposed, approved, applied or rejected;
+  authentication failures; cross-tenant denials) are written synchronously to Postgres. All other
+  events go through the exporter, with an alarm when its lag exceeds 60 seconds. Default retention is
+  400 days queryable, partitioned by month, with older partitions archived. This default is not a
+  compliance determination and is replaced by the real requirement when it is confirmed.
+- **Rollout order:** RAG repository first (migrations, role split, audit table, row-level security;
+  then JWT validation accepting both token types), then this repository (client credentials, digest
+  pin, contract check, audit writes and exporter), then removal of static tokens in both.
+
 
 - A new Postgres dependency is added to this stack for the audit table (the first one here).
 - Identity-provider availability becomes a dependency of document questions. Behaviour when the
