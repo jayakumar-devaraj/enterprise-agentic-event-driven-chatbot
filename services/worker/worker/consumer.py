@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from chat_common.schemas import Envelope
+from chat_common.schemas import TERMINAL_TYPES, Envelope
 from chat_common.settings import Settings
 from pydantic import ValidationError
 from redis.exceptions import RedisError
@@ -159,7 +159,7 @@ class Worker:
             ttl_s=self._s.stream_ttl_s,
         )
         last = await writer.last_event()
-        if last is not None and last["type"] != "token":
+        if last is not None and last["type"] in TERMINAL_TYPES:
             # An earlier attempt wrote its terminal event and died before recording the outcome:
             # keep the stream the client may be reading and finish the bookkeeping only.
             log.info("terminal event already streamed; recording outcome", extra=ctx)
@@ -211,7 +211,7 @@ class Worker:
             except (TransientDependencyError, RedisError, TimeoutError, ConnectionError) as exc:
                 last = f"{type(exc).__name__}: {exc}"
                 log.warning("transient failure", extra={**ctx, "attempt": attempt, "error": last})
-                if writer.seq > 0 or attempt == self._s.max_retries:
+                if writer.reply_started or attempt == self._s.max_retries:
                     break
                 await asyncio.sleep(min(0.5 * 2**attempt, self._s.retry_backoff_max_s))
         return last

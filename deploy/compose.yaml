@@ -152,6 +152,11 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      # Present only with `--profile rag`; without it the worker starts and document questions
+      # end with a fixed error.
+      rag-api:
+        condition: service_healthy
+        required: false
     cpus: 2
     mem_limit: 1536m
     restart: unless-stopped
@@ -177,6 +182,69 @@ services:
     cpus: 1
     mem_limit: 1536m
     restart: unless-stopped
+
+  # Document questions (profile `rag`): the RAG service from its published image, never its source,
+  # plus its own pgvector database. Export RAG_TENANT_TOKENS (token:tenant,...) and RAG_DB_PASSWORD
+  # in the shell, as with AUTH_USERS. The service reaches the same Ollama as the worker.
+  rag-db:
+    profiles: ["rag"]
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: ${RAG_DB_PASSWORD:-}
+      POSTGRES_DB: rag
+    volumes:
+      - rag-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+  rag-api:
+    profiles: ["rag"]
+    # Pinned tag of the RAG service's published image. Its API contract is docs/contracts/.
+    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.1.0}
+    environment:
+      DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
+      # The same value the worker reads as RAG_TENANT_TOKENS, so the two cannot disagree.
+      TENANT_TOKENS: ${RAG_TENANT_TOKENS:-}
+      FASTEMBED_MODEL: BAAI/bge-small-en-v1.5
+      # Its sufficiency check uses the chatbot's OpenAI-compatible endpoint; no real key is needed.
+      OPENAI_API_KEY: unused
+      OPENAI_CHAT_MODEL: ${LLM_MODEL:-llama3.2:1b}
+      OPENAI_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
+      RETRIEVE_LLM_MAX_RETRIES: "0"
+    depends_on:
+      rag-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${RAG_API_HOST_PORT:-18000}:8000"
+    mem_limit: 1536m
+    restart: unless-stopped
+
+  # One-shot: uploads the committed fixture document as tenant T1 through the service's /ingest.
+  rag-seed:
+    profiles: ["rag"]
+    image: curlimages/curl:8.22.0
+    environment:
+      RAG_TENANT_TOKENS: ${RAG_TENANT_TOKENS:-}
+    volumes:
+      - ./rag/handbook.txt:/fixture/handbook.txt:ro
+    depends_on:
+      rag-api:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        token=$$(echo "$$RAG_TENANT_TOKENS" | tr ',' '\n' | awk -F: '$$2=="T1" {print $$1}')
+        [ -n "$$token" ] || { echo "RAG_TENANT_TOKENS has no token for tenant T1" >&2; exit 1; }
+        curl -fsS -X POST -H "Authorization: Bearer $$token" \
+          -F "file=@/fixture/handbook.txt" http://rag-api:8000/ingest
+    restart: "no"
 
   # React chat window (Vite dev server). /api is proxied to the gateway service.
   frontend:
@@ -209,3 +277,4 @@ services:
 volumes:
   redis-data:
   kafka-data:
+  rag-db-data:

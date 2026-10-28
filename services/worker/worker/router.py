@@ -7,8 +7,8 @@ from qdrant_client import AsyncQdrantClient
 
 from worker.embedding import Embedder
 
-Intent = Literal["billing", "tech_support", "general"]
-INTENTS: tuple[Intent, ...] = ("billing", "tech_support", "general")
+Intent = Literal["billing", "tech_support", "general", "document_rag"]
+INTENTS: tuple[Intent, ...] = ("billing", "tech_support", "general", "document_rag")
 
 
 @dataclass(frozen=True)

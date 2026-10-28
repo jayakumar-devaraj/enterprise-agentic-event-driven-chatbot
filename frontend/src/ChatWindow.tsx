@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { HttpError, postApprove, postChat, streamMessage, type Fetch, type StreamEvent } from "./api";
+import { HttpError, postApprove, postChat, streamMessage, type Citation, type Fetch, type StreamEvent } from "./api";
 
 interface Message {
   role: "user" | "assistant";
   text: string;
+  citations?: Citation[];
 }
 
 type Status = "idle" | "sending" | "streaming" | "awaiting_approval" | "error";
@@ -28,9 +29,11 @@ export function ChatWindow({ auth, fetchImpl = fetch }: { auth: string; fetchImp
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const pendingRef = useRef<string | null>(null);
 
   function appendToken(token: string) {
+    setNote(null);
     setMessages((prev) => {
       const last = prev[prev.length - 1];
       const text = last.text ? `${last.text} ${token}` : token;
@@ -45,16 +48,25 @@ export function ChatWindow({ auth, fetchImpl = fetch }: { auth: string; fetchImp
       setMessages((prev) => [...prev, { role: "assistant", text: "" }]);
       await streamMessage(fetchImpl, auth, stream_url, (event: StreamEvent) => {
         if (event.type === "token") appendToken(event.token);
-        else if (event.type === "done") setStatus("idle");
-        else if (event.type === "error") {
+        else if (event.type === "status") setNote(event.detail);
+        else if (event.type === "citations") {
+          setMessages((prev) => [...prev.slice(0, -1), { ...prev[prev.length - 1], citations: event.citations }]);
+        } else if (event.type === "done") {
+          setNote(null);
+          setStatus("idle");
+        } else if (event.type === "error") {
+          setNote(null);
           setError(event.code === "dependency_unavailable" ? HTTP_MESSAGES[503] : event.detail);
           setStatus("error");
-        } else {
+        } else if (event.type === "approval_required") {
           pendingRef.current = message_id;
           appendToken(event.detail);
           setStatus("awaiting_approval");
-        }
-      }, () => setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", text: "" }]));
+        } // any other type is progress from a newer server: ignore it
+      }, () => {
+        setNote(null);
+        setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", text: "" }]);
+      });
     } catch (err) {
       setError(describe(err));
       setStatus("error");
@@ -86,9 +98,19 @@ export function ChatWindow({ auth, fetchImpl = fetch }: { auth: string; fetchImp
         {messages.map((m, i) => (
           <li key={i} data-role={m.role}>
             <strong>{m.role === "user" ? "You" : "Assistant"}:</strong> <span>{m.text}</span>
+            {m.citations && m.citations.length > 0 && (
+              <ul aria-label="sources">
+                {m.citations.map((c) => (
+                  <li key={`${c.doc_key}#${c.page_key}`}>
+                    {c.doc_key} ({c.page_key})
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
+      {note && <p role="status">{note}</p>}
       {error && (
         <div role="alert">
           {error} <button onClick={() => { setError(null); setStatus("idle"); }}>Dismiss</button>

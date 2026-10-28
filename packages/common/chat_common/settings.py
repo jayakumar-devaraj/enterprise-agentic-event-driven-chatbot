@@ -3,6 +3,10 @@
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+RAG_EXTRA_EVENTS = 22
+"""Events a document reply adds to its tokens: a status, the citations and the fixed caveat, which
+is at most 20 tokens (a worker test holds it to that)."""
+
 
 class Settings(BaseSettings):
     """All config keys. Construction fails loudly on an unsafe combination (SPEC.md §5)."""
@@ -24,8 +28,8 @@ class Settings(BaseSettings):
     qdrant_injection_collection: str = "injection_patterns"
     qdrant_benign_collection: str = "benign_patterns"
     embed_model: str = "BAAI/bge-small-en-v1.5"
-    route_threshold: float = 0.5821  # ADR 0004
-    injection_margin: float = -0.0149  # ADR 0004 addendum 2026-10-18 (LOO-calibrated)
+    route_threshold: float = 0.5734  # ADR 0004 addendum 2026-10-25
+    injection_margin: float = -0.0137  # ADR 0004 addendum 2026-10-25 (LOO-calibrated)
 
     spacy_model: str = "en_core_web_lg"
 
@@ -36,6 +40,12 @@ class Settings(BaseSettings):
     inference_timeout_s: float = 60
     max_retries: int = 2
     retry_backoff_max_s: float = 4
+
+    rag_base_url: str = "http://rag-api:8000"
+    rag_timeout_s: float = 20  # one deadline for the whole call to the RAG service
+    rag_max_tokens: int = 256
+    rag_context_chars: int = 12000  # cap on document text placed in one prompt
+    rag_tenant_tokens: SecretStr = SecretStr("")  # `token:tenant,...`, the RAG service's own format
 
     dedupe_lease_s: int = 200
     dedupe_ttl_s: int = 777600  # 9 days: outlives Kafka retention + one segment (SPEC §5)
@@ -51,6 +61,7 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 20
     cors_origins: str = "http://localhost:5173"
     auth_users: SecretStr = SecretStr("")
+    user_tenants: str = ""  # `user:tenant,...`; a user not listed has no document tenant (SPEC §3)
 
     approval_ttl_s: int = 3600
 
@@ -94,10 +105,27 @@ class Settings(BaseSettings):
 
         A stream long enough for that is never trimmed, so a resuming client never meets a gap.
         """
-        if not self.stream_maxlen > self.llm_max_tokens + 2:
+        longest = max(self.llm_max_tokens + 2, self.rag_max_tokens + 2 + RAG_EXTRA_EVENTS)
+        if not self.stream_maxlen > longest:
             raise ValueError(
                 f"STREAM_MAXLEN={self.stream_maxlen} must exceed "
-                f"LLM_MAX_TOKENS+2={self.llm_max_tokens + 2}"
+                f"max(LLM_MAX_TOKENS+2, RAG_MAX_TOKENS+2+{RAG_EXTRA_EVENTS})={longest}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _rag_leaves_room_to_answer(self) -> "Settings":
+        """The RAG deadline sits inside one attempt, which INFERENCE_TIMEOUT_S already caps.
+
+        `_lease_outlives_retries` therefore still bounds the worst case with RAG included. What it
+        cannot catch is a RAG deadline that eats the whole attempt and leaves nothing to answer in.
+        Checked only when RAG is configured (tokens set); with it off the deadline is never used.
+        """
+        rag_on = bool(self.rag_tenant_tokens.get_secret_value())
+        if rag_on and not self.rag_timeout_s < self.inference_timeout_s:
+            raise ValueError(
+                f"RAG_TIMEOUT_S={self.rag_timeout_s:g} must be below "
+                f"INFERENCE_TIMEOUT_S={self.inference_timeout_s:g}"
             )
         return self
 

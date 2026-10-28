@@ -204,6 +204,28 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   detector, so an after-the-fact ablation disabled it: the model then obeyed 2/16 instruction
   attacks (one escaping the `<user_message>` delimiter), while actions and the prompt stayed safe.
   The off-topic refusals are open; any fix needs a new final set.
+- **Document questions (2026-10-25, ADR 0010, ADR 0004 addendum):**
+  - *Routing scope.* The `document_rag` intent is chosen by similarity to 12 exemplars. All 5 held-out
+    document questions routed correctly and nothing else regressed, but a probe afterwards showed that a
+    question naming no document and far from the exemplars ("What is the parental leave policy?", 0.566,
+    below the cut) goes to the plain assistant, not to the documents.
+  - *Raw document text reaches the chat model provider.* Accepted on the condition that the provider is at
+    least as trusted as the RAG service's providers.
+  - *Number check.* A numbered list or "page 2" in an answer makes its sentence be dropped (the prompt
+    forbids both). A number the model derives (a sum) is dropped too.
+  - *Old frontends* stop reading at the first `status` event. Nothing sends one until `USER_TENANTS` is set.
+  - *Tracing across the two services* is joined by request id, not as one span tree: the RAG service does
+    not read `traceparent`.
+  - *Not in CI.* The `rag` end-to-end tests need the RAG image, a model and the `rag` profile. They ran
+    locally on 2026-10-25 against a locally built image tagged as the pinned name, because that tag had
+    not been published.
+  - *Model latency.* With `llama3.2:1b` on CPU, `status` arrived after about 0.5 s and the first token
+    after about 7 s with the model warm and 34 s cold (one run each, this machine).
+  - *Grounded is not correct.* In the next end-to-end run the model answered a vacation question with "16"
+    (the parental-leave figure). The number exists in the documents, so the number check passed it; the check
+    verifies that a figure is in the sources, not that it answers the question. A later run took 80 s to the
+    first token with the model cold.
+  - *No tenant.* A message routed to `document_rag` from a user with no tenant is answered as `general`.
 - **Answer quality fails its targets (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):**
   on 20 pre-registered support questions with the real 1B model, the mean rubric score was 3.4/5
   (target 3.5) and 4 replies invented specifics such as hours, a discount and a URL (target ≤ 2). No

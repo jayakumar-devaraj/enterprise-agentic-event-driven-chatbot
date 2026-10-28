@@ -1,0 +1,159 @@
+{
+  "source": "multi-tenant-agentic-rag src/eval/triad.py numeric_groundedness at d2aa34a",
+  "cases": [
+    {
+      "answer": "Servers cost 4200.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "Servers cost $4,200.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "The budget is 9999.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 0.0,
+      "unsupported": [
+        "9999"
+      ]
+    },
+    {
+      "answer": "No numbers here at all.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "Servers cost 4200.",
+      "contexts": [],
+      "ratio": 0.0,
+      "unsupported": [
+        "4200"
+      ]
+    },
+    {
+      "answer": "There are 12 engineers and 3.5 support FTE.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "There are 12 engineers and 4 support.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 0.5,
+      "unsupported": [
+        "4"
+      ]
+    },
+    {
+      "answer": "Growth was 12% and 3.50 units.",
+      "contexts": [
+        "Servers cost 4,200 per quarter. The Falcon budget is 777.",
+        "Headcount: 12 in engineering, 3.5 FTE in support."
+      ],
+      "ratio": 0.5,
+      "unsupported": [
+        "3.50"
+      ]
+    },
+    {
+      "answer": "Dates: 2024-01-05 and 2024-01-06.",
+      "contexts": [
+        "2024-01-05"
+      ],
+      "ratio": 0.75,
+      "unsupported": [
+        "-06"
+      ]
+    },
+    {
+      "answer": "The value is -42 and also 42.",
+      "contexts": [
+        "-42"
+      ],
+      "ratio": 0.5,
+      "unsupported": [
+        "42"
+      ]
+    },
+    {
+      "answer": "Totals: 1,000 and 1000 and 1,000.00.",
+      "contexts": [
+        "1000"
+      ],
+      "ratio": 0.5,
+      "unsupported": [
+        "1000.00"
+      ]
+    },
+    {
+      "answer": "Version 3.14.15 shipped.",
+      "contexts": [
+        "3.14"
+      ],
+      "ratio": 0.5,
+      "unsupported": [
+        "15"
+      ]
+    },
+    {
+      "answer": "Call 555-0100 now.",
+      "contexts": [
+        "Call 555-0100"
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    },
+    {
+      "answer": "Step 1. Open it. Step 2. Close it.",
+      "contexts": [
+        "Open it, close it."
+      ],
+      "ratio": 0.0,
+      "unsupported": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "answer": "Costs 4200 and 777.",
+      "contexts": [
+        "Servers cost 4,200",
+        "Falcon is 777"
+      ],
+      "ratio": 1.0,
+      "unsupported": []
+    }
+  ]
+}

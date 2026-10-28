@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 ThreadId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 """UUID or `[A-Za-z0-9_-]{1,64}`; a canonical UUID already satisfies the pattern."""
 
+TenantId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+"""Document-store tenant a user belongs to (SPEC §3); set by the gateway, never by a request."""
+
 
 class _Strict(BaseModel):
     """Base for wire models: unknown fields are rejected, instances are immutable."""
@@ -51,6 +54,7 @@ class Envelope(_Strict):
     kind: Literal["chat", "approval"] = "chat"
     ref_message_id: UUID | None = None
     approved: bool | None = None
+    tenant_id: TenantId | None = None
 
     @model_validator(mode="after")
     def _approval_fields(self) -> "Envelope":
@@ -97,8 +101,32 @@ class ApprovalRequiredEvent(_Strict):
     detail: str
 
 
+class StatusEvent(_Strict):
+    """Non-terminal progress note, sent before a slow step (SPEC §6). Carries no reply text."""
+
+    type: Literal["status"] = "status"
+    seq: int = Field(ge=0)
+    detail: str
+
+
+class Citation(_Strict):
+    """Where an answer came from: a document and its page or tab. Never any document text."""
+
+    doc_key: str
+    page_key: str
+
+
+class CitationsEvent(_Strict):
+    """Non-terminal: the sources of a document answer, sent after its last token, before `done`."""
+
+    type: Literal["citations"] = "citations"
+    seq: int = Field(ge=0)
+    citations: list[Citation]
+
+
 StreamEvent = Annotated[
-    TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent, Field(discriminator="type")
+    TokenEvent | DoneEvent | ErrorEvent | ApprovalRequiredEvent | StatusEvent | CitationsEvent,
+    Field(discriminator="type"),
 ]
 TERMINAL_TYPES = frozenset({"done", "error", "approval_required"})
 

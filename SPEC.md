@@ -10,11 +10,13 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 |---|---|
 | `ChatRequest` | `message: str`, `thread_id: str`, `message_id: UUID` |
 | `ChatAccepted` | `message_id`, `thread_id`, `stream_url` |
-| `Envelope` (Kafka value) | `message_id`, `thread_id`, `user_id`, `text` (scrubbed), `ts`, `trace_id`, `kind: "chat" \| "approval"`, `ref_message_id?`, `approved?` |
+| `Envelope` (Kafka value) | `message_id`, `thread_id`, `user_id`, `text` (scrubbed), `ts`, `trace_id`, `kind: "chat" \| "approval"`, `ref_message_id?`, `approved?`, `tenant_id?` |
 | `TokenEvent` | `seq`, `token` |
 | `DoneEvent` | `seq` |
 | `ErrorEvent` | `seq`, `code`, `detail` |
 | `ApprovalRequiredEvent` | `seq`, `action: "refund_request"`, `detail` |
+| `StatusEvent` (not terminal) | `seq`, `detail` |
+| `CitationsEvent` (not terminal) | `seq`, `citations: [{doc_key, page_key}]` (locations, never document text) |
 | `ApprovalRequest` (body of `/approve`) | `message_id: UUID` (new), `approved: bool` |
 
 `thread_id`: UUID or `[A-Za-z0-9_-]{1,64}`. `message_id`: client-generated UUID.
@@ -44,6 +46,17 @@ binding. The worker checks ownership too, on every envelope it processes: a miss
 restored to the user the thread's history belongs to (or the envelope's user for a new thread), and an
 envelope from anyone else gets `ErrorEvent{thread_owner_mismatch}` and changes nothing. A replay after a
 Redis restore therefore re-binds every thread it rebuilds (§12).
+
+**Tenant.** `USER_TENANTS` (`user:tenant,...`, a `TenantId` of `[A-Za-z0-9_-]{1,64}`) maps an
+authenticated username to the document tenant its requests run under. It is parsed at gateway
+startup like `AUTH_USERS`; a malformed entry, a duplicate or a user missing from `AUTH_USERS` fails
+startup. The gateway sets `Envelope.tenant_id` from the username alone and never from a request body
+(`ChatRequest` forbids unknown fields). A user with no entry has `tenant_id` unset, and the field is
+left out of the Kafka value then, so a worker that predates it still accepts the record. A message
+routed to `document_rag` that carries no tenant has nothing to search, so the worker answers it as
+`general` (§8, §13). Deploy
+workers before gateways: a worker without the field rejects an envelope that has it
+(`extra="forbid"`) as malformed.
 
 ## 4 · Kafka
 
@@ -83,9 +96,17 @@ from config. SSE `id:` is the Redis entry id; the payload carries `seq`. Read fr
 `Last-Event-ID` (exclusive) when sent. Close after `done`, `error` or `approval_required`. A client
 disconnect stops the relay without error logs.
 
+`status` and `citations` are progress, not terminal. A reply that searches documents sends one
+`status` before the search and one `citations` after its last token and before `done`. A client reads
+past every type it does not know. A `status` is not reply output: a transient fault after it is still
+retried (§7), and the retried attempt does not send it again. A stream whose last event is not
+terminal is a partial attempt (§6, below), whatever type that event has.
+
 A reply never exceeds `LLM_MAX_TOKENS` tokens, one redaction token and a terminal event, and settings
 validation fails startup unless `STREAM_MAXLEN > LLM_MAX_TOKENS + 2`, so a stream is never trimmed and
-a resume never meets a gap. A stream that no longer exists, for a message that finished (dedupe
+a resume never meets a gap. A document reply adds a `status`, the `citations` and a fixed caveat of
+at most 20 tokens to `RAG_MAX_TOKENS` tokens, so startup also requires
+`STREAM_MAXLEN > RAG_MAX_TOKENS + 2 + 22`. A stream that no longer exists, for a message that finished (dedupe
 `done`), expired after `STREAM_TTL_S`: the response is a single terminal
 `ErrorEvent{seq: 0, code: "stream_expired"}` with no `id:`, sent at once whether or not
 `Last-Event-ID` is given. A missing stream for a message that is still queued or running is waited
@@ -124,7 +145,8 @@ from `data/injection.seed.jsonl`; benign look-alikes in `benign_patterns` from
 loud if the model or collection is missing. `data/intents.eval.jsonl` (≥ 3 per intent + ≥ 5
 off-topic) is never loaded into Qdrant. Top-1 score < `ROUTE_THRESHOLD` ⇒ `general`.
 `ROUTE_THRESHOLD` and `INJECTION_MARGIN` are set by leave-one-out over the seed files (max-accuracy
-cut), recorded in ADR 0004; changing either requires an ADR update. `data/guard.holdout.jsonl` and
+cut), recorded in ADR 0004. Intents are `billing`, `tech_support`, `general` and `document_rag`
+(a question about the user's own documents, answered per §13); changing either requires an ADR update. `data/guard.holdout.jsonl` and
 `data/guard.eval.jsonl` are never loaded into Qdrant.
 
 ## 9 · Inference and prompts
@@ -185,3 +207,37 @@ already saw. Gateways stay stopped until the replay finishes, because a thread w
 could otherwise be claimed before its replay restores it (the replay would then be refused,
 `thread_owner_mismatch`). Losing the Kafka volume loses the requests it held that no worker had
 finished, and their 202 acceptances.
+
+## 13 · Document questions (RAG service)
+
+A message routed to `document_rag` (§8) is answered from the caller's tenant documents. The worker
+calls the RAG service's `POST /v1/retrieve`; the contract is
+[`docs/contracts/rag-openapi-v1.json`](docs/contracts/rag-openapi-v1.json), and a unit test fails if
+the worker's response models drift from it. The service is a separate container at `RAG_BASE_URL`,
+used at a pinned image tag and never as source. A message routed to `document_rag` from a user with no
+tenant has nothing to search: the worker answers it as `general`, with no status, search or citations.
+
+**Call.** Only the scrubbed, standalone question is sent, with `Authorization: Bearer <tenant
+token>` (`RAG_TENANT_TOKENS`, `token:tenant,...`), `traceparent`, `X-Request-ID` (the trace id) and
+`X-Timeout-Ms`. The tenant is `Envelope.tenant_id` (§3); the body carries none. The whole call has
+one deadline, `RAG_TIMEOUT_S`. Every document turn first streams a `status` event.
+
+**Errors.** A connection error, 503 or 504 is a dependency fault: bounded retries while no reply
+has started (§7), then `dependency_unavailable` and the DLQ. Anything else ends the turn at once
+with a fixed `ErrorEvent`, not retried and not sent to the DLQ: `rag_tenant_unknown` (no token for the tenant), `rag_unauthorized` (401), `rag_bad_request`
+(422), `rag_error` (500, any other status, or a body off-contract).
+
+**Answer.** When the service reports `insufficient`, the reply is a fixed "not found in your
+documents" sentence and no model is called. Otherwise the sections are placed in an escaped
+`<documents>` data block, never in the system prompt (§9), and the reply streams through the output
+guard. Each sentence is checked before it is scrubbed: a sentence with a number that occurs in no
+section (or the question) is dropped, and one fixed caveat follows the last sentence. After the last
+token the worker sends `citations`, then `done`.
+
+A model that returns no text is a dependency fault (§7), not an empty answer: it is retried while
+no reply has started, and no `citations` event is sent for it.
+
+**Data.** Section text is never checkpointed, streamed, logged, traced or sent to the DLQ. The
+checkpoint keeps `doc_key`, `page_id`, `page_key` and `score` per section, reset every turn. The
+scrubbed reply is stored in `turns` like any other. Raw section text does reach the chat model
+provider (ADR 0010).

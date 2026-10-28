@@ -62,6 +62,10 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   `ollama/ollama:0.40.6` (profile `llm`, model baked in at build). Host ports bind to 127.0.0.1 on
   19092 / 16379 / 16333 / 16334 / 16686 / 14317; Kafka advertises `127.0.0.1` (not `localhost`) to
   avoid IPv6-first resolution delays.
+- **Document questions:** a separate RAG service (its own repository, container and Postgres) is
+  called over HTTP by `worker/rag_client.py` (httpx, one shared pool, one deadline) and run from a
+  pinned image behind the compose profile `rag`; its contract is `docs/contracts/rag-openapi-v1.json`.
+  `USER_TENANTS` (gateway) and `RAG_TENANT_TOKENS` (worker) bind users to tenants.
 - **Testing:** httpx 0.28.1 (`ASGITransport` for in-process API tests), pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).
@@ -99,6 +103,17 @@ uv run uvicorn gateway.app:create_app --factory --host 0.0.0.0 --port 8000
 
 docker compose -f deploy/compose.yaml up -d --build frontend   # http://localhost:5173 (demo / demo-pw)
 ```
+
+Document questions (optional): needs Ollama running (`--profile llm`) for the RAG service's sufficiency check.
+
+```bash
+export RAG_TENANT_TOKENS=<token>:T1 RAG_DB_PASSWORD=<password>   # placeholders; set USER_TENANTS=demo:T1 on the gateway
+docker compose -f deploy/compose.yaml --profile rag up -d rag-db rag-api   # http://127.0.0.1:18000/health
+docker compose -f deploy/compose.yaml --profile rag up rag-seed            # uploads deploy/rag/handbook.txt as tenant T1
+```
+
+The image is `RAG_API_IMAGE` (default: the pinned `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.1.0`).
+`uv run pytest -m rag` shows the settings the host-run worker needs (`tests/integration/test_rag_e2e.py`).
 
 Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`,
 `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` in the environment (never commit them).
@@ -150,6 +165,7 @@ uv run pytest -m durability   # own compose project: SIGKILL, replacement, backu
 uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
 uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
 uv run pytest -m stack     # running stack: raw PII absent from logs, Kafka, DLQ, Redis and traces
+uv run pytest -m rag       # document questions end to end: compose profile rag + Ollama (IT_RAG_URL, IT_RAG_TOKENS, IT_LLM_URL)
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
 docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
 ```

@@ -22,6 +22,14 @@ class DependencyUnavailable(Exception):
     """An infrastructure dependency failed; the API maps this to 503."""
 
 
+def envelope_bytes(envelope: Envelope) -> bytes:
+    """The Kafka value. `tenant_id` is left out when unset, so a worker that predates the field
+    (`extra="forbid"`) still accepts records from users who have no tenant."""
+    return envelope.model_dump_json(
+        exclude={"tenant_id"} if envelope.tenant_id is None else None
+    ).encode()
+
+
 class EnvelopeSink(Protocol):
     """What the app needs from a producer (lets tests use a double)."""
 
@@ -69,7 +77,7 @@ class KafkaEnvelopeProducer:
                 async with asyncio.timeout(self._timeout_s + 1):
                     delivery = await self._producer.produce(
                         self._topic,
-                        value=envelope.model_dump_json().encode(),
+                        value=envelope_bytes(envelope),
                         key=envelope.thread_id.encode(),
                     )
                     await delivery

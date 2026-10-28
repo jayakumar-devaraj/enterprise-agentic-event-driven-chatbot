@@ -18,6 +18,7 @@ from worker.embedding import get_embedder
 from worker.graph import build_graph, make_processor
 from worker.llm import Engine, MockEngine, OpenAICompatEngine
 from worker.observability import LangfuseObserver, LLMObserver, NullObserver
+from worker.rag_client import RagClient, parse_tenant_tokens
 from worker.router import Router
 
 
@@ -46,6 +47,7 @@ def make_engine(settings: Settings) -> Engine:
 
 async def run(settings: Settings) -> None:
     """Wire everything and consume until SIGTERM/SIGINT."""
+    tenant_tokens = parse_tenant_tokens(settings.rag_tenant_tokens.get_secret_value())  # fail first
     setup_tracing("worker", settings.otel_exporter_otlp_endpoint)
     scrubber = get_scrubber(settings.spacy_model)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
@@ -72,6 +74,7 @@ async def run(settings: Settings) -> None:
         }
     )
     dlq = AIOProducer({"bootstrap.servers": settings.kafka_bootstrap_servers})
+    rag = RagClient(settings.rag_base_url, settings.rag_timeout_s, tenant_tokens)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -90,6 +93,9 @@ async def run(settings: Settings) -> None:
             redis=redis,
             observer=make_observer(settings),
             model="mock" if settings.mock_llm else settings.llm_model,
+            rag=rag,
+            rag_max_tokens=settings.rag_max_tokens,
+            rag_context_chars=settings.rag_context_chars,
         )
         process = make_processor(
             graph.compile(checkpointer=saver), redis=redis, approval_ttl_s=settings.approval_ttl_s
@@ -100,6 +106,7 @@ async def run(settings: Settings) -> None:
         finally:
             await consumer.close()
             await dlq.close()
+            await rag.aclose()
             await qdrant.close()
             await redis.aclose()
 

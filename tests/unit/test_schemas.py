@@ -75,3 +75,24 @@ def test_stream_key_format() -> None:
     """One stream per message (ADR 0005)."""
     mid = uuid4()
     assert stream_key("t1", mid) == f"tokens:t1:{mid}"
+
+
+def test_status_and_citations_are_stream_events_but_not_terminal() -> None:
+    """D6: both parse through the discriminated union; neither ends a stream."""
+    from chat_common.schemas import TERMINAL_TYPES, CitationsEvent, StatusEvent
+
+    adapter = TypeAdapter(StreamEvent)
+    status = adapter.validate_python({"type": "status", "seq": 0, "detail": "searching"})
+    cites = adapter.validate_python(
+        {"type": "citations", "seq": 3, "citations": [{"doc_key": "a.txt", "page_key": "page:1"}]}
+    )
+    assert isinstance(status, StatusEvent) and isinstance(cites, CitationsEvent)
+    assert not ({"status", "citations"} & TERMINAL_TYPES)
+    with pytest.raises(ValidationError):  # a citation carries a location, never document text
+        adapter.validate_python(
+            {
+                "type": "citations",
+                "seq": 3,
+                "citations": [{"doc_key": "a", "page_key": "p", "text": "x"}],
+            }
+        )

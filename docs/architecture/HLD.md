@@ -30,6 +30,7 @@ flowchart LR
   sys -- "OTLP traces" --> jaeger[(Jaeger v2, local)]
   sys -- "LLM spans, scrubbed only" --> langfuse[(LangFuse Cloud US)]
   sys -- "OpenAI-compatible /v1" --> ollama[(Ollama, local CPU)]
+  sys -- "POST /v1/retrieve, tenant token (profile rag)" --> rag[(RAG service + its Postgres)]
 ```
 
 External egress at runtime is LangFuse Cloud only (approved deviation, ADR 0006). Model weights
@@ -56,14 +57,17 @@ flowchart TB
     lg[LangGraph StateGraph]
     llm[OpenAI-compatible client / mock]
     outg[Output guardrail L5]
+    ragc[RAG client]
   end
   redis[(Redis 8 :6379<br/>streams, checkpoints, dedupe,<br/>rate limit, owners, audit)]
   qdrant[(Qdrant gRPC :6334, REST :6333<br/>intents, injection_patterns,<br/>benign_patterns)]
   seed[[seed one-shot]]
+  ragsvc[RAG service :8000<br/>profile rag, pinned image]
   auth --> guard --> prod --> req --> dedupe --> lg --> llm --> outg
   ui --> auth
   sse -- SSE --> ui
   lg -- "route (gRPC)" --> qdrant
+  lg -- "document question" --> ragc -- "HTTP, tenant token, one deadline" --> ragsvc
   outg -- XADD tokens --> redis
   lg -- checkpoint --> redis
   sse -- XREAD --> redis
@@ -81,6 +85,7 @@ flowchart TB
 | Redis 8 | Token streams, LangGraph checkpoints, dedupe leases, rate-limit counters, thread owners, refunds, audit stream | All shared mutable state |
 | Qdrant | Intent exemplars and injection exemplars (384-dim cosine) | Seeded once |
 | Seed | Embeds and loads the seed files; fails loud | One-shot |
+| RAG service (profile `rag`) | Tenant-isolated document retrieval over HTTP (`/v1/retrieve`); the worker writes the answer (ADR 0010) | Its own Postgres + pgvector |
 | React chat window | Vite + React + TypeScript SPA: sends turns, renders tokens incrementally, shows error and approval-required states, approve/reject buttons | Credentials and thread id in memory only |
 | Ollama | Local CPU inference (`llama3.2:1b`); vLLM on GPU is the documented production path behind the same URL | Model cache |
 | Jaeger v2 / LangFuse | Infra traces / LLM-level traces | External to the request path |
@@ -125,6 +130,10 @@ flowchart TB
 | Worker stalls past its lease, another takes over | Fenced write finds another token (or none) in `dedupe:{id}` | `LeaseLost` before the write → process stops without commit, restarts, re-reads from the last committed offset (ADR 0009) | The new owner's stream and refund records are unchanged |
 | Duplicate delivery / repeated POST | Gateway `accepted`/`delivered` keys / worker `done` key | Same 202 body; worker skips and commits | One stream, one `done` |
 | Gateway interrupted between claim and broker ack | `delivered:{id}` absent | Client retries the same body (the React client does once); gateway produces again; worker dedupes | 202 only for acknowledged work |
+| RAG service 503 / 504 / unreachable | Status or connection error | Bounded retries while no reply has started → `dependency_unavailable` + DLQ (the `status` note does not count as reply output) | SSE `status`, then `error` |
+| RAG service 401 / 422 / 500, or an unknown tenant | Status code / token lookup | Final: fixed `ErrorEvent`, no retry, no DLQ | SSE `error` (`rag_unauthorized`, `rag_bad_request`, `rag_error`, `rag_tenant_unknown`) |
+| Document question from a user with no tenant | `Envelope.tenant_id` unset | Routed as `general`; no search, status or citations | A plain assistant answer |
+| Model returns no text for a document question | Empty reply, nothing dropped | Treated as a dependency fault, retried | No empty answer is shown |
 | Prompt injection | Injection-collection similarity ≥ threshold | Refusal node; flagged in span + log | Refusal text |
 | Refund requested | Billing node | `interrupt()`; nothing applied until approval; expires after `APPROVAL_TTL_S` | `approval_required` event |
 | LangFuse unreachable | Client error | Caught and logged as a warning; never fails the request (`tests/unit/test_observability.py`) | — |
@@ -148,3 +157,9 @@ Five layers, detailed in ADR 0007: L1 authentication, ownership and schema/size 
 per-thread rate limit; L3 Presidio scrub before Kafka; L4 prompt-injection defence (structural
 separation + embedding detection); L5 output scrub, token cap, system-prompt echo check and removal of echoed `<user_message>` /
 `<history>` blocks.
+
+Document answers (ADR 0010): retrieved sections are untrusted data, placed only in an escaped
+`<documents>` block and never in the system prompt. Raw section text reaches the chat model
+provider, which must be at least as trusted as the RAG service's; it never reaches the
+checkpoint, stream, logs, traces or DLQ. Each streamed sentence is number-checked before it is
+scrubbed, and the tenant comes only from the authenticated username.

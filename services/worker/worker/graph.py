@@ -4,27 +4,49 @@ import logging
 import operator
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, TypedDict
 
 from chat_common.audit import AuditLog
-from chat_common.schemas import Envelope, owner_key
-from chat_common.tracing import context_from_traceparent
+from chat_common.schemas import Citation, Envelope, owner_key
+from chat_common.tracing import context_from_traceparent, current_traceparent
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 from opentelemetry import trace
 
 from worker import approval
 from worker.consumer import TransientDependencyError
-from worker.guards import guarded_tokens
-from worker.llm import REFUSAL, Engine, Turn
+from worker.guards import GroundingGate, guarded_tokens
+from worker.llm import REFUSAL, Engine, Turn, render_documents
 from worker.observability import LLMObserver, NullObserver
+from worker.rag_client import RagClient, RagRejected, Section
 from worker.router import Router
 from worker.streams import StreamWriter
 
 log = logging.getLogger("worker.graph")
 current_writer: ContextVar[StreamWriter] = ContextVar("current_writer")
+current_scratch: ContextVar["Scratch"] = ContextVar("current_scratch")
 tracer = trace.get_tracer("worker")
+
+STATUS_TEXT = "Searching your documents..."
+NOT_FOUND_TEXT = "I couldn't find that in your documents."
+NUMERIC_CAVEAT = (
+    "Some details were left out because they could not be checked against your documents."
+)
+NO_DOCUMENTS_DETAIL = "Document search is not set up for your account."
+MAX_QUESTION_CHARS = 2000  # the RAG service rejects a longer question
+CONDENSE_TURNS = 4
+
+
+@dataclass
+class Scratch:
+    """Raw section text for the turn in flight. It lives in this object, never in graph state.
+
+    Graph state is checkpointed after every node; section text must not be (SPEC §13).
+    """
+
+    sections: list[Section] = field(default_factory=list)
 
 
 class ChatState(TypedDict, total=False):
@@ -40,6 +62,11 @@ class ChatState(TypedDict, total=False):
     injection_score: float
     decision: dict[str, Any]
     proposed_at: str  # ISO time the refund approval window opened (SPEC §10)
+    # Document turns. Set from the envelope every turn, so nothing carries over from the last one.
+    tenant_id: str | None
+    question: str  # scrubbed standalone question sent to the RAG service
+    doc_refs: list[dict[str, Any]]  # doc_key, page_id, page_key, score; never section text
+    insufficient: bool
 
 
 async def _single(text: str) -> Any:
@@ -56,6 +83,9 @@ def build_graph(
     redis: Any = None,
     observer: LLMObserver | None = None,
     model: str = "mock",
+    rag: RagClient | None = None,
+    rag_max_tokens: int = 256,
+    rag_context_chars: int = 12000,
 ) -> StateGraph:
     """Assemble the graph; the caller compiles it with a checkpointer."""
 
@@ -76,6 +106,8 @@ def build_graph(
                 }
             )
         intent = "refuse" if r.injection else r.intent
+        if intent == "document_rag" and not state.get("tenant_id"):
+            intent = "general"  # no documents to search for this user: the plain assistant answers
         if r.injection:
             log.warning(
                 "prompt injection detected; refusing",
@@ -86,12 +118,14 @@ def build_graph(
     def after_route(state: ChatState) -> str:
         if approval.wants_refund(state["intent"], state["pending"]):
             return "propose_refund"
-        return state["intent"]
+        return "condense" if state["intent"] == "document_rag" else state["intent"]
 
-    async def stream_reply(deltas: Any) -> str:
+    async def stream_reply(
+        deltas: Any, *, limit: int | None = None, gate: GroundingGate | None = None
+    ) -> str:
         writer = current_writer.get()
         tokens: list[str] = []
-        async for token in guarded_tokens(deltas, scrub, max_tokens):
+        async for token in guarded_tokens(deltas, scrub, limit or max_tokens, gate):
             tokens.append(token)
             await writer.token(token)
         return " ".join(tokens)
@@ -114,6 +148,80 @@ def build_graph(
                     "user_message": state["pending"],
                     "history_turns": len(state.get("turns", [])),
                 },
+                output=reply,
+            )
+        return {
+            "turns": [
+                {"role": "user", "text": state["pending"]},
+                {"role": "assistant", "text": reply},
+            ],
+            "answered": state["message_id"],
+        }
+
+    async def condense(state: ChatState) -> dict[str, Any]:
+        """Tenant check first, then one standalone question; skipped when there is no history."""
+        if rag is None:
+            raise RagRejected("rag_tenant_unknown", NO_DOCUMENTS_DETAIL)
+        question = state["pending"]
+        history = state.get("turns", [])[-CONDENSE_TURNS:]
+        if history:
+            with tracer.start_as_current_span("condense"):
+                rewritten = (await scrub(await engine.condense(question, history))).strip()
+            question = rewritten[:MAX_QUESTION_CHARS] or question
+        return {"question": question}
+
+    async def rag_retrieve(state: ChatState) -> dict[str, Any]:
+        """Tell the client we are searching, then ask the RAG service as the user's tenant."""
+        assert rag is not None  # condense already refused the turn otherwise
+        await current_writer.get().status(STATUS_TEXT)
+        with tracer.start_as_current_span("rag_retrieve") as span:
+            result = await rag.retrieve(
+                state["tenant_id"], state["question"], traceparent=current_traceparent()
+            )
+            span.set_attributes(
+                {"rag.sections": len(result.sections), "rag.insufficient": result.insufficient}
+            )
+        current_scratch.get().sections = result.sections
+        refs = [
+            {"doc_key": s.doc_key, "page_id": s.page_id, "page_key": s.page_key, "score": s.score}
+            for s in result.sections
+        ]
+        return {"insufficient": result.insufficient or not refs, "doc_refs": refs}
+
+    async def rag_respond(state: ChatState) -> dict[str, Any]:
+        """Answer from the sections, or say they were not found without calling the model."""
+        writer = current_writer.get()
+        sections = current_scratch.get().sections
+        history = state.get("turns", [])
+        found = bool(sections) and not state.get("insufficient")
+        gate = GroundingGate([s.markdown for s in sections] + [state["question"]])
+        with tracer.start_as_current_span("rag_respond") as span:
+            span.set_attributes({"intent": "document_rag", "found": found})
+            if found:
+                documents = render_documents(sections, rag_context_chars)
+                deltas = engine.stream_documents(state["question"], history, documents)
+                reply = await stream_reply(deltas, limit=rag_max_tokens, gate=gate)
+                if (
+                    not reply.strip() and not gate.dropped
+                ):  # nothing came back: a fault, not an answer
+                    raise TransientDependencyError("llm: empty answer")
+                if gate.dropped:
+                    for part in NUMERIC_CAVEAT.split():
+                        await writer.token(part)
+                    reply = f"{reply} {NUMERIC_CAVEAT}".strip()
+                cites = [
+                    Citation(doc_key=r["doc_key"], page_key=r["page_key"])
+                    for r in state.get("doc_refs", [])
+                ]
+                await writer.citations(cites)
+            else:
+                reply = await stream_reply(_single(NOT_FOUND_TEXT))
+            llm_observer.record(
+                trace_id=format(span.get_span_context().trace_id, "032x"),
+                intent="document_rag",
+                engine=engine.name if found else "fixed",
+                model=model,
+                input={"user_message": state["question"], "history_turns": len(history)},
                 output=reply,
             )
         return {
@@ -168,6 +276,12 @@ def build_graph(
     for name in ("billing", "tech_support", "general", "refuse"):
         builder.add_node(name, respond)
         builder.add_edge(name, END)
+    builder.add_node("condense", condense)
+    builder.add_node("rag_retrieve", rag_retrieve)
+    builder.add_node("rag_respond", rag_respond)
+    builder.add_edge("condense", "rag_retrieve")
+    builder.add_edge("rag_retrieve", "rag_respond")
+    builder.add_edge("rag_respond", END)
     builder.add_node("propose_refund", propose_refund)
     builder.add_node("await_approval", await_approval)
     builder.add_node("settle_refund", settle_refund)
@@ -197,6 +311,7 @@ def make_processor(
         config = {"configurable": {"thread_id": env.thread_id}}
         mid = str(env.message_id)
         token = current_writer.set(writer)
+        scratch_token = current_scratch.set(Scratch())
         try:
             snapshot = await compiled.aget_state(config)
             values = snapshot.values
@@ -216,6 +331,12 @@ def make_processor(
                     await redis.delete(approval.pending_key(env.thread_id, str(env.ref_message_id)))
                 for part in values["turns"][-1]["text"].split(" "):
                     await writer.token(part)
+                if values.get("doc_refs"):
+                    cites = [
+                        Citation(doc_key=r["doc_key"], page_key=r["page_key"])
+                        for r in values["doc_refs"]
+                    ]
+                    await writer.citations(cites)
             elif env.kind == "approval":
                 ref = str(env.ref_message_id)
                 if paused != ref:
@@ -259,9 +380,22 @@ def make_processor(
                 if paused == mid:  # paused by an earlier attempt that died before announcing it
                     interrupted = True
                 else:
-                    result = await compiled.ainvoke(
-                        {"pending": env.text, "message_id": mid, "user_id": env.user_id}, config
-                    )
+                    try:
+                        result = await compiled.ainvoke(
+                            {
+                                "pending": env.text,
+                                "message_id": mid,
+                                "user_id": env.user_id,
+                                "tenant_id": env.tenant_id,
+                                "question": "",
+                                "doc_refs": [],
+                                "insufficient": False,
+                            },
+                            config,
+                        )
+                    except RagRejected as exc:  # final: not retried, not a dependency fault
+                        await writer.error(exc.code, exc.detail)
+                        return
                     interrupted = bool(result.get("__interrupt__"))
                 if interrupted:
                     await redis.set(
@@ -276,6 +410,7 @@ def make_processor(
                     await writer.approval_required("A refund request needs your approval.")
                     return
         finally:
+            current_scratch.reset(scratch_token)
             current_writer.reset(token)
         await writer.done()
 
