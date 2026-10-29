@@ -86,3 +86,12 @@ Points 1–2 of Round 1 stand. Points 3–7 are accepted, with these answers to 
 - `RAG_TENANT_TOKENS` and `USER_TENANTS` are superseded once question A is settled; until then they
   remain the only mechanism and this record changes no running behaviour.
 - Implementation is split into separate pull requests per decision after Round 2.
+
+## Amendment (2026-10-29, release pin and contract check)
+
+`RAG_API_IMAGE` now defaults to release v0.1.0 pinned by digest (`docker buildx imagetools inspect`
+resolved the tag to the index digest in `deploy/compose.yaml`); the tag stays in a comment that the CI
+`contract` job reads. That job downloads `docs/openapi-v1.json` from the pinned release of the RAG
+repository and fails if it differs from `docs/contracts/rag-openapi-v1.json`. The RAG repository's own
+unit test already checks its contract against the document its code generates. Moving the pin is a
+reviewed change that updates the digest, the comment and, if the contract changed, the local copy.
