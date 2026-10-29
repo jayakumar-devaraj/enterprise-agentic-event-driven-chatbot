@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     rag_max_tokens: int = 256
     rag_context_chars: int = 12000  # cap on document text placed in one prompt
     rag_tenant_tokens: SecretStr = SecretStr("")  # `token:tenant,...`, the RAG service's own format
+    rag_token_url: str = ""  # OIDC token endpoint for the client-credentials grant (ADR 0011)
+    rag_tenant_clients: SecretStr = SecretStr("")  # `tenant:client_id:secret,...`; replaces tokens
 
     dedupe_lease_s: int = 200
     dedupe_ttl_s: int = 777600  # 9 days: outlives Kafka retention + one segment (SPEC §5)
@@ -114,6 +116,21 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _rag_credentials_are_one_consistent_choice(self) -> "Settings":
+        """Static tokens and client credentials are alternatives, never both; clients need a URL.
+
+        Accepting both would leave it unclear which one a request used, and a client-credentials
+        setup that silently fell back to static tokens would defeat the point of moving off them.
+        """
+        tokens = bool(self.rag_tenant_tokens.get_secret_value())
+        clients = bool(self.rag_tenant_clients.get_secret_value())
+        if tokens and clients:
+            raise ValueError("set RAG_TENANT_TOKENS or RAG_TENANT_CLIENTS, not both")
+        if clients and not self.rag_token_url:
+            raise ValueError("RAG_TENANT_CLIENTS needs RAG_TOKEN_URL")
+        return self
+
+    @model_validator(mode="after")
     def _rag_leaves_room_to_answer(self) -> "Settings":
         """The RAG deadline sits inside one attempt, which INFERENCE_TIMEOUT_S already caps.
 
@@ -121,7 +138,9 @@ class Settings(BaseSettings):
         cannot catch is a RAG deadline that eats the whole attempt and leaves nothing to answer in.
         Checked only when RAG is configured (tokens set); with it off the deadline is never used.
         """
-        rag_on = bool(self.rag_tenant_tokens.get_secret_value())
+        rag_on = bool(
+            self.rag_tenant_tokens.get_secret_value() or self.rag_tenant_clients.get_secret_value()
+        )
         if rag_on and not self.rag_timeout_s < self.inference_timeout_s:
             raise ValueError(
                 f"RAG_TIMEOUT_S={self.rag_timeout_s:g} must be below "

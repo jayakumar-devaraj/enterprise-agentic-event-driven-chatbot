@@ -235,3 +235,5 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
   the direct gateway ports carry Basic credentials in clear, so any local process can read or write
   all state. Not suitable beyond one trusted host as configured.
+- **RAG client credentials (ADR 0011, 2026-10-29).** `RAG_TENANT_CLIENTS` is implemented and unit-tested against a test double of the token endpoint only; no real identity provider was run. Secrets come from the environment, not a secrets manager. Static `RAG_TENANT_TOKENS` remain the default until the deployment sets the client variables.
+- **Audit export (ADR 0011, 2026-10-29).** The exporter is opt-in (`--profile audit`) and runs as a single consumer; the audit table has no partitioning or retention job; the schema is created by an init script, not migrations; no lag alarm. Events are exported after the Redis write, so an event lost from Redis (AOF `everysec`, about one second) before export is not in Postgres; the synchronous tier that would close that gap for refunds and denials is not built.

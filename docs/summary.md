@@ -14,7 +14,7 @@ request is traceable end to end, and key actions are written to an audit log.
 when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
-- **Tests collected:** 194 unit, 54 integration (real Kafka, Redis, Qdrant), 8 durability, 11 frontend.
+- **Tests collected:** 203 unit, 54 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 11 frontend.
 - **Coverage:** 88 % of 952 statements. Report header: "Coverage at main c3b4f0f, measured 2026-10-17 20:15 CDT (unit + integration; scale/llm tests need special stacks)".
 <!-- figures:end -->
 
@@ -42,9 +42,12 @@ state (ADR 0008).
 **Remaining work, in priority order.**
 1. Latency: every latency target still fails after the producer fix. The cause is queueing inside the
    workers (queue delay p95 8.8 s with the gateway answering in 181 ms); it is not yet explained.
-2. Tenant security: the services currently trust static tokens and HTTP Basic. ADR 0011 (accepted)
-   moves tenant authentication to short-lived signed tokens and the audit trail to a durable store;
-   the RAG service side is built, the chatbot side is not.
+2. Tenant security: end users still use HTTP Basic, and static tokens remain the default for calls to
+   the document service. ADR 0011 (accepted) moves tenant authentication to short-lived signed
+   tokens and the audit trail to a durable store. Built: the document service validates signed
+   tokens, the worker can use per-tenant client credentials, and an optional exporter copies the
+   audit stream into an append-only database. Not built: writing refund and access-denial events
+   straight to that database, and any run against a real identity provider.
 3. Detection quality: harmless off-topic questions are refused, and location names and some
    structured identifiers slip through the PII scrubber.
 4. Reply quality and independent scoring: the local 1B model deflects most billing questions.

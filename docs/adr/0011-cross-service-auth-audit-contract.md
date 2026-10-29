@@ -86,3 +86,30 @@ Points 1–2 of Round 1 stand. Points 3–7 are accepted, with these answers to 
 - `RAG_TENANT_TOKENS` and `USER_TENANTS` are superseded once question A is settled; until then they
   remain the only mechanism and this record changes no running behaviour.
 - Implementation is split into separate pull requests per decision after Round 2.
+
+## Amendment (2026-10-29, client credentials in the worker)
+
+Decision A is implemented in `services/worker/worker/rag_auth.py`. With `RAG_TOKEN_URL` and
+`RAG_TENANT_CLIENTS` (`tenant:client_id:secret,...`) set, the worker obtains one access token per tenant
+with the OAuth 2.0 client-credentials grant, caches it in memory until 30 s before it expires, and lets
+one caller per tenant fetch at a time. A refused client (4xx) is a final `rag_unauthorized`; an
+unreachable or failing token endpoint (5xx, transport error) is retryable like any other dependency
+fault; neither is answered with a static token. Settings fail startup if both `RAG_TENANT_TOKENS` and
+`RAG_TENANT_CLIENTS` are set, or if the clients have no URL. A 403 from the RAG service (a token without
+the `rag:query` scope) maps to the same `rag_unauthorized` as a 401. Verified at the HTTP boundary with a
+test double for the token endpoint; no real identity provider (for example Keycloak) has been run.
+Still open from this record: the audit store and exporter, the digest pin, and the cross-repository
+contract check.
+
+## Amendment (2026-10-29, audit export)
+
+Decision C is implemented for the export tier. `services/audit` reads `audit:events` through the
+consumer group `audit-exporter`, inserts into `audit_log` (Postgres 16.14, profile `audit`) using the
+stream entry id as a unique key, and acknowledges only after the insert committed, so a crash between the
+two redelivers an entry whose insert is then a no-op. Idle unacknowledged entries are reclaimed from dead
+consumers; a damaged entry is stored with placeholder fields and its raw text, never dropped. The writer
+role has `SELECT` and `INSERT` only; the table is created by the database image's init script, so a later
+schema change needs a migration tool (the RAG repository uses Alembic). Rows survive the Redis stream
+being trimmed (tested). Not built: the synchronous tier (refund and access-denial events written straight
+to Postgres), monthly partitioning and the 400-day retention job, the 60-second lag alarm (the exporter
+logs the lag after each batch), and a query endpoint (SQL only).

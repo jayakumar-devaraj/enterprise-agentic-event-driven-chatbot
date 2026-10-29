@@ -40,6 +40,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   `en_core_web_lg` 3.8.0 (`chat_common.scrubber`; typed placeholders such as `<EMAIL_ADDRESS>`,
   `ascrub` runs off the event loop).
 - **Persistence:** redis-py 8.1.0 (`redis.asyncio`; `audit:events` stream via `chat_common.audit`).
+- **Audit export (profile `audit`):** `services/audit` (psycopg 3.3.6) reads `audit:events` through a Redis consumer group and inserts into the append-only `audit_log` table of `postgres:16.14` (`audit-db`) with the stream entry id as the idempotency key; it acknowledges only after the insert commits. The exporter's role can `SELECT` and `INSERT` only. Query it with SQL, for example `docker compose -f deploy/compose.yaml exec audit-db psql -U audit_admin -d audit -c "select ts, event, actor from audit_log where thread_id = '<id>' order by id"`; start it with `AUDIT_DB_PASSWORD=<pw> AUDIT_WRITER_PASSWORD=<pw> docker compose -f deploy/compose.yaml --profile audit up -d --build audit-db audit-exporter`.
 - **Observability (traces):** opentelemetry-sdk 1.45.1 + OTLP/gRPC exporter 1.45.1 →
   Jaeger v2 (`chat_common.tracing`; gateway auto-instrumented by
   opentelemetry-instrumentation-fastapi 0.66b1; trace context crosses Kafka as the W3C `traceparent`
@@ -65,7 +66,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
 - **Document questions:** a separate RAG service (its own repository, container and Postgres) is
   called over HTTP by `worker/rag_client.py` (httpx, one shared pool, one deadline) and run from a
   pinned image behind the compose profile `rag`; its contract is `docs/contracts/rag-openapi-v1.json`.
-  `USER_TENANTS` (gateway) and `RAG_TENANT_TOKENS` (worker) bind users to tenants.
+  `USER_TENANTS` (gateway) binds users to tenants; the worker authenticates to the RAG service with `RAG_TENANT_TOKENS` or, preferably, per-tenant OAuth client credentials (`RAG_TOKEN_URL` + `RAG_TENANT_CLIENTS`, ADR 0011).
 - **Testing:** httpx 0.28.1 (`ASGITransport` for in-process API tests), pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).
