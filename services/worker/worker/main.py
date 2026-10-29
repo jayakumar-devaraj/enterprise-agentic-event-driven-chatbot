@@ -10,9 +10,9 @@ from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from chat_common.tracing import setup_tracing
 from confluent_kafka.aio import AIOConsumer, AIOProducer
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from qdrant_client import AsyncQdrantClient
 
+from worker.checkpoint import FencedRedisSaver
 from worker.consumer import Worker
 from worker.embedding import get_embedder
 from worker.graph import build_graph, make_processor
@@ -91,7 +91,7 @@ async def run(settings: Settings) -> None:
         except NotImplementedError:  # Windows event loops do not support signal handlers
             pass
     ttl = {"default_ttl": settings.checkpoint_ttl_min, "refresh_on_read": True}
-    async with AsyncRedisSaver.from_conn_string(settings.redis_url, ttl=ttl) as saver:
+    async with FencedRedisSaver.from_conn_string(settings.redis_url, ttl=ttl) as saver:
         await saver.asetup()
         graph = build_graph(
             router,

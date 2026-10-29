@@ -86,8 +86,9 @@ Writes under the lease are fenced (ADR 0009). Token-stream appends and resets, `
 the refund apply each check the token in the same Lua script, and fail before writing unless the
 lease still holds it. The DLQ produce is preceded by a lease check. A failed check stops the worker
 process without committing, so a worker that stalled past its lease cannot change the stream,
-lease or refund records of the attempt that took over. Checkpoint, `pending_approval:*` and audit
-writes are not fenced atomically (ADR 0009, Consequences).
+lease or refund records of the attempt that took over. Checkpoint writes are preceded by a lease
+check, so such a worker cannot roll the thread's history back either. Checkpoint,
+`pending_approval:*` and audit writes are not fenced atomically (ADR 0009, Consequences).
 
 ## 6 · Token stream
 

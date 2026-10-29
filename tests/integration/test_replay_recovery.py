@@ -17,8 +17,8 @@ from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from conftest import REDIS_URL
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
+from worker.checkpoint import FencedRedisSaver
 from worker.consumer import Worker
 from worker.graph import build_graph, make_processor
 from worker.lease import LeaseLost
@@ -88,7 +88,7 @@ class NoDLQ:
 async def stack() -> AsyncIterator[tuple[Any, Worker, Consumer]]:
     """Real Redis + checkpointer + compiled graph behind a Worker."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
+    async with FencedRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
         graph = build_graph(Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis)
         process = make_processor(graph.compile(checkpointer=saver), redis=redis)
@@ -273,6 +273,48 @@ async def test_stale_worker_cannot_write_after_another_took_over(stack, monkeypa
     assert len(await _turns(saver, graph, env.thread_id)) == 2
     assert await redis.get(f"dedupe:{env.message_id}") == "done"
     assert (consumer_a.commits, consumer_b.commits) == (0, 1)
+
+
+async def test_stale_worker_cannot_roll_back_history_after_another_took_over(
+    stack, monkeypatch
+) -> None:
+    """A loads the thread, then stalls in routing past its lease; B redoes M1 and answers M2.
+
+    When A resumes, its next checkpoint is built on the history it loaded before the stall. Written,
+    it would become the thread's latest checkpoint and drop B's turns (CI rebalance run on 65894ba).
+    """
+    redis, worker_b, _, graph, saver = stack
+    consumer_a = Consumer()
+    worker_a = Worker(
+        SETTINGS, consumer=consumer_a, dlq_producer=NoDLQ(), redis=redis, process=worker_b._process
+    )
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    first, second = _chat(thread, "Why is my bill higher?"), _chat(thread, "And next month?")
+    stalled, resume = asyncio.Event(), asyncio.Event()
+    original = Billing.route
+
+    async def stall_first_route(self: Billing, text: str) -> Route:
+        if not stalled.is_set():
+            stalled.set()
+            await resume.wait()  # after aget_state: A now holds the history as it was
+        return await original(self, text)
+
+    monkeypatch.setattr(Billing, "route", stall_first_route)
+    # A frozen process overruns asyncio.timeout; a longer timeout lets the await stand in for it.
+    monkeypatch.setattr(SETTINGS, "inference_timeout_s", 30)
+    task_a = asyncio.create_task(worker_a.handle(Msg(first)))
+    await stalled.wait()
+    await asyncio.sleep(SETTINGS.dedupe_lease_s + 0.5)
+    await worker_b.handle(Msg(first))
+    await worker_b.handle(Msg(second))
+    turns = await _turns(saver, graph, thread)
+    assert len(turns) == 4
+
+    resume.set()
+    with pytest.raises(LeaseLost):
+        await task_a
+    assert await _turns(saver, graph, thread) == turns
+    assert consumer_a.commits == 0
 
 
 async def test_old_message_redelivered_after_a_later_turn_changes_nothing(stack) -> None:
