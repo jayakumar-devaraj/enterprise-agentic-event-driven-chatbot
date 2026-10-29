@@ -9,15 +9,25 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 from chat_common.schemas import TenantId
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from worker.consumer import TransientDependencyError
+from worker.rag_auth import TokenRejected
 
 log = logging.getLogger("worker.rag")
+
+
+class TokenProvider(Protocol):
+    """Supplies a bearer token per tenant (see `worker.rag_auth.ClientCredentialsTokens`)."""
+
+    async def token(self, tenant_id: str) -> str | None:
+        """The token, or None when the tenant has no credentials."""
+        ...
+
 
 _DEADLINE_MARGIN_MS = 500  # the service gives up this much before we do, so its 504 can arrive
 _TENANT = TypeAdapter(TenantId)
@@ -92,11 +102,17 @@ class RagClient:
         timeout_s: float,
         tenant_tokens: dict[str, str],
         *,
+        token_provider: TokenProvider | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        """One shared connection pool; the only timeout is the overall deadline in `retrieve`."""
+        """One shared connection pool; the only timeout is the overall deadline in `retrieve`.
+
+        With a `token_provider` (OAuth client credentials) it supplies every token and
+        `tenant_tokens` is not consulted; otherwise the static tokens are used.
+        """
         self._timeout_s = timeout_s
         self._tokens = tenant_tokens
+        self._provider = token_provider
         self._http = httpx.AsyncClient(
             base_url=base_url,
             timeout=httpx.Timeout(None),
@@ -108,13 +124,26 @@ class RagClient:
         """Release the pool."""
         await self._http.aclose()
 
-    async def retrieve(self, tenant_id: str, question: str, *, traceparent: str = "") -> Retrieval:
-        """Run the call under one deadline. `question` must already be scrubbed."""
-        token = self._tokens.get(tenant_id)
+    async def _token(self, tenant_id: str) -> str:
+        """The bearer token for `tenant_id`: from the provider when set, else the static table."""
+        if self._provider is None:
+            token = self._tokens.get(tenant_id)
+        else:
+            try:
+                token = await self._provider.token(tenant_id)
+            except TokenRejected as exc:
+                raise RagRejected(
+                    "rag_unauthorized", "Document search is not available for your account."
+                ) from exc
         if token is None:
             raise RagRejected(
                 "rag_tenant_unknown", "Document search is not set up for your account."
             )
+        return token
+
+    async def retrieve(self, tenant_id: str, question: str, *, traceparent: str = "") -> Retrieval:
+        """Run the call under one deadline. `question` must already be scrubbed."""
+        token = await self._token(tenant_id)
         request_id = _trace_id(traceparent)
         headers = {
             "Authorization": f"Bearer {token}",
@@ -151,7 +180,7 @@ class RagClient:
         code = response.status_code
         if code in (503, 504):
             raise TransientDependencyError(f"rag: HTTP {code}")
-        if code == 401:
+        if code in (401, 403):  # unknown token, or a token without the rag:query scope
             raise RagRejected(
                 "rag_unauthorized", "Document search is not available for your account."
             )
