@@ -1,0 +1,11 @@
+{
+  "unit_tests": 192,
+  "integration_tests": 49,
+  "durability_tests": 8,
+  "frontend_tests": 11,
+  "coverage": {
+    "percent": 88,
+    "statements": 952,
+    "source": "Coverage at main c3b4f0f, measured 2026-10-17 20:15 CDT (unit + integration; scale/llm tests need special stacks):"
+  }
+}
