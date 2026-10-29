@@ -15,7 +15,7 @@ when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
 - **Tests collected:** 206 unit, 54 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 11 frontend.
-- **Coverage:** 88 % of 952 statements. Report header: "Coverage at main c3b4f0f, measured 2026-10-17 20:15 CDT (unit + integration; scale/llm tests need special stacks)".
+- **Coverage:** 89 % of 1606 statements. Report header: "Coverage at efe4fea from CI run 40929094525 (unit + integration; scale, llm, durability and stack tests need special stacks)".
 <!-- figures:end -->
 
 Crash recovery is tested by injecting failures at each step, by stopping Qdrant live, and by killing the
