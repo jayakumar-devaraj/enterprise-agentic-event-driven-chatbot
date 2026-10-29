@@ -1,4 +1,4 @@
-"""The summary's figures block is generated from data; it must render those numbers and nothing else."""
+"""The summary figures block is generated from data and must render exactly those numbers."""
 
 import importlib.util
 from pathlib import Path

@@ -62,6 +62,7 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Answer document questions via the RAG service (tenancy, routing, citations) | files changed (by path): code 15, other 14, docs 7, tests 11 | feat/rag-tenancy | #73 | unrecorded |
 | ADR 0011 round 1: cross-service auth, audit and contract with the RAG service | files changed (by path): docs 1 | docs/adr-0011-cross-service | #74 | 9c652407 |
 | ADR 0011 round 2: accept cross-service auth, audit and contract decisions | files changed (by path): docs 1 | docs/adr-0011-round2 | #75 | 9c652407 |
+| Fix LLD diagram, check docs and diagrams in CI, complete the orchestration log | files changed (by path): docs 4, other 4, tests 1 | docs/chatbot-docs-consistency | #76 | 9c652407 |
 
 
 
