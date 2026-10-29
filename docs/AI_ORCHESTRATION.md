@@ -38,6 +38,23 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | demo script phase 1 | code: `scripts/end_to_end_demo.py` (POST /chat + SSE, stdlib only); verified live: argument, prompt, unreachable, 401 | demo-script-phase-1 | #33 | 25d36d33 |
 | demo script phase 2 | code: demo finds/starts the compose stack, Docker checks, one-line failures, non-tty input; verified warm, cold, Docker unreachable/missing, twice in a row, NUL stdin | demo-script-phase-2 | #34 | 25d36d33 |
 | demo script phase 3 | code: stop/ps hints use the absolute compose path; verified on Windows from CMD, PowerShell, Git Bash, another directory, cold start, printed stop command; macOS not run | demo-script-phase-3 | #35 | 25d36d33 |
+| Keep thread ownership for the life of the thread's data | files changed (by path): code 1, docs 4, other 1, tests 2 | fix/ownership-lifetime | #36 | 9d3720f9 |
+| Return 202 only for broker-acknowledged work and keep retry identity | files changed (by path): code 1, docs 4, other 3, tests 3 | fix/acceptance-protocol | #37 | 9d3720f9 |
+| Record refund marker, request and audit entry atomically | files changed (by path): code 4, docs 3, other 2, tests 1 | fix/refund-atomicity | #38 | 9d3720f9 |
+| Make redelivery advance a thread by at most one turn | files changed (by path): code 3, docs 4, other 4, tests 2 | fix/replay-idempotency | #39 | 9d3720f9 |
+| Persist Redis and Kafka state on named volumes | files changed (by path): docs 4, other 4, tests 1 | fix/redis-kafka-persistence | #40 | 9d3720f9 |
+| Verify passwords off the event loop | files changed (by path): code 1, docs 3, other 1, tests 1 | fix/auth-off-event-loop | #41 | 9d3720f9 |
+| Separate liveness from readiness and check Kafka | files changed (by path): code 3, docs 2, other 2, tests 3 | fix/readiness-probe | #42 | 9d3720f9 |
+| Measure the refusal rules on a held-out guard set (candidate not adopted) | files changed (by path): docs 4, other 1, tests 1 | fix/refusal-false-positive | #43 | 9d3720f9 |
+| Detect injections by contrastive margin against benign exemplars | files changed (by path): code 5, docs 9, other 6, tests 3 | feat/contrastive-injection-guard | #44 | 9d3720f9 |
+| Reconcile the summary, LLD and limitations with the audited fixes | files changed (by path): docs 4 | docs/reconcile-after-audit | #45 | 9d3720f9 |
+| Automate A4 with a live Qdrant outage | files changed (by path): docs 2, other 1, tests 1 | test/a4-live-qdrant-outage | #46 | 9d3720f9 |
+| Automate A5 with a live worker SIGKILL under load | files changed (by path): docs 3, other 1, tests 2 | test/a5-worker-kill | #47 | 9d3720f9 |
+| Wait for Qdrant to serve before the A4 recovery message | files changed (by path): tests 1 | fix/a4-wait-qdrant-serving | #48 | 9d3720f9 |
+| Stop the output guard from flushing entities in fragments | files changed (by path): code 1, docs 3, tests 1 | test/pii-hard-cases | #49 | 9d3720f9 |
+| Document remaining requirements for full-score reassessment | files changed (by path): docs 1 | codex/evaluation-remediation-checklist | #50 | unrecorded |
+| Measure PII recall on a harder labelled set | files changed (by path): docs 5, tests 3 | test/pii-hard-fixture | #51 | 9d3720f9 |
+| Replace the coverage report with the CI report and log recent PRs | files changed (by path): docs 4 | docs/freeze-figures | #81 | 9c652407 |
 | Bind the delivered marker to the request so acceptance retries stay idempotent | files changed (by path): code 1, other 1, docs 2, tests 2 | fix/acceptance-binding | #52 | 2d000a26 |
 | Validate refund script inputs before writing and make the marker a receipt | files changed (by path): code 1, other 1, docs 2, tests 1 | fix/refund-receipt | #53 | 2d000a26 |
 | Fix Mermaid diagrams that GitHub cannot render | files changed (by path): docs 2 | fix/mermaid-diagrams | #54 | 2d000a26 |
