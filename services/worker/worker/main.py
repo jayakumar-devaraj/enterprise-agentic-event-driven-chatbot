@@ -18,6 +18,7 @@ from worker.embedding import get_embedder
 from worker.graph import build_graph, make_processor
 from worker.llm import Engine, MockEngine, OpenAICompatEngine
 from worker.observability import LangfuseObserver, LLMObserver, NullObserver
+from worker.rag_auth import ClientCredentialsTokens, parse_tenant_clients
 from worker.rag_client import RagClient, parse_tenant_tokens
 from worker.router import Router
 
@@ -48,6 +49,8 @@ def make_engine(settings: Settings) -> Engine:
 async def run(settings: Settings) -> None:
     """Wire everything and consume until SIGTERM/SIGINT."""
     tenant_tokens = parse_tenant_tokens(settings.rag_tenant_tokens.get_secret_value())  # fail first
+    clients = parse_tenant_clients(settings.rag_tenant_clients.get_secret_value())
+    token_provider = ClientCredentialsTokens(settings.rag_token_url, clients) if clients else None
     setup_tracing("worker", settings.otel_exporter_otlp_endpoint)
     scrubber = get_scrubber(settings.spacy_model)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
@@ -74,7 +77,12 @@ async def run(settings: Settings) -> None:
         }
     )
     dlq = AIOProducer({"bootstrap.servers": settings.kafka_bootstrap_servers})
-    rag = RagClient(settings.rag_base_url, settings.rag_timeout_s, tenant_tokens)
+    rag = RagClient(
+        settings.rag_base_url,
+        settings.rag_timeout_s,
+        tenant_tokens,
+        token_provider=token_provider,
+    )
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -107,6 +115,8 @@ async def run(settings: Settings) -> None:
             await consumer.close()
             await dlq.close()
             await rag.aclose()
+            if token_provider is not None:
+                await token_provider.aclose()
             await qdrant.close()
             await redis.aclose()
 
