@@ -218,7 +218,7 @@ used at a pinned image tag and never as source. A message routed to `document_ra
 tenant has nothing to search: the worker answers it as `general`, with no status, search or citations.
 
 **Call.** Only the scrubbed, standalone question is sent, with `Authorization: Bearer <tenant
-token>` (`RAG_TENANT_TOKENS`, `token:tenant,...`), `traceparent`, `X-Request-ID` (the trace id) and
+token>` (`RAG_TENANT_TOKENS`, `token:tenant,...`; or, when `RAG_TENANT_CLIENTS` and `RAG_TOKEN_URL` are set instead, the access token from that tenant's OAuth client-credentials client, never both and never a fallback between them), `traceparent`, `X-Request-ID` (the trace id) and
 `X-Timeout-Ms`. The tenant is `Envelope.tenant_id` (§3); the body carries none. The whole call has
 one deadline, `RAG_TIMEOUT_S`. Every document turn first streams a `status` event.
 

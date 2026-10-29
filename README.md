@@ -65,7 +65,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
 - **Document questions:** a separate RAG service (its own repository, container and Postgres) is
   called over HTTP by `worker/rag_client.py` (httpx, one shared pool, one deadline) and run from a
   pinned image behind the compose profile `rag`; its contract is `docs/contracts/rag-openapi-v1.json`.
-  `USER_TENANTS` (gateway) and `RAG_TENANT_TOKENS` (worker) bind users to tenants.
+  `USER_TENANTS` (gateway) binds users to tenants; the worker authenticates to the RAG service with `RAG_TENANT_TOKENS` or, preferably, per-tenant OAuth client credentials (`RAG_TOKEN_URL` + `RAG_TENANT_CLIENTS`, ADR 0011).
 - **Testing:** httpx 0.28.1 (`ASGITransport` for in-process API tests), pytest 9.1.1 (unit by default; `-m integration` for real-service tests),
   pytest-asyncio 1.4.0 (`asyncio_mode=auto`), pytest-cov 7.1.0 (coverage reports).
 - **Lint:** ruff 0.17.1 (`ruff check`, `ruff format --check`).
