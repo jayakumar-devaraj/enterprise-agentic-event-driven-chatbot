@@ -63,6 +63,9 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | ADR 0011 round 1: cross-service auth, audit and contract with the RAG service | files changed (by path): docs 1 | docs/adr-0011-cross-service | #74 | 9c652407 |
 | ADR 0011 round 2: accept cross-service auth, audit and contract decisions | files changed (by path): docs 1 | docs/adr-0011-round2 | #75 | 9c652407 |
 | Fix LLD diagram, check docs and diagrams in CI, complete the orchestration log | files changed (by path): docs 4, other 4, tests 1 | docs/chatbot-docs-consistency | #76 | 9c652407 |
+| Generate summary figures from the repo and produce CI coverage | files changed (by path): docs 3, other 3, tests 1 | docs/figures-and-summary | #77 | 9c652407 |
+| Authenticate to the RAG service with per-tenant OAuth client credentials | files changed (by path): code 4, docs 4, other 3, tests 1 | feat/rag-client-credentials | #78 | 9c652407 |
+| Export the Redis audit stream to an append-only Postgres table | files changed (by path): code 5, docs 4, other 8, tests 2 | feat/audit-exporter | #80 | 9c652407 |
 
 
 

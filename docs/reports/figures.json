@@ -4,8 +4,8 @@
   "durability_tests": 8,
   "frontend_tests": 11,
   "coverage": {
-    "percent": 88,
-    "statements": 952,
-    "source": "Coverage at main c3b4f0f, measured 2026-10-17 20:15 CDT (unit + integration; scale/llm tests need special stacks):"
+    "percent": 89,
+    "statements": 1606,
+    "source": "Coverage at efe4fea from CI run 40929094525 (unit + integration; scale, llm, durability and stack tests need special stacks):"
   }
 }
