@@ -77,8 +77,30 @@ jobs:
           enable-cache: true
       - name: Sync
         run: uv sync --locked
+      - name: Follow container logs (diagnostics)
+        run: |
+          mkdir -p dur-logs
+          cat > dur-logs/follow.sh <<'SH'
+          #!/bin/bash
+          cd "$1"
+          docker events --format '{{.Time}} {{.Actor.Attributes.name}} {{.Action}}' --filter type=container > events.log 2>&1 &
+          while true; do
+            for n in $(docker ps -a --format '{{.Names}}' | grep '^chatbot-dur-'); do
+              if [ ! -e "$n.started" ]; then touch "$n.started"; docker logs -f -t "$n" > "$n.log" 2>&1 & fi
+            done
+            sleep 0.5
+          done
+          SH
+          chmod +x dur-logs/follow.sh
+          nohup setsid dur-logs/follow.sh "$PWD/dur-logs" > /dev/null 2>&1 &
       - name: Durability tests
-        run: uv run pytest -m durability -v
+        run: uv run pytest -m durability -v -k rebalance
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: durability-logs
+          path: dur-logs
 
   frontend:
     runs-on: ubuntu-latest
