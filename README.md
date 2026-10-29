@@ -175,6 +175,6 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 ## Deployment / CI
 
 `.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), durability (Redis
-and Kafka restart/replacement/restore), and frontend jobs on every push and pull request. Gateway, worker and seed images build from `services/*/Dockerfile`
+and Kafka restart/replacement/restore), and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
 (multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
 there is no registry push or production deployment target yet.

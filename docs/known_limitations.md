@@ -82,9 +82,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   rule refuses 10/20 benign held-out messages (mostly refund and money-back phrasings) and detects
   12/20 novel injections. The pre-registered margin rule (2/20 refused, 9/20 detected) missed its
   targets and was not adopted. The structural defence and the human refund gate are unaffected.
-- **Answer-quality evaluation not yet run (2026-10-18, ADR 0009):** the DeepEval harness is on branch
-  `feat/deepeval-answer-quality` (unmerged). Its first full run failed because each local-judge call
-  exceeded DeepEval's 88.5 s per-attempt limit on CPU; no quality score exists yet. Paused by the lead.
+- **Answer quality was measured without DeepEval (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):** the DeepEval harness on `feat/deepeval-answer-quality` was never merged, because each local-judge call exceeded DeepEval's 88.5 s per-attempt limit on CPU (ADR 0009). The build agent scored 20 replies against a pre-registered rubric instead: mean 68/100 = 3.4 against a 3.5 target (fail) and 16/20 on no invented specifics against 18 (fail). That is not an independent judge.
 - **Contrastive injection detector adopted below its targets (2026-10-18, ADR 0004/0006):** on the
   fresh holdout it refuses 4/20 benign messages and detects 20/20 injections; it also refuses 3
   off-topic `intents.eval` requests (no in-scope one). The seeds and holdout were written by the same

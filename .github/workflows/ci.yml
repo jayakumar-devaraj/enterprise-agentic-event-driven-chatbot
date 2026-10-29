@@ -70,3 +70,22 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm test
+
+  docs:
+    # Documents must not point at anything that does not exist, and every diagram must render.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Links and orchestration references
+        run: python3 scripts/check_docs.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Mermaid diagrams render
+        run: |
+          npm install --no-save --silent @mermaid-js/mermaid-cli@12.0.0
+          for f in $(git ls-files '*.md' | xargs grep -l '^```mermaid'); do
+            echo "rendering $f"
+            npx mmdc -p .github/mermaid-puppeteer.json -i "$f" -o "$RUNNER_TEMP/out.md" -q
+          done
