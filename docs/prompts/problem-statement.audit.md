@@ -1,6 +1,6 @@
 # Audit: problem-statement.md (per prompt_audit_template.md)
 
-Rewrite: [problem-statement.v2.md](problem-statement.v2.md)
+Rewrite: `problem-statement.v2.md` (not kept in this repository)
 
 ## 1. Structural Audit & Vulnerability Analysis
 
@@ -38,12 +38,12 @@ Rewrite: [problem-statement.v2.md](problem-statement.v2.md)
 | **Overall** | **4.25/10** | |
 
 ## 3. Optimized Refusal & Boundary Protocol
-See the "Refusals" section of [problem-statement.v2.md](problem-statement.v2.md).
+See the "Refusals" section of `problem-statement.v2.md` (not kept in this repository).
 
 ## 4. Optimized Prompt (Version 2.0)
-[problem-statement.v2.md](problem-statement.v2.md)
+`problem-statement.v2.md` (not kept in this repository)
 
-## 5. Patch cycle: V2.0 -> V2.1 ([problem-statement.v2.1.md](problem-statement.v2.1.md))
+## 5. Patch cycle: V2.0 -> V2.1 (`problem-statement.v2.1.md` (not kept in this repository))
 
 Residual gaps found in V2.0 and the patch that closes each:
 | Gap in V2.0 | Patch in V2.1 |
@@ -65,7 +65,7 @@ Score V2.1: Role 9, Unambiguity 9, Constraints 9.5, Token efficiency 8; overall 
 - The 5-hour estimate is unmeasured.
 - Prompt is long (token cost) because it doubles as a spec.
 
-## 6. Re-evaluation of V2.1 and patch to V2.2 ([problem-statement.v2.2.md](problem-statement.v2.2.md))
+## 6. Re-evaluation of V2.1 and patch to V2.2 (`problem-statement.v2.2.md` (not kept in this repository))
 
 V2.1 re-scored 8.4/10 (Role 9, Unambiguity 8, Constraints 8.5, Token efficiency 8); the earlier 9.1 missed gap 1.
 

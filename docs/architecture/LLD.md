@@ -288,9 +288,9 @@ sequenceDiagram
   participant L as LLM
   participant R as Redis
   C->>G: POST /chat (Basic auth)
-  G->>G: username → tenant (USER_TENANTS); ascrub(message) [scrub point 1]
+  G->>G: username → tenant (USER_TENANTS), then ascrub(message) [scrub point 1]
   G->>K: Envelope{text scrubbed, tenant_id}
-  W->>K: poll; dedupe lease
+  W->>K: poll, then dedupe lease
   W->>Q: route → document_rag (an injection verdict wins)
   W->>W: tenant_id absent ⇒ intent becomes general (no search)
   opt prior turns
@@ -307,7 +307,7 @@ sequenceDiagram
     W->>L: <documents> (escaped) + question, system prompt constant
     loop each sentence
       W->>W: number check against raw sections [before scrub]
-      W->>W: ascrub(sentence) [scrub point 3]; ungrounded ⇒ dropped
+      W->>W: ascrub(sentence) [scrub point 3], ungrounded ⇒ dropped
       W->>R: XADD TokenEvent (retries now blocked)
     end
     W->>R: XADD caveat tokens if any were dropped
