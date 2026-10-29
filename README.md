@@ -40,6 +40,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   `en_core_web_lg` 3.8.0 (`chat_common.scrubber`; typed placeholders such as `<EMAIL_ADDRESS>`,
   `ascrub` runs off the event loop).
 - **Persistence:** redis-py 8.1.0 (`redis.asyncio`; `audit:events` stream via `chat_common.audit`).
+- **Audit export (profile `audit`):** `services/audit` (psycopg 3.3.6) reads `audit:events` through a Redis consumer group and inserts into the append-only `audit_log` table of `postgres:16.14` (`audit-db`) with the stream entry id as the idempotency key; it acknowledges only after the insert commits. The exporter's role can `SELECT` and `INSERT` only. Query it with SQL, for example `docker compose -f deploy/compose.yaml exec audit-db psql -U audit_admin -d audit -c "select ts, event, actor from audit_log where thread_id = '<id>' order by id"`; start it with `AUDIT_DB_PASSWORD=<pw> AUDIT_WRITER_PASSWORD=<pw> docker compose -f deploy/compose.yaml --profile audit up -d --build audit-db audit-exporter`.
 - **Observability (traces):** opentelemetry-sdk 1.45.1 + OTLP/gRPC exporter 1.45.1 →
   Jaeger v2 (`chat_common.tracing`; gateway auto-instrumented by
   opentelemetry-instrumentation-fastapi 0.66b1; trace context crosses Kafka as the W3C `traceparent`

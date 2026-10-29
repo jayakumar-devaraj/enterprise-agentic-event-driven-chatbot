@@ -8,19 +8,21 @@ dependencies = [
     "gateway",
     "worker",
     "seed",
+    "audit",
 ]
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["packages/common", "services/gateway", "services/worker", "services/seed"]
+members = ["packages/common", "services/gateway", "services/worker", "services/seed", "services/audit"]
 
 [tool.uv.sources]
 chat-common = { workspace = true }
 gateway = { workspace = true }
 worker = { workspace = true }
 seed = { workspace = true }
+audit = { workspace = true }
 
 [dependency-groups]
 dev = [

@@ -70,7 +70,7 @@ def block(f: dict[str, object]) -> str:
     return (
         f"{START}\n"
         f"- **Tests collected:** {f['unit_tests']} unit, {f['integration_tests']} integration "
-        f"(real Kafka, Redis, Qdrant), {f['durability_tests']} durability, "
+        f"(real Kafka, Redis, Qdrant, Postgres), {f['durability_tests']} durability, "
         f"{f['frontend_tests']} frontend.\n"
         f"- **Coverage:** {cov['percent']} % of {cov['statements']} statements. "
         f'Report header: "{source}".\n'

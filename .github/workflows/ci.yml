@@ -43,8 +43,11 @@ jobs:
         run: uv sync --locked
       - name: Start infrastructure
         run: |
-          docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
+          docker compose -f deploy/compose.yaml --profile audit up -d --wait kafka redis qdrant jaeger audit-db
           docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
+        env:
+          AUDIT_DB_PASSWORD: ci-admin-password
+          AUDIT_WRITER_PASSWORD: ci-writer-password
       - name: Seed Qdrant
         env:
           QDRANT_URL: http://127.0.0.1:16333
@@ -53,6 +56,8 @@ jobs:
         run: uv run pytest -m integration -v --cov=chat_common --cov=gateway --cov=worker --cov=seed
         env:
           COVERAGE_FILE: .coverage.integration
+          IT_AUDIT_WRITER_URL: postgresql://audit_writer:ci-writer-password@127.0.0.1:15432/audit
+          IT_AUDIT_ADMIN_URL: postgresql://audit_admin:ci-admin-password@127.0.0.1:15432/audit
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage-integration
