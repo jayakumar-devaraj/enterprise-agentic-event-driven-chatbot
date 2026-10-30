@@ -1,6 +1,6 @@
 {
   "unit_tests": 213,
-  "integration_tests": 56,
+  "integration_tests": 57,
   "durability_tests": 8,
   "frontend_tests": 11,
   "coverage": {

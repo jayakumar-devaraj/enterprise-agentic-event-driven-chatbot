@@ -162,6 +162,36 @@ async def test_expired_stream_of_a_finished_message_ends_at_once_with_stream_exp
     assert event["id"] is None  # synthetic: there is no Redis entry to resume from
 
 
+async def test_a_message_that_finishes_while_the_stream_is_opened_is_not_reported_expired(
+    monkeypatch,
+) -> None:
+    """The stream is missing when the GET arrives, then the worker writes it and marks the message
+    `done` before the gateway reads the marker. The reply exists, so it must be streamed (seen as
+    `stream_expired` in the 2026-10-30 latency runs)."""
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread, mid = f"a3r-{uuid.uuid4().hex[:8]}", uuid.uuid4()
+    await redis.set(auth.owner_key(thread), "alice", ex=600)
+    await redis.set(f"delivered:{mid}", "x", ex=600)
+    key = f"tokens:{thread}:{mid}"
+    original = aioredis.Redis.exists
+
+    async def exists_then_the_worker_finishes(self, *names):
+        found = await original(self, *names)
+        if key in names and not found and not await redis.get(f"dedupe:{mid}"):
+            lease = Lease(f"dedupe:{mid}")
+            await redis.set(lease.key, lease.token, ex=600)
+            writer = StreamWriter(redis, thread, mid, lease=lease, maxlen=100, ttl_s=600)
+            await writer.token("hello")
+            await writer.done()
+            await lease.done(redis, 600)
+        return found
+
+    monkeypatch.setattr(aioredis.Redis, "exists", exists_then_the_worker_finishes)
+    r = await _get(thread, mid)
+    await redis.aclose()
+    assert [e["event"] for e in parse_sse(r.text)] == ["token", "done"]
+
+
 async def test_stream_of_an_unknown_message_is_404() -> None:
     """Never accepted (no `delivered:` marker) and no stream: 404 before any event."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
