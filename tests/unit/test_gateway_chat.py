@@ -259,3 +259,29 @@ async def test_audit_failure_after_delivery_is_retried_not_skipped(h) -> None:
     harness.redis.xadd = real_xadd
     assert (await client.post("/chat", json=b, auth=ALICE)).status_code == 202
     assert [r[1]["event"] for r in harness.redis.streams["audit:events"]] == ["chat_accepted"]
+
+
+def _count_scrypt(monkeypatch) -> list[tuple]:
+    """Record every full scrypt check made through auth.verify."""
+    calls: list[tuple] = []
+    real = auth.verify
+    monkeypatch.setattr(auth, "verify", lambda *a: calls.append(a) or real(*a))
+    return calls
+
+
+def test_verified_credentials_cost_one_scrypt_per_process(monkeypatch) -> None:
+    """Each POST /chat and GET /stream authenticates; scrypt again for a known pair is waste."""
+    calls = _count_scrypt(monkeypatch)
+    check = auth.Verifier(USERS)
+    assert [check("alice", "alice-pw") for _ in range(3)] == [True, True, True]
+    assert len(calls) == 1
+
+
+def test_failed_credentials_are_never_cached(monkeypatch) -> None:
+    """A guess always pays the full scrypt cost, even for a user whose password is cached."""
+    calls = _count_scrypt(monkeypatch)
+    check = auth.Verifier(USERS)
+    assert [check("alice", "wrong") for _ in range(3)] == [False, False, False]
+    assert check("alice", "alice-pw") and not check("alice", "alice-pw-2")
+    assert not check("mallory", "alice-pw") and not check("bob", "alice-pw")
+    assert len(calls) == 7

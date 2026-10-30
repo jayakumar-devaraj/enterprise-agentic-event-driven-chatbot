@@ -32,7 +32,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   uvloop on Linux) — `uvicorn gateway.app:create_app --factory`; `POST /chat`, `GET /stream/{thread_id}/{message_id}` (SSE via `fastapi.sse.EventSourceResponse`,
   `Last-Event-ID` resume), `POST /approve/{thread_id}/{message_id}` (human approval of a paused refund,
   LangGraph `interrupt()` / `Command(resume=...)`), `GET /healthz` (liveness), `GET /readyz` (Redis + Kafka readiness).
-- **Security (access control):** HTTP Basic against `AUTH_USERS` (stdlib scrypt; generate entries with
+- **Security (access control):** HTTP Basic against `AUTH_USERS` (stdlib scrypt, run once per accepted pair per process; generate entries with
   `uv run python -m gateway.auth <user> <password>`), thread ownership bound in Redis (401/403).
 - **Validation:** pydantic 2.14.1 (wire contracts in `chat_common.schemas`, strict, extra fields
   rejected), pydantic-settings 2.16.0 (`chat_common.settings`; startup fails on an unsafe dedupe lease).

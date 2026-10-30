@@ -57,6 +57,31 @@ def verify(users: dict[str, str], username: str, password: str) -> bool:
     return hmac.compare_digest(candidate, base64.b64decode(hash_b64)) and username in users
 
 
+class Verifier:
+    """`verify` that remembers pairs it has already accepted, for the life of the process.
+
+    AUTH_USERS is read once at startup, so an accepted pair stays valid until restart. Entries are
+    keyed by an HMAC under a per-process random key, never the password. Failures are never cached,
+    so every wrong guess still pays the full scrypt cost.
+    """
+
+    def __init__(self, users: dict[str, str]) -> None:
+        """Bind to the startup user table."""
+        self._users = users
+        self._key = secrets.token_bytes(32)
+        self._accepted: set[tuple[str, bytes]] = set()
+
+    def __call__(self, username: str, password: str) -> bool:
+        """True when the pair is valid; scrypt runs only for a pair not accepted before."""
+        tag = (username, hmac.digest(self._key, password.encode(), "sha256"))
+        if tag in self._accepted:
+            return True
+        ok = verify(self._users, username, password)
+        if ok:
+            self._accepted.add(tag)
+        return ok
+
+
 if __name__ == "__main__":
     # Usage: python -m gateway.auth <username> <password>  → prints an AUTH_USERS entry.
     print(f"{sys.argv[1]}:{hash_password(sys.argv[2])}")
