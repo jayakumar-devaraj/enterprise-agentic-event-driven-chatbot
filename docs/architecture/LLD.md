@@ -17,7 +17,7 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `gateway.auth` | HTTP Basic verification (scrypt via `asyncio.to_thread`, accepted pairs cached per process by `Verifier`), thread ownership, `USER_TENANTS` parsing |
 | `gateway.producer` | confluent-kafka asyncio producer wrapper |
 | `gateway.sse` | Redis stream → SSE relay |
-| `worker.consumer` | Poll loop, dedupe lease, retries, DLQ, commit |
+| `worker.consumer` | Poll loop with per-thread lanes (up to `WORKER_CONCURRENCY` in flight), dedupe lease, retries, DLQ, commit below the oldest record in flight (ADR 0012) |
 | `worker.graph` | LangGraph `StateGraph` definition and the processor (replay idempotency, approval resume) |
 | `worker.streams` | Per-message Redis Stream writer |
 | `worker.embedding` | fastembed bge-small query/passage embeddings |

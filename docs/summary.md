@@ -14,7 +14,7 @@ request is traceable end to end, and key actions are written to an audit log.
 when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
-- **Tests collected:** 208 unit, 57 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 11 frontend.
+- **Tests collected:** 213 unit, 57 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 11 frontend.
 - **Coverage:** 89 % of 1606 statements. Report header: "Coverage at efe4fea from CI run 40929094525 (unit + integration; scale, llm, durability and stack tests need special stacks)".
 <!-- figures:end -->
 
@@ -28,7 +28,7 @@ live worker container under load. The measured results below come from pre-regis
 | Safety, off-topic questions wrongly refused | 4 of 10 | ≤ 1 | Fail |
 | PII, structured identifiers redacted | 10/14 = 0.71 | ≥ 0.90 | Fail |
 | PII, locations redacted | 16/30 = 0.53 | ≥ 0.80 | Fail |
-| Latency, mock engine, 200 turns, credential cache (2026-10-29) | `POST /chat` p95 0.8 s; completion p95 2.2 s; first reply word p95 2.2 s; queue delay p95 2.0 s; 14.6 turns/s | first word ≤ 2 s, queue ≤ 0.5 s | Fail |
+| Latency, mock engine, 200 turns, worker concurrency (2026-10-30, two runs) | `POST /chat` p95 0.6–0.8 s; first reply word p95 1.2–1.3 s; completion p95 1.2–1.4 s; queue delay p95 0.77–0.81 s; 20.5–22.7 turns/s | queue ≤ 0.5 s | Fail |
 | Latency, real model, 20 turns | accept request p95 0.7 s passes; full reply p95 63 s | ≤ 60 s | Fail (confounded run) |
 | Reply quality, real model, 20 questions | mean 3.4 of 5; 16/20 without invented specifics | ≥ 3.5; ≥ 18/20 | Fail (scored by the build agent, not independent) |
 
@@ -40,10 +40,10 @@ single web server. Data survives restarts; a whole-machine crash can lose up to 
 state (ADR 0008).
 
 **Remaining work, in priority order.**
-1. Latency: `POST /chat` (p95 0.8 s) and completion (p95 2.2 s) now pass; first reply word (p95 2.2 s)
-   and queue delay (p95 2.0 s) fail. Idle embedding threads (queue delay 5.7 s → 0.2 s) and a scrypt per
-   request at the gateways (`latency-2026-10-29-gateway-auth-cache.md`) are fixed; each worker now
-   handles one record at a time and uses about one of its two CPUs.
+1. Latency: on the mock engine only queue delay still fails (p95 0.77–0.81 s against 0.5 s). Workers
+   now run 4 records at once, one per thread (ADR 0012): against a model that takes about 1.8 s per reply,
+   throughput rose about 4× (`latency-2026-10-30-worker-concurrency.md`). Not yet measured with a real
+   model server.
 2. Tenant security: end users still use HTTP Basic, and static tokens remain the default for calls to
    the document service. ADR 0011 (accepted) moves tenant authentication to short-lived signed
    tokens and the audit trail to a durable store. Built: the document service validates signed

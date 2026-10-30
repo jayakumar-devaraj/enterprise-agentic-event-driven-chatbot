@@ -143,7 +143,8 @@ flowchart TB
 
 - Gateway: stateless; scale replicas freely behind any L7 balancer. Any replica can serve any stream
   because streams live in Redis.
-- Worker: one consumer group; effective parallelism = `KAFKA_PARTITIONS`; replicas above that idle.
+- Worker: one consumer group; replicas above `KAFKA_PARTITIONS` idle. Each replica runs up to
+  `WORKER_CONCURRENCY` records at once, one per thread at a time (ADR 0012).
   Per-thread order is preserved by keying on `thread_id`. Changing partition count remaps keys and is
   an ADR decision, never a runtime tweak.
 - Redis: single node now, AOF `everysec` on a named volume (ADR 0008); streams are bounded (`STREAM_MAXLEN`, `STREAM_TTL_S`), checkpoints expire

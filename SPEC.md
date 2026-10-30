@@ -64,6 +64,8 @@ Topics `chat-requests` (partitions = `KAFKA_PARTITIONS`, key = `thread_id`) and
 `chat-requests.dlq`. Per-thread order comes from the key; worker replicas ≤ `KAFKA_PARTITIONS`.
 Changing the partition count remaps keys and is an ADR decision, never a runtime tweak. Offsets are
 committed manually and only after the outcome is durable (stream event written, or DLQ written).
+A worker runs up to `WORKER_CONCURRENCY` records at once, never two of one `thread_id`, and commits a
+partition only below its oldest record still in flight (ADR 0012).
 
 ## 5 · Worker idempotency
 

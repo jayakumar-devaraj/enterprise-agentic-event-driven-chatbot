@@ -1,6 +1,6 @@
 """Runtime configuration from the environment; defaults mirror `.env.example`."""
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RAG_EXTRA_EVENTS = 22
@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     mock_llm: bool = True
     inference_timeout_s: float = 60
     max_retries: int = 2
+    worker_concurrency: int = Field(4, ge=1)  # records in flight per worker; one thread at a time
     retry_backoff_max_s: float = 4
 
     rag_base_url: str = "http://rag-api:8000"
