@@ -87,8 +87,10 @@ the refund apply each check the token in the same Lua script, and fail before wr
 lease still holds it. The DLQ produce is preceded by a lease check. A failed check stops the worker
 process without committing, so a worker that stalled past its lease cannot change the stream,
 lease or refund records of the attempt that took over. Checkpoint writes are preceded by a lease
-check, so such a worker cannot roll the thread's history back either. Checkpoint,
-`pending_approval:*` and audit writes are not fenced atomically (ADR 0009, Consequences).
+check, and a thread's state is read from the checkpoint named by `thread_head:{thread_id}`, which
+only a lease holder can move (fenced in the same Lua script). A checkpoint written by such a worker
+after its check passed is never read as the thread's history. `pending_approval:*` and audit writes
+are not fenced atomically (ADR 0009, Consequences).
 
 ## 6 · Token stream
 

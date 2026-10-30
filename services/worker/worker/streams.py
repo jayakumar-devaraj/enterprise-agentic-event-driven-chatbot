@@ -27,6 +27,21 @@ return id
 """
 )
 _RESET = FENCE + "redis.call('DEL', KEYS[1])"
+_HEAD = (
+    FENCE
+    + """
+if tonumber(ARGV[2]) > 0 then
+  redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+else
+  redis.call('SET', KEYS[1], ARGV[1])
+end
+"""
+)
+
+
+def head_key(thread_id: str) -> str:
+    """The id of the checkpoint that is the thread's current state (ADR 0009)."""
+    return f"thread_head:{thread_id}"
 
 
 class StreamWriter:
@@ -44,6 +59,7 @@ class StreamWriter:
     ) -> None:
         """Bind to `tokens:{thread_id}:{message_id}`; every write requires `lease` to be held."""
         self._redis = redis
+        self.thread_id = thread_id
         self.key = stream_key(thread_id, message_id)
         self.lease = lease
         self._maxlen = maxlen
@@ -54,6 +70,10 @@ class StreamWriter:
     async def check_lease(self) -> None:
         """LeaseLost unless this writer's lease is still held (for writes made outside it)."""
         await self.lease.check(self._redis)
+
+    async def advance_head(self, checkpoint_id: str, ttl_s: int) -> None:
+        """Make `checkpoint_id` the thread's current state, if the lease is still held."""
+        await self.lease.run(self._redis, _HEAD, [head_key(self.thread_id)], [checkpoint_id, ttl_s])
 
     @property
     def reply_started(self) -> bool:

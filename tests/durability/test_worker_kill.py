@@ -20,7 +20,7 @@ import pytest
 import redis.asyncio as aioredis
 from chat_common.schemas import TERMINAL_TYPES, Envelope
 from confluent_kafka import Producer
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+from worker.checkpoint import FencedRedisSaver
 from worker.graph import build_graph
 from worker.llm import MockEngine
 
@@ -129,7 +129,7 @@ async def _assert_each_processed_once(
         assert events[-1]["type"] == "done", events[-1]
         assert await redis.get(f"dedupe:{env.message_id}") == "done"
 
-    async with AsyncRedisSaver.from_conn_string(REDIS_URL) as saver:
+    async with FencedRedisSaver.from_conn_string(REDIS_URL) as saver:  # reads the head
         graph = build_graph(_Unused(), MockEngine(), _Unused.route, 256).compile(  # type: ignore[arg-type]
             checkpointer=saver
         )
