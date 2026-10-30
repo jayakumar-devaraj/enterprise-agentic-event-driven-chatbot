@@ -1,0 +1,134 @@
+# promtool test rules alerts_test.yml (CI job `alerts`).
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+
+tests:
+  - name: no worker up fires after 1m, and not while one is up
+    input_series:
+      - series: 'up{job="worker", instance="w1:9100"}'
+        values: "1 1 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: NoWorkerUp
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: NoWorkerUp
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: No worker is scraped as up; chat requests are not being consumed.
+
+  - name: lag must stay above 100 for 5m, and only the workers' group counts
+    input_series:
+      - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="0"}'
+        values: "60x4 120x10"
+      - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="1"}'
+        values: "60x14"
+      - series: 'kafka_consumergroup_lag{consumergroup="other", topic="chat-requests", partition="0"}'
+        values: "1000x14"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ConsumerLagHigh
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: ConsumerLagHigh
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "180 chat requests are waiting; workers are not keeping up."
+
+  - name: one dead-lettered record fires
+    input_series:
+      - series: 'kafka_topic_partition_current_offset{topic="chat-requests.dlq", partition="0"}'
+        values: "5x5 6x5"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RecordsDeadLettered
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: RecordsDeadLettered
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Records reached chat-requests.dlq in the last 10 minutes.
+
+  - name: 2% 5xx does not fire
+    input_series:
+      - series: 'chatbot_gateway_requests_total{method="POST", route="/chat", status="202"}'
+        values: "0+90x20"
+      - series: 'chatbot_gateway_requests_total{method="POST", route="/chat", status="503"}'
+        values: "0+10x20"
+      - series: 'chatbot_gateway_requests_total{method="GET", route="/healthz", status="200"}'
+        values: "0+400x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: GatewayErrorRateHigh
+        exp_alerts: []  # 10 of 500 per minute
+
+  - name: 10% 5xx sustained for 5m fires
+    input_series:
+      - series: 'chatbot_gateway_requests_total{method="POST", route="/chat", status="202"}'
+        values: "0+90x20"
+      - series: 'chatbot_gateway_requests_total{method="POST", route="/chat", status="503"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: GatewayErrorRateHigh
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: More than 5% of gateway requests end in a 5xx.
+
+  - name: POST /chat p95 above 1 s for 10m fires, and other routes do not count
+    input_series:
+      # Every request lands in (1, 2.5], so p95 is above 1 s.
+      - series: 'chatbot_gateway_request_seconds_bucket{method="POST", route="/chat", le="1"}'
+        values: "0x30"
+      - series: 'chatbot_gateway_request_seconds_bucket{method="POST", route="/chat", le="2.5"}'
+        values: "0+10x30"
+      - series: 'chatbot_gateway_request_seconds_bucket{method="POST", route="/chat", le="+Inf"}'
+        values: "0+10x30"
+      - series: 'chatbot_gateway_request_seconds_bucket{method="GET", route="/stream/{thread_id}/{message_id}", le="1"}'
+        values: "0+1000x30"
+      - series: 'chatbot_gateway_request_seconds_bucket{method="GET", route="/stream/{thread_id}/{message_id}", le="+Inf"}'
+        values: "0+1000x30"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ChatAcceptSlow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ChatAcceptSlow
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: POST /chat p95 is above the 1 s target.
+
+  - name: queue delay p95 at or under 500 ms does not fire
+    input_series:
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="0.25"}'
+        values: "0+100x30"
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="0.5"}'
+        values: "0+100x30"
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="+Inf"}'
+        values: "0+100x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: QueueDelayHigh
+        exp_alerts: []
+
+  - name: queue delay p95 above 500 ms for 10m fires
+    input_series:
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="0.5"}'
+        values: "0+50x30"
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="1"}'
+        values: "0+100x30"
+      - series: 'chatbot_worker_queue_delay_seconds_bucket{le="+Inf"}'
+        values: "0+100x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: QueueDelayHigh
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Queue delay p95 is above the 500 ms target.

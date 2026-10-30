@@ -46,6 +46,11 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   opentelemetry-instrumentation-fastapi 0.66b1; trace context crosses Kafka as the W3C `traceparent`
   in `Envelope.trace_id`); langfuse 5.0.2 sends one scrubbed `generation` per reply to LangFuse
   Cloud, linked by trace id (`worker.observability`, disabled when keys are absent).
+- **Observability (metrics, profile `ops`):** prometheus-client 0.26.0 on `METRICS_PORT` (9100, never
+  published) in the gateway (`gateway.metrics`, requests by route template and status) and the worker
+  (`worker.metrics`, outcomes, queue delay, in-flight records, retries); `prom/prometheus:v3.15.1` scrapes
+  them and `danielqsj/kafka-exporter:v1.11.0` (consumer lag, DLQ offsets) and evaluates
+  `deploy/prometheus/alerts.yml` (ADR 0013).
 - **Observability (logs):** stdlib `logging` with `chat_common.logjson.JsonFormatter` (one JSON object per
   line, `trace_id`/`thread_id` as keys).
 - **Orchestration:** langgraph 1.2.16 with langgraph-checkpoint-redis 0.5.2 (`AsyncRedisSaver`;
@@ -146,6 +151,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.
+- Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter prometheus`
+  → http://127.0.0.1:19090 (`/alerts` lists firing alerts; no Alertmanager is configured).
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):
   `MOCK_LLM=false docker compose -f deploy/compose.yaml --profile llm up -d --build --wait`.
 - Generate a user: `uv run python -m gateway.auth <user> <password>` → append to `AUTH_USERS`.
@@ -169,6 +176,7 @@ uv run pytest -m stack     # running stack: raw PII absent from logs, Kafka, DLQ
 uv run pytest -m rag       # document questions end to end: compose profile rag + Ollama (IT_RAG_URL, IT_RAG_TOKENS, IT_LLM_URL)
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
 docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
+docker run --rm -v "$PWD/deploy/prometheus":/etc/prometheus -w /etc/prometheus --entrypoint promtool prom/prometheus:v3.15.1 test rules alerts_test.yml
 ```
 
 Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
@@ -176,6 +184,6 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 ## Deployment / CI
 
 `.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), durability (Redis
-and Kafka restart/replacement/restore), and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
+and Kafka restart/replacement/restore), alert rule tests (`promtool`), and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
 (multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
 there is no registry push or production deployment target yet.

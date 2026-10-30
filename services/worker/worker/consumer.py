@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from redis.exceptions import RedisError
 
 from worker.lease import Lease, LeaseLost
+from worker.metrics import IN_FLIGHT, QUEUE_DELAY, RECORD_SECONDS, RECORDS, RETRIES
 from worker.streams import StreamWriter
 
 log = logging.getLogger("worker.consumer")
@@ -152,7 +153,8 @@ class Worker:
                 await asyncio.wait([previous])
                 if previous.cancelled() or previous.exception() is not None:
                     return
-            await self.handle(msg)
+            with IN_FLIGHT.track_inprogress(), RECORD_SECONDS.time():
+                await self.handle(msg)
         finally:
             slots.release()
             if self._lanes.get(msg.key()) is asyncio.current_task():
@@ -222,6 +224,7 @@ class Worker:
             )
             log.warning("malformed envelope to DLQ", extra={"error": problems[:500]})
             await self._to_dlq(msg, "malformed", problems[:2000], None)
+            RECORDS.labels("dlq_malformed").inc()
             await self._commit(msg)
             return
 
@@ -233,8 +236,10 @@ class Worker:
         lease = await self._acquire_lease(env)
         if lease is None:
             log.info("duplicate delivery skipped", extra=ctx)
+            RECORDS.labels("duplicate").inc()
             await self._commit(msg)
             return
+        QUEUE_DELAY.observe((datetime.now(UTC) - env.ts).total_seconds())
 
         writer = StreamWriter(
             self._redis,
@@ -253,8 +258,10 @@ class Worker:
                 await lease.check(self._redis)
                 await self._to_dlq(msg, "dependency_unavailable", "recovered after restart", env)
                 await lease.release(self._redis)
+                RECORDS.labels("dlq_dependency").inc()
             else:
                 await lease.done(self._redis, self._s.dedupe_ttl_s)
+                RECORDS.labels("done").inc()
             await self._commit(msg)
             return
         await writer.reset()  # partial attempt: the retry restarts the stream at seq 0 (SPEC §6)
@@ -265,6 +272,7 @@ class Worker:
             except RedisError:
                 # The DoneEvent is already durable; the lease simply expires.
                 log.error("could not mark message done", extra=ctx)
+            RECORDS.labels("done").inc()
             await self._commit(msg)
             return
 
@@ -278,6 +286,7 @@ class Worker:
             await lease.release(self._redis)
         except RedisError:
             log.error("could not release dedupe lease; it will expire", extra=ctx)
+        RECORDS.labels("dlq_dependency").inc()
         await self._commit(msg)
 
     async def _run_with_retries(
@@ -299,5 +308,6 @@ class Worker:
                 log.warning("transient failure", extra={**ctx, "attempt": attempt, "error": last})
                 if writer.reply_started or attempt == self._s.max_retries:
                     break
+                RETRIES.inc()
                 await asyncio.sleep(min(0.5 * 2**attempt, self._s.retry_backoff_max_s))
         return last

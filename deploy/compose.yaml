@@ -314,7 +314,37 @@ services:
     mem_limit: 512m
     restart: unless-stopped
 
+  # Metrics and alerts (profile `ops`): Prometheus scrapes the gateway and worker on their unpublished
+  # port 9100 and the lag exporter; rules in prometheus/alerts.yml. No Alertmanager: where alerts go
+  # is a deployment decision, so firing alerts show at http://127.0.0.1:19090/alerts.
+  kafka-exporter:
+    profiles: ["ops"]
+    image: danielqsj/kafka-exporter:v1.11.0
+    # Only the chat topics and the workers' group: walking __consumer_offsets made scrapes time out.
+    command:
+      - --kafka.server=kafka:9092
+      - --kafka.version=3.9.0
+      - --topic.filter=^chat-requests
+      - --group.filter=^chat-workers$
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    mem_limit: 128m
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["ops"]
+    image: prom/prometheus:v3.15.1
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_HOST_PORT:-19090}:9090"
+    mem_limit: 512m
+    restart: unless-stopped
+
 volumes:
+  prometheus-data:
   redis-data:
   kafka-data:
   rag-db-data:

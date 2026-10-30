@@ -89,6 +89,7 @@ flowchart TB
 | React chat window | Vite + React + TypeScript SPA: sends turns, renders tokens incrementally, shows error and approval-required states, approve/reject buttons | Credentials and thread id in memory only |
 | Ollama | Local CPU inference (`llama3.2:1b`); vLLM on GPU is the documented production path behind the same URL | Model cache |
 | Jaeger v2 / LangFuse | Infra traces / LLM-level traces | External to the request path |
+| Prometheus + kafka-exporter (profile `ops`) | Gateway and worker metrics, consumer lag, alert rules (ADR 0013) | Scrapes an unpublished port; no Alertmanager |
 
 ## 4 · Key trade-offs
 
