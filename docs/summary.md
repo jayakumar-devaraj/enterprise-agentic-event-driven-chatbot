@@ -28,7 +28,7 @@ live worker container under load. The measured results below come from pre-regis
 | Safety, off-topic questions wrongly refused | 4 of 10 | ≤ 1 | Fail |
 | PII, structured identifiers redacted | 10/14 = 0.71 | ≥ 0.90 | Fail |
 | PII, locations redacted | 16/30 = 0.53 | ≥ 0.80 | Fail |
-| Latency, mock engine, 200 turns, after the producer fix | first reply word p95 15.4 s; 0 errors; 3.5 turns/s | p95 ≤ 2 s | Fail |
+| Latency, mock engine, 200 turns, one-thread embedder (2026-10-29) | first reply word p95 4.3 s; queue delay p95 0.2 s; 0 errors; 8.2 turns/s | p95 ≤ 2 s | Fail |
 | Latency, real model, 20 turns | accept request p95 0.7 s passes; full reply p95 63 s | ≤ 60 s | Fail (confounded run) |
 | Reply quality, real model, 20 questions | mean 3.4 of 5; 16/20 without invented specifics | ≥ 3.5; ≥ 18/20 | Fail (scored by the build agent, not independent) |
 
@@ -40,8 +40,9 @@ single web server. Data survives restarts; a whole-machine crash can lose up to 
 state (ADR 0008).
 
 **Remaining work, in priority order.**
-1. Latency: every latency target still fails after the producer fix. The cause is queueing inside the
-   workers (queue delay p95 8.8 s with the gateway answering in 181 ms); it is not yet explained.
+1. Latency: every latency target except queue delay still fails. The worker queue was CPU taken by
+   idle embedding threads and is fixed (queue delay p95 5.7 s → 0.2 s); the gateways are now the
+   limit (`POST /chat` p50 1.6 s), for a reason not yet measured.
 2. Tenant security: end users still use HTTP Basic, and static tokens remain the default for calls to
    the document service. ADR 0011 (accepted) moves tenant authentication to short-lived signed
    tokens and the audit trail to a durable store. Built: the document service validates signed
