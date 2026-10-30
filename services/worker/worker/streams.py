@@ -51,6 +51,10 @@ class StreamWriter:
         self.seq = 0
         self._statuses = 0
 
+    async def check_lease(self) -> None:
+        """LeaseLost unless this writer's lease is still held (for writes made outside it)."""
+        await self.lease.check(self._redis)
+
     @property
     def reply_started(self) -> bool:
         """True once anything but a status note was written: a retry would then repeat output."""

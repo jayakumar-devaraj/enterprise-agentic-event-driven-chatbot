@@ -35,6 +35,15 @@ offset commit, because the consumer-group generation fences it. Redis writes had
   is preceded by a lease check. The others follow fenced token writes in the same node, so a stale
   worker reaches them only if it stalls for a full lease between two adjacent awaits. They can then
   duplicate an audit entry or `pending_approval:*`, or replace a checkpoint.
+- **Addendum 2026-10-29: checkpoint writes are lease-checked.** The paragraph above was wrong for
+  checkpoints. The graph writes one after its input and one after routing, before any token, so a
+  worker that loaded the thread and then stalled in routing wrote a checkpoint built on that stale
+  history once it resumed. It became the thread's latest and dropped the turns the new owner had
+  answered meanwhile (the CI rebalance test on `65894ba` lost one turn; on real Redis,
+  `test_stale_worker_cannot_roll_back_history_after_another_took_over` lost four). The worker's saver
+  (`worker.checkpoint.FencedRedisSaver`) now checks the lease before every checkpoint and
+  pending-writes write and raises `LeaseLost`. The check is not atomic with the saver's write, so a
+  stall of a full lease between the two still rolls history back.
 - `LeaseLost` restarts the worker process. This is acceptable because a lease is lost only after a
   stall longer than `DEDUPE_LEASE_S`.
 - Every fenced script names the lease key with the keys it writes. A move to Redis Cluster would
