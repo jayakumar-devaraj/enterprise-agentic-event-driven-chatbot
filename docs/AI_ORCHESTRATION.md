@@ -83,6 +83,7 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Generate summary figures from the repo and produce CI coverage | files changed (by path): docs 3, other 3, tests 1 | docs/figures-and-summary | #77 | 9c652407 |
 | Authenticate to the RAG service with per-tenant OAuth client credentials | files changed (by path): code 4, docs 4, other 3, tests 1 | feat/rag-client-credentials | #78 | 9c652407 |
 | Export the Redis audit stream to an append-only Postgres table | files changed (by path): code 5, docs 4, other 8, tests 2 | feat/audit-exporter | #80 | 9c652407 |
+| Check the dedupe lease before every checkpoint write (stale worker rolled back history) | files changed (by path): code 3, docs 5, tests 1 | fix/fence-history-turns | #84 | b045e33f |
 
 
 
