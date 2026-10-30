@@ -233,6 +233,8 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         Returns the stream key and whether the stream expired: the message finished (dedupe
         `done`) but its stream is gone. With no stream and no `delivered:` marker the message was
         never accepted (404). Otherwise a missing stream is still to come (queued or running).
+        The stream is checked again after `done` is seen: the worker writes it before marking the
+        message `done`, so it may have appeared since the first check.
         """
         await require_owner(deps, thread_id, user)
         key = stream_key(thread_id, message_id)
@@ -240,7 +242,8 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
             return key, False
         if await deps.redis.get(f"delivered:{message_id}") is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown message")
-        return key, await deps.redis.get(f"dedupe:{message_id}") == "done"
+        done = await deps.redis.get(f"dedupe:{message_id}") == "done"
+        return key, done and not await deps.redis.exists(key)
 
     @app.get("/stream/{thread_id}/{message_id}", response_class=EventSourceResponse)
     async def stream(
