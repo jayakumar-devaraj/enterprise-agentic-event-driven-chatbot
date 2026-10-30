@@ -89,6 +89,9 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Run scrypt once per accepted credential pair per gateway process | files changed (by path): code 2, docs 6, other 3, tests 1 | perf/gateway-auth-cache | #87 | b045e33f |
 | Stop durability tests from rerunning the seed under live workers | files changed (by path): docs 1, tests 1 | fix/durability-no-reseed | #88 | b045e33f |
 | Read a thread's state from a head checkpoint only a lease holder can move | files changed (by path): code 2, docs 5, other 1, tests 2 | fix/checkpoint-head | #89 | b045e33f |
+| Log PRs #85-#89 in the orchestration record | files changed (by path): docs 1 | docs/orchestration-86-89 | #90 | b045e33f |
+| Recheck the stream before reporting a finished reply as expired | files changed (by path): code 1, docs 2, other 1, tests 1 | fix/stream-expired-race | #91 | b045e33f |
+| Run several records per worker, one per thread, committing below the oldest in flight | files changed (by path): code 2, docs 7, other 10, tests 2 | perf/worker-concurrency | #92 | b045e33f |
 
 
 
@@ -186,5 +189,5 @@ Rows for these PRs are in the table above; titles and file-type counts come from
   security path, and answer quality. Each pre-registered its targets before running.
 - **RAG integration (#73):** document questions via the separate RAG service (ADR 0010).
 - **Cross-service decisions (#74, #75):** ADR 0011, round 1 then round 2.
-- **Enterprise audit follow-ups (#84–#89):** history fencing and the head pointer that closes its race (#84, #89), the durability test seed fix (#88), and two latency fixes measured before and after (#86, #87).
+- **Enterprise audit follow-ups (#84–#92):** history fencing and the head pointer that closes its race (#84, #89), the durability test seed fix (#88), and two latency fixes measured before and after (#86, #87), a gateway race that reported finished replies as expired (#91), and several records in flight per worker (#92, ADR 0012).
 - **Not recorded:** the creating session of #69 and #73, and of #17, #19, #20 (see the table).
