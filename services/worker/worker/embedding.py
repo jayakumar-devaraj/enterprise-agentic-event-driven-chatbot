@@ -17,8 +17,13 @@ class Embedder:
     """Loads the model once; embedding is CPU-bound, so async callers use `aembed_query`."""
 
     def __init__(self, model_name: str, cache_dir: str | None = None) -> None:
-        """Fail loudly if the model is absent and the hub is offline (HF_HUB_OFFLINE=1)."""
-        self._model = TextEmbedding(model_name=model_name, cache_dir=cache_dir)
+        """Fail loudly if the model is absent and the hub is offline (HF_HUB_OFFLINE=1).
+
+        One ONNX Runtime thread: by default it starts one per host core (not per container CPU), and
+        the idle ones spin, taking CPU from the scrubber and the event loop. Throughput comes from
+        replicas, not from splitting one short query embedding across threads.
+        """
+        self._model = TextEmbedding(model_name=model_name, cache_dir=cache_dir, threads=1)
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
         """Embed exemplar texts (no prefix), L2-normalised by the model."""

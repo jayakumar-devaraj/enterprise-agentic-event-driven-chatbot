@@ -50,6 +50,11 @@ class Deps:
     scrub: Callable[[str], Awaitable[str]]
     users: dict[str, str]
     tenants: dict[str, str] = field(default_factory=dict)  # username → document tenant (SPEC §3)
+    verify: auth.Verifier = field(init=False)
+
+    def __post_init__(self) -> None:
+        """One credential cache per process, over the startup user table."""
+        self.verify = auth.Verifier(self.users)
 
     @property
     def audit(self) -> AuditLog:
@@ -75,10 +80,8 @@ async def current_user(
     creds: Annotated[HTTPBasicCredentials | None, Depends(_basic)],
     deps: Annotated[Deps, Depends(_deps)],
 ) -> str:
-    """401 unless the Basic credentials match AUTH_USERS; scrypt (~150 ms) runs off the loop."""
-    if creds is None or not await asyncio.to_thread(
-        auth.verify, deps.users, creds.username, creds.password
-    ):
+    """401 unless the Basic credentials match AUTH_USERS; scrypt runs off the loop, once a pair."""
+    if creds is None or not await asyncio.to_thread(deps.verify, creds.username, creds.password):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "invalid credentials", {"WWW-Authenticate": "Basic"}
         )

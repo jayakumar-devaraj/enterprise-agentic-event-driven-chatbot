@@ -29,3 +29,12 @@ not count.
 - Embedding-based injection detection is heuristic; structural separation is the primary defence.
 - Basic credentials are protected on the wire only through the Caddy TLS entry point (:8443); the
   direct dev ports are plain HTTP (documented in known limitations).
+- **Addendum 2026-10-29: accepted credentials are cached per process.** scrypt ran on every
+  `POST /chat` and `GET /stream`, and was half of gateway CPU under load
+  (`docs/reports/latency-2026-10-29-gateway-auth-cache.md`). `gateway.auth.Verifier` remembers a
+  pair it has accepted, keyed by HMAC-SHA256 under a random per-process key, until the process
+  exits; `AUTH_USERS` is read only at startup, so a changed password already needs a restart.
+  Failures are never cached, so a guess still costs a full scrypt. Residual: a memory dump of a
+  gateway holds the key with the tags, so guesses against a dumped tag cost an HMAC, not a scrypt;
+  the same dump also holds Basic headers of requests in flight. Rejected: a TTL cache (it
+  would add a clock to reason about without changing what a restart already guarantees).
