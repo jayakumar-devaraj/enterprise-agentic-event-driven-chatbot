@@ -172,6 +172,7 @@ the checkpoint: `answered == message_id` ⇒ re-send that reply; paused on this 
 | `refunds` | Stream | worker | none | The side effect being gated |
 | `audit:events` | Stream | gateway, worker | `MAXLEN ~ 100000` | Durable, queryable runtime audit trail |
 | checkpointer keys | JSON (library-managed) | worker | `CHECKPOINT_TTL_MIN` | Conversation memory per `thread_id` |
+| `thread_head:{thread_id}` | String (checkpoint id) | worker | `CHECKPOINT_TTL_MIN`, refreshed on read | The checkpoint read as the thread's state; moved only under a held lease, in the same script as the token check (ADR 0009) |
 
 ## 7 · Kafka
 

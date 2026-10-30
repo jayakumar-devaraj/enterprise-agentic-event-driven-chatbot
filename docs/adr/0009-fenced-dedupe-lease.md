@@ -44,6 +44,15 @@ offset commit, because the consumer-group generation fences it. Redis writes had
   (`worker.checkpoint.FencedRedisSaver`) now checks the lease before every checkpoint and
   pending-writes write and raises `LeaseLost`. The check is not atomic with the saver's write, so a
   stall of a full lease between the two still rolls history back.
+- **Addendum 2026-10-30: a fenced head pointer decides the thread's history.** That residual was
+  hit: with the seed fix in place, CI on #88 lost turn 29 of a rebalance-test thread. The saver now
+  moves `thread_head:{thread_id}` to every checkpoint it writes under a held lease, in one Lua script
+  that checks the lease token, and returns the head checkpoint when a thread's current state is read
+  (no `checkpoint_id` named). A stale write can still land after its check passes, but it cannot
+  move the head (`LeaseLost`), so it stays an orphan checkpoint and the next turn builds on the head
+  (`test_stale_checkpoint_that_passed_the_lease_check_does_not_become_history`, real Redis; it fails
+  without the head). The head key has the checkpoints' TTL and is refreshed when read. A thread with
+  no head (written before this change, or its head expired) falls back to the newest checkpoint.
 - `LeaseLost` restarts the worker process. This is acceptable because a lease is lost only after a
   stall longer than `DEDUPE_LEASE_S`.
 - Every fenced script names the lease key with the keys it writes. A move to Redis Cluster would

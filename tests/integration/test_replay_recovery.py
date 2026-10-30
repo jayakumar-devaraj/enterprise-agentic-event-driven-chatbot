@@ -17,6 +17,7 @@ from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from conftest import REDIS_URL
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
 from worker.checkpoint import FencedRedisSaver
 from worker.consumer import Worker
@@ -314,6 +315,52 @@ async def test_stale_worker_cannot_roll_back_history_after_another_took_over(
     with pytest.raises(LeaseLost):
         await task_a
     assert await _turns(saver, graph, thread) == turns
+    assert consumer_a.commits == 0
+
+
+async def test_stale_checkpoint_that_passed_the_lease_check_does_not_become_history(
+    stack, monkeypatch
+) -> None:
+    """A passes the lease check, then stalls before the checkpoint write; B redoes M1, answers M2.
+
+    A's write still lands, built on the history A loaded. The check is not atomic with the write,
+    so only the fenced head pointer keeps that checkpoint out of the thread's history (CI on #88).
+    """
+    redis, worker_b, _, graph, saver = stack
+    consumer_a = Consumer()
+    worker_a = Worker(
+        SETTINGS, consumer=consumer_a, dlq_producer=NoDLQ(), redis=redis, process=worker_b._process
+    )
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    first, second, third = (
+        _chat(thread, t) for t in ("Why is my bill higher?", "And next month?", "Thanks")
+    )
+    stalled, resume = asyncio.Event(), asyncio.Event()
+    original = AsyncRedisSaver.aput
+
+    async def stall_first_write(self: AsyncRedisSaver, *args: Any, **kwargs: Any) -> Any:
+        if not stalled.is_set():
+            stalled.set()
+            await resume.wait()  # A's lease check already passed
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncRedisSaver, "aput", stall_first_write)
+    monkeypatch.setattr(SETTINGS, "inference_timeout_s", 30)
+    task_a = asyncio.create_task(worker_a.handle(Msg(first)))
+    await stalled.wait()
+    await asyncio.sleep(SETTINGS.dedupe_lease_s + 0.5)
+    await worker_b.handle(Msg(first))
+    await worker_b.handle(Msg(second))
+    turns = await _turns(saver, graph, thread)
+    assert len(turns) == 4
+
+    resume.set()
+    with pytest.raises(LeaseLost):
+        await task_a
+    assert await _turns(saver, graph, thread) == turns
+    await worker_b.handle(Msg(third))
+    users = [t["text"] for t in await _turns(saver, graph, thread) if t["role"] == "user"]
+    assert users == [first.text, second.text, third.text]
     assert consumer_a.commits == 0
 
 
