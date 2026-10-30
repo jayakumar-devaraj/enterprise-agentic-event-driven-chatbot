@@ -14,7 +14,7 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `chat_common.audit` | `audit:events` writer and reader |
 | `chat_common.tracing` | OpenTelemetry setup; W3C trace context carried in `Envelope.trace_id` (ADR 0003) |
 | `gateway.app` | FastAPI app, routes, exception → status mapping, owner binding, per-thread rate limit, idempotent enqueue |
-| `gateway.auth` | HTTP Basic verification (scrypt, called via `asyncio.to_thread`), thread ownership, `USER_TENANTS` parsing |
+| `gateway.auth` | HTTP Basic verification (scrypt via `asyncio.to_thread`, accepted pairs cached per process by `Verifier`), thread ownership, `USER_TENANTS` parsing |
 | `gateway.producer` | confluent-kafka asyncio producer wrapper |
 | `gateway.sse` | Redis stream → SSE relay |
 | `worker.consumer` | Poll loop, dedupe lease, retries, DLQ, commit |
