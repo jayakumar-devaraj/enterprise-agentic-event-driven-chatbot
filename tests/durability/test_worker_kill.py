@@ -152,7 +152,7 @@ async def test_a5_sigkill_during_processing_loses_and_duplicates_nothing(stack) 
             if await _terminal_count(redis, envelopes) < len(envelopes):
                 kills_with_work_pending += 1
             _compose("kill", "worker")
-            _compose("up", "-d", "--wait", "--no-build", "worker")
+            _compose("up", "-d", "--wait", "--no-build", "--no-deps", "worker")
         await _assert_each_processed_once(redis, threads, envelopes, PER_THREAD)
     finally:
         await redis.aclose()
@@ -165,11 +165,13 @@ async def test_rebalance_while_processing_loses_and_duplicates_nothing(stack) ->
     Each step rebalances the consumer group, so a partition's uncommitted records are redelivered
     to a new owner while the old one may still hold their dedupe lease (ADR 0009).
     """
+    # --no-deps on every `up` after the fixture: without it compose reruns the one-shot seed, which
+    # drops and recreates the Qdrant collections under live workers.
     steps = (
-        ("up", "-d", "--wait", "--no-build", "--scale", "worker=3", "worker"),
+        ("up", "-d", "--wait", "--no-build", "--no-deps", "--scale", "worker=3", "worker"),
         ("kill", "worker-2"),
-        ("up", "-d", "--wait", "--no-build", "--scale", "worker=2", "worker"),
-        ("up", "-d", "--wait", "--no-build", "--scale", "worker=1", "worker"),
+        ("up", "-d", "--wait", "--no-build", "--no-deps", "--scale", "worker=2", "worker"),
+        ("up", "-d", "--wait", "--no-build", "--no-deps", "--scale", "worker=1", "worker"),
     )
     threads, envelopes = _envelopes("rb", 2 * THREADS, PER_THREAD)
     # One batch before each step, cut in message order, so per-thread order is kept and every
