@@ -136,6 +136,12 @@ async def _assert_each_processed_once(
         for t in threads:
             snapshot = await graph.aget_state({"configurable": {"thread_id": t}})
             users = [x["text"] for x in snapshot.values["turns"] if x["role"] == "user"]
+            expected = [f"message {n} on {t}" for n in range(per_thread)]
+            if users != expected:
+                rows = await redis.lrange(f"diag:{t}", 0, -1)
+                print("DIAG " + t + chr(10) + chr(10).join(rows))
+            if users != expected and os.environ.get("DIAG_OUT"):
+                Path(os.environ["DIAG_OUT"]).write_text(chr(10).join(rows), encoding="utf-8")
             assert users == [f"message {n} on {t}" for n in range(per_thread)], t
             assert len(snapshot.values["turns"]) == 2 * per_thread, t
 

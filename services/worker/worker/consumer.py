@@ -17,6 +17,7 @@ from redis.exceptions import RedisError
 
 from worker.lease import Lease, LeaseLost
 from worker.metrics import IN_FLIGHT, QUEUE_DELAY, RECORD_SECONDS, RECORDS, RETRIES
+from worker.diag import diag
 from worker.streams import StreamWriter
 
 log = logging.getLogger("worker.consumer")
@@ -236,11 +237,13 @@ class Worker:
         lease = await self._acquire_lease(env)
         if lease is None:
             log.info("duplicate delivery skipped", extra=ctx)
+            await diag(self._redis, env.thread_id, "dup_skip", text=env.text)
             RECORDS.labels("duplicate").inc()
             await self._commit(msg)
             return
         QUEUE_DELAY.observe((datetime.now(UTC) - env.ts).total_seconds())
 
+        await diag(self._redis, env.thread_id, 'lease', text=env.text, token=lease.token[-6:])
         writer = StreamWriter(
             self._redis,
             env.thread_id,
@@ -254,6 +257,7 @@ class Worker:
             # An earlier attempt wrote its terminal event and died before recording the outcome:
             # keep the stream the client may be reading and finish the bookkeeping only.
             log.info("terminal event already streamed; recording outcome", extra=ctx)
+            await diag(self._redis, env.thread_id, "terminal_seen", text=env.text, last=last)
             if last.get("code") == "dependency_unavailable":
                 await lease.check(self._redis)
                 await self._to_dlq(msg, "dependency_unavailable", "recovered after restart", env)
@@ -266,6 +270,7 @@ class Worker:
             return
         await writer.reset()  # partial attempt: the retry restarts the stream at seq 0 (SPEC §6)
         error = await self._run_with_retries(env, writer, ctx)
+        await diag(self._redis, env.thread_id, 'ran', text=env.text, error=error)
         if error is None:
             try:
                 await lease.done(self._redis, self._s.dedupe_ttl_s)
@@ -306,6 +311,7 @@ class Worker:
             except (TransientDependencyError, RedisError, TimeoutError, ConnectionError) as exc:
                 last = f"{type(exc).__name__}: {exc}"
                 log.warning("transient failure", extra={**ctx, "attempt": attempt, "error": last})
+                await diag(self._redis, env.thread_id, "transient", text=env.text, attempt=attempt, error=last, started=writer.reply_started)
                 if writer.reply_started or attempt == self._s.max_retries:
                     break
                 RETRIES.inc()

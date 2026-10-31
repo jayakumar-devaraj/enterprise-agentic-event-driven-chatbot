@@ -7,3 +7,4 @@ services:
       MAX_RETRIES: "1"
       RETRY_BACKOFF_MAX_S: "1"
       DEDUPE_LEASE_S: "15"
+      WORKER_DIAG: "1"

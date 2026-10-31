@@ -47,6 +47,11 @@ class FencedRedisSaver(AsyncRedisSaver):
         writer = current_writer.get(None)
         if writer is not None and not saved["configurable"].get("checkpoint_ns"):
             await writer.advance_head(saved["configurable"]["checkpoint_id"], self._head_ttl_s())
+            from worker.diag import diag
+            meta = args[2] if len(args) > 2 else kwargs.get("metadata", {})
+            await diag(writer._redis, writer.thread_id, "head", mid=str(writer.message_id),
+                       cid=saved["configurable"]["checkpoint_id"], step=meta.get("step"),
+                       parent=(args[0] if args else kwargs.get("config"))["configurable"].get("checkpoint_id"))
         return saved
 
     async def aput_writes(self, *args: Any, **kwargs: Any) -> None:

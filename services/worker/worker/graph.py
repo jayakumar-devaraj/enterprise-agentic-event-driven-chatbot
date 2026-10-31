@@ -315,6 +315,11 @@ def make_processor(
         try:
             snapshot = await compiled.aget_state(config)
             values = snapshot.values
+            from worker.diag import diag
+            await diag(redis, env.thread_id, 'start', text=env.text, mid=mid,
+                       loaded=snapshot.config['configurable'].get('checkpoint_id'),
+                       answered=values.get('answered'), users=sum(1 for x in values.get('turns', []) if x['role'] == 'user'),
+                       next=list(snapshot.next))
             # Ownership is checked here too, not only at the gateway. A missing binding (Redis
             # restore, lost write) is restored to the user the history belongs to, or to this
             # envelope's user for a new thread, so a replay never leaves history unowned and an
