@@ -53,6 +53,15 @@ offset commit, because the consumer-group generation fences it. Redis writes had
   (`test_stale_checkpoint_that_passed_the_lease_check_does_not_become_history`, real Redis; it fails
   without the head). The head key has the checkpoints' TTL and is refreshed when read. A thread with
   no head (written before this change, or its head expired) falls back to the newest checkpoint.
+- **Addendum 2026-10-31: a replayed reply is checkpointed before `done`.** The head pointer did not
+  stop the losses: CI on #95 and on `8aa6657` each dropped one turn. Per-thread diagnostics on #96 showed
+  the cause. A worker died after the reply node's writes were saved but before the checkpoint that
+  applies them. The redelivery read the thread's state, which includes those pending writes, found the
+  reply already answered and re-sent it, so the message became `done` without that checkpoint. The next
+  turn's run starts from the checkpoint, not the pending writes, and dropped the reply. The replay path
+  now applies pending writes (`ainvoke(None)`) before re-sending
+  (`test_crash_between_the_reply_writes_and_their_checkpoint`, real Redis; it fails without the fix).
+  Several records in flight per worker (ADR 0012) widened the window; it existed before.
 - `LeaseLost` restarts the worker process. This is acceptable because a lease is lost only after a
   stall longer than `DEDUPE_LEASE_S`.
 - Every fenced script names the lease key with the keys it writes. A move to Redis Cluster would
