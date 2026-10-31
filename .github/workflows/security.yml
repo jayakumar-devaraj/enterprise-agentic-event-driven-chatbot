@@ -1,0 +1,50 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # New CVEs land against unchanged code; a weekly run surfaces them without a commit.
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    # A fixable HIGH or CRITICAL vulnerability in any service image fails the build.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [gateway, worker, seed, audit]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build
+        run: docker build -f services/${{ matrix.service }}/Dockerfile -t chatbot-${{ matrix.service }}:scan .
+      - name: Trivy
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.1 \
+            image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            chatbot-${{ matrix.service }}:scan
+
+  codeql:
+    # Findings appear under Security → Code scanning; the job fails only if analysis fails.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: github/codeql-action/init@v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@v4.39.1
+        with:
+          category: /language:${{ matrix.language }}

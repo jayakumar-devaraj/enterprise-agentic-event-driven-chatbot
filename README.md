@@ -187,3 +187,6 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 and Kafka restart/replacement/restore), alert rule tests (`promtool`), and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
 (multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
 there is no registry push or production deployment target yet.
+`.github/workflows/security.yml` builds each service image and fails on a fixable HIGH or CRITICAL
+vulnerability (Trivy), and runs CodeQL on Python and TypeScript, on every pull request, on `main` and weekly
+(ADR 0014).
