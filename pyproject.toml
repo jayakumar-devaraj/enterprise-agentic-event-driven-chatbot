@@ -13,6 +13,7 @@ dependencies = [
 
 [tool.uv]
 package = false
+required-version = ">=0.13.6"  # also the version CI's setup-uv installs
 
 [tool.uv.workspace]
 members = ["packages/common", "services/gateway", "services/worker", "services/seed", "services/audit"]

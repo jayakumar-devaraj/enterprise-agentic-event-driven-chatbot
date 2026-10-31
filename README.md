@@ -26,7 +26,7 @@ Contracts: `SPEC.md`. Summary for leadership: `docs/summary.md`. Known gaps:
 
 Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
 
-- **Language / tooling:** Python 3.13.13 (`.python-version`), uv workspace (`packages/common`,
+- **Language / tooling:** Python 3.13.18 (`.python-version`), uv 0.13.6 or later (`required-version`), uv workspace (`packages/common`,
   `services/{gateway,worker,seed}`), build backend `uv_build` 0.13.x.
 - **API:** FastAPI 0.143.3 on Starlette 1.8.0, served by uvicorn 0.54.0 (`[standard]`: httptools;
   uvloop on Linux) — `uvicorn gateway.app:create_app --factory`; `POST /chat`, `GET /stream/{thread_id}/{message_id}` (SSE via `fastapi.sse.EventSourceResponse`,
@@ -55,7 +55,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   line, `trace_id`/`thread_id` as keys).
 - **Orchestration:** langgraph 1.2.16 with langgraph-checkpoint-redis 0.5.2 (`AsyncRedisSaver`;
   checkpoint write/read on Redis 8 proven by spike a, ADR 0002).
-- **Embeddings / vector search:** fastembed 0.9.0 (ONNX Runtime 1.31.0, `BAAI/bge-small-en-v1.5`,
+- **Embeddings / vector search:** fastembed 0.9.1 (ONNX Runtime 1.31.0, `BAAI/bge-small-en-v1.5`,
   query instruction on messages only) and qdrant-client 1.19.1 (worker searches over gRPC with
   `prefer_grpc`; seed loads over REST). Thresholds from leave-one-out calibration (ADR 0004).
 - **Model providers:** openai 3.33.0 `AsyncOpenAI` against the OpenAI-compatible `LLM_BASE_URL`
@@ -97,7 +97,7 @@ Diagrams and failure modes: `docs/architecture/HLD.md`, `docs/architecture/LLD.m
 Prerequisites: Docker, uv, network access for first-time model downloads (spaCy, fastembed).
 
 ```bash
-uv sync                                                    # Python 3.13.13 + all packages
+uv sync                                                    # Python 3.13.18 + all packages
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
 QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main
