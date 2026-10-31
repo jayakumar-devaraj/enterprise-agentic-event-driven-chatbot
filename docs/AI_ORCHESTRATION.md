@@ -92,6 +92,12 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Log PRs #85-#89 in the orchestration record | files changed (by path): docs 1 | docs/orchestration-86-89 | #90 | b045e33f |
 | Recheck the stream before reporting a finished reply as expired | files changed (by path): code 1, docs 2, other 1, tests 1 | fix/stream-expired-race | #91 | b045e33f |
 | Run several records per worker, one per thread, committing below the oldest in flight | files changed (by path): code 2, docs 7, other 10, tests 2 | perf/worker-concurrency | #92 | b045e33f |
+| Log PRs #90-#92 in the orchestration record | files changed (by path): docs 1 | docs/orchestration-91-92 | #93 | b045e33f |
+| Expose Prometheus metrics from the gateway and worker and add alert rules | files changed (by path): code 6, docs 6, other 10, tests 1 | feat/prometheus-metrics | #94 | b045e33f |
+| Upgrade packages with fixable HIGH and CRITICAL vulnerabilities | files changed (by path): docs 1, other 2 | fix/trivy-findings | #95 | b045e33f |
+| Checkpoint a replayed reply before marking it done | files changed (by path): code 1, docs 3, other 1, tests 1 | fix/replay-pending-writes | #97 | b045e33f |
+| Move to Python 3.13.18 and clear the remaining image findings | files changed (by path): docs 3, other 9 | chore/python-3.13.18 | #98 | b045e33f |
+| Scan service images with Trivy and code with CodeQL in CI | files changed (by path): docs 3, other 1 | ci/security-scans | #99 | b045e33f |
 
 
 
@@ -189,5 +195,5 @@ Rows for these PRs are in the table above; titles and file-type counts come from
   security path, and answer quality. Each pre-registered its targets before running.
 - **RAG integration (#73):** document questions via the separate RAG service (ADR 0010).
 - **Cross-service decisions (#74, #75):** ADR 0011, round 1 then round 2.
-- **Enterprise audit follow-ups (#84–#92):** history fencing and the head pointer that closes its race (#84, #89), the durability test seed fix (#88), and two latency fixes measured before and after (#86, #87), a gateway race that reported finished replies as expired (#91), and several records in flight per worker (#92, ADR 0012).
+- **Enterprise audit follow-ups (#84–#92):** history fencing and the head pointer that closes its race (#84, #89), the durability test seed fix (#88), and two latency fixes measured before and after (#86, #87), a gateway race that reported finished replies as expired (#91), and several records in flight per worker (#92, ADR 0012). Ops and security: Prometheus metrics and alert rules (#94, ADR 0013), a replayed reply dropped from history after a crash between its writes and its checkpoint, found with per-thread diagnostics (#97), image findings cleared (#95, #98) and Trivy and CodeQL in CI (#99, ADR 0014).
 - **Not recorded:** the creating session of #69 and #73, and of #17, #19, #20 (see the table).
