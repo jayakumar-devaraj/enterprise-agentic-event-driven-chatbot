@@ -233,7 +233,7 @@ SSE, routing against Qdrant, and the approval gate.
 `docs/master_plan.md`. ADRs and design docs live on `main`. When code and a document disagree, the
 code is right and the document is the bug.
 
-**Toolchain standard.** Python 3.13.13 (`.python-version`), managed by uv: `uv sync`, `uv add <pkg>`
+**Toolchain standard.** Python 3.13.18 (`.python-version`), managed by uv 0.13.6+: `uv sync`, `uv add <pkg>`
 (writes a `>=` floor at the resolved version), `uv lock`; `uv.lock` holds the exact pins. Keep the
 lockfile committed; never hand-edit it. The `dev` dependency group (pytest, ruff, DeepEval) must
 never enter a runtime image: DeepEval ships telemetry and test tooling has no place in production.

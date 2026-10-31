@@ -26,7 +26,7 @@ Contracts: `SPEC.md`. Summary for leadership: `docs/summary.md`. Known gaps:
 
 Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
 
-- **Language / tooling:** Python 3.13.13 (`.python-version`), uv workspace (`packages/common`,
+- **Language / tooling:** Python 3.13.18 (`.python-version`), uv 0.13.6 or later (`required-version`), uv workspace (`packages/common`,
   `services/{gateway,worker,seed}`), build backend `uv_build` 0.13.x.
 - **API:** FastAPI 0.143.3 on Starlette 1.8.0, served by uvicorn 0.54.0 (`[standard]`: httptools;
   uvloop on Linux) — `uvicorn gateway.app:create_app --factory`; `POST /chat`, `GET /stream/{thread_id}/{message_id}` (SSE via `fastapi.sse.EventSourceResponse`,
@@ -97,7 +97,7 @@ Diagrams and failure modes: `docs/architecture/HLD.md`, `docs/architecture/LLD.m
 Prerequisites: Docker, uv, network access for first-time model downloads (spaCy, fastembed).
 
 ```bash
-uv sync                                                    # Python 3.13.13 + all packages
+uv sync                                                    # Python 3.13.18 + all packages
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
 QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main

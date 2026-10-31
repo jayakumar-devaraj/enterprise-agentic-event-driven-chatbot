@@ -35,3 +35,6 @@ memory):
 - APIs not yet exercised are marked `VERIFY:` in code until a test covers them: `fastapi.sse`,
   confluent-kafka asyncio classes, `AsyncRedisSaver`, openai 3.x, langfuse 5.x env names.
 - `en_core_web_lg` and `llama3.2:1b` enlarge images/model pulls; CI uses `MOCK_LLM=true`.
+- **Addendum 2026-10-31:** Python 3.13.18 and uv 0.13.6. The `python:3.13.13-slim` image was no longer
+  rebuilt and carried 59 fixable HIGH/CRITICAL Debian findings (Trivy 0.76.1); `3.13.18-slim` has none.
+  The table above keeps the original choice.
