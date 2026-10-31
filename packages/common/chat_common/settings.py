@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     approval_ttl_s: int = 3600
 
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
+    metrics_port: int = 9100  # Prometheus /metrics; a port of its own, never published
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_base_url: str = "https://us.cloud.langfuse.com"

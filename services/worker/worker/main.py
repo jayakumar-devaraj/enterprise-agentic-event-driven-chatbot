@@ -10,6 +10,7 @@ from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from chat_common.tracing import setup_tracing
 from confluent_kafka.aio import AIOConsumer, AIOProducer
+from prometheus_client import start_http_server
 from qdrant_client import AsyncQdrantClient
 
 from worker.checkpoint import FencedRedisSaver
@@ -52,6 +53,7 @@ async def run(settings: Settings) -> None:
     clients = parse_tenant_clients(settings.rag_tenant_clients.get_secret_value())
     token_provider = ClientCredentialsTokens(settings.rag_token_url, clients) if clients else None
     setup_tracing("worker", settings.otel_exporter_otlp_endpoint)
+    start_http_server(settings.metrics_port)
     scrubber = get_scrubber(settings.spacy_model)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     qdrant = AsyncQdrantClient(

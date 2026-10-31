@@ -30,9 +30,11 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from prometheus_client import start_http_server
 from redis.exceptions import RedisError
 
 from gateway import auth
+from gateway.metrics import MetricsMiddleware
 from gateway.producer import DependencyUnavailable, EnvelopeSink, KafkaEnvelopeProducer
 from gateway.sse import expired_event, relay
 
@@ -172,6 +174,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         settings = Settings()
         configure_logging(settings.log_level)
         setup_tracing("gateway", settings.otel_exporter_otlp_endpoint)
+        start_http_server(settings.metrics_port)
         scrubber = get_scrubber(settings.spacy_model)
         users = auth.parse_users(settings.auth_users.get_secret_value())
         return Deps(
@@ -193,6 +196,7 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
 
     app = FastAPI(title="chat-gateway", lifespan=lifespan)
     FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz")
+    app.add_middleware(MetricsMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=Settings().cors_origin_list,

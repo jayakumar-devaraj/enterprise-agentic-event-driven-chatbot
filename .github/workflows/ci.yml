@@ -92,6 +92,16 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
 
+  alerts:
+    # Each alert rule fires on the synthetic series it is meant for and stays quiet otherwise.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Prometheus config and alert rule tests
+        run: |
+          docker run --rm -v "$PWD/deploy/prometheus:/etc/prometheus:ro" --entrypoint promtool             prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm -v "$PWD/deploy/prometheus:/etc/prometheus:ro" -w /etc/prometheus             --entrypoint promtool prom/prometheus:v3.15.1 test rules alerts_test.yml
+
   docs:
     # Documents must not point at anything that does not exist, and every diagram must render.
     runs-on: ubuntu-latest
