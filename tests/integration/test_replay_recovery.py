@@ -162,6 +162,47 @@ async def test_crash_after_checkpoint_before_done(stack, monkeypatch) -> None:
     assert consumer.commits == 1
 
 
+async def test_crash_between_the_reply_writes_and_their_checkpoint(stack, monkeypatch) -> None:
+    """The reply node's writes are saved, the checkpoint that applies them is not (SIGKILL).
+
+    The redelivered message must not be answered from those pending writes alone: the next turn
+    starts from the checkpoint and would drop the reply (CI on #95, thread rb-4cbfea-11 on #96).
+    """
+    redis, worker, consumer, graph, saver = stack
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    first, second, third = (
+        _chat(thread, t) for t in ("Why is my bill higher?", "And next month?", "Thanks")
+    )
+    original = AsyncRedisSaver.aput
+    calls = {"n": 0}
+
+    async def counting(self: AsyncRedisSaver, *args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncRedisSaver, "aput", counting)
+    await worker.handle(Msg(first))
+    per_message, calls["n"] = calls["n"], 0
+
+    async def crash_on_last(self: AsyncRedisSaver, *args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        if calls["n"] == per_message:
+            raise Crash("aput")
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncRedisSaver, "aput", crash_on_last)
+    with pytest.raises(Crash):
+        await worker.handle(Msg(second))
+    monkeypatch.setattr(AsyncRedisSaver, "aput", original)
+
+    await asyncio.sleep(SETTINGS.dedupe_lease_s + 0.5)  # the dead worker's lease expires
+    await worker.handle(Msg(second))
+    await worker.handle(Msg(third))
+    users = [t["text"] for t in await _turns(saver, graph, thread) if t["role"] == "user"]
+    assert users == [first.text, second.text, third.text]
+    assert [e["type"] for _, e in await _events(redis, second)][-1] == "done"
+
+
 async def test_crash_after_done_before_dedupe(stack, monkeypatch) -> None:
     """`done` is durable but the worker died before marking dedupe: the stream is left untouched."""
     redis, worker, consumer, graph, saver = stack
