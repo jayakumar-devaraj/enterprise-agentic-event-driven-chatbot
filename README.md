@@ -55,7 +55,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   line, `trace_id`/`thread_id` as keys).
 - **Orchestration:** langgraph 1.2.16 with langgraph-checkpoint-redis 0.5.2 (`AsyncRedisSaver`;
   checkpoint write/read on Redis 8 proven by spike a, ADR 0002).
-- **Embeddings / vector search:** fastembed 0.9.0 (ONNX Runtime 1.31.0, `BAAI/bge-small-en-v1.5`,
+- **Embeddings / vector search:** fastembed 0.9.1 (ONNX Runtime 1.31.0, `BAAI/bge-small-en-v1.5`,
   query instruction on messages only) and qdrant-client 1.19.1 (worker searches over gRPC with
   `prefer_grpc`; seed loads over REST). Thresholds from leave-one-out calibration (ADR 0004).
 - **Model providers:** openai 3.33.0 `AsyncOpenAI` against the OpenAI-compatible `LLM_BASE_URL`
