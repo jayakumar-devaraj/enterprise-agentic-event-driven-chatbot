@@ -36,7 +36,7 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   `uv run python -m gateway.auth <user> <password>`), thread ownership bound in Redis (401/403).
 - **Validation:** pydantic 2.14.1 (wire contracts in `chat_common.schemas`, strict, extra fields
   rejected), pydantic-settings 2.16.0 (`chat_common.settings`; startup fails on an unsafe dedupe lease).
-- **Security (PII):** presidio-analyzer 2.2.364 + presidio-anonymizer 2.2.364 with spaCy 3.8.16 and
+- **Security (PII):** presidio-analyzer 2.2.366 + presidio-anonymizer 2.2.366 with spaCy 3.8.16 and
   `en_core_web_lg` 3.8.0 (`chat_common.scrubber`; typed placeholders such as `<EMAIL_ADDRESS>`,
   `ascrub` runs off the event loop).
 - **Persistence:** redis-py 8.1.0 (`redis.asyncio`; `audit:events` stream via `chat_common.audit`).
