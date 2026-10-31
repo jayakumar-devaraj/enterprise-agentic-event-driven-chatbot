@@ -118,7 +118,7 @@ docker compose -f deploy/compose.yaml --profile rag up -d rag-db rag-api   # htt
 docker compose -f deploy/compose.yaml --profile rag up rag-seed            # uploads deploy/rag/handbook.txt as tenant T1
 ```
 
-The image is `RAG_API_IMAGE` (default: the pinned `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.1.0`).
+The image is `RAG_API_IMAGE` (default: release `v0.1.0` of `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag`, pinned by digest `sha256:f8ef8a010565f1e479748e199d12475321444c05eae56614883c5046049d280e`; the CI `contract` job checks `docs/contracts/rag-openapi-v1.json` against that release).
 `uv run pytest -m rag` shows the settings the host-run worker needs (`tests/integration/test_rag_e2e.py`).
 
 Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`,

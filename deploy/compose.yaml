@@ -205,8 +205,8 @@ services:
 
   rag-api:
     profiles: ["rag"]
-    # Pinned tag of the RAG service's published image. Its API contract is docs/contracts/.
-    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.1.0}
+    # Pinned RAG release: v0.1.0, by digest (a tag can be moved). Its API contract is docs/contracts/.
+    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag@sha256:f8ef8a010565f1e479748e199d12475321444c05eae56614883c5046049d280e}
     environment:
       DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
       # The same value the worker reads as RAG_TENANT_TOKENS, so the two cannot disagree.

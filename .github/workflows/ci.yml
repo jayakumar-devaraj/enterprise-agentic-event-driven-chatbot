@@ -143,3 +143,15 @@ jobs:
         with:
           name: coverage-report
           path: coverage.txt
+
+  contract:
+    # The RAG service's /v1 contract in this repository must equal the one in the release this stack pins.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Compare with the pinned release
+        run: |
+          ref=$(grep -oP '(?<=Pinned RAG release: )v[0-9][0-9.]*' deploy/compose.yaml)
+          echo "pinned release: $ref"
+          curl -fsSL "https://raw.githubusercontent.com/jayakumar-devaraj/multi-tenant-agentic-rag/$ref/docs/openapi-v1.json" | tr -d '\r' > /tmp/rag-openapi-v1.json
+          diff /tmp/rag-openapi-v1.json <(tr -d '\r' < docs/contracts/rag-openapi-v1.json)
