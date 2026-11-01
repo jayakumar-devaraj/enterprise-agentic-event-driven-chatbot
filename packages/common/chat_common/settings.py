@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     auth_users: SecretStr = SecretStr("")
     user_tenants: str = ""  # `user:tenant,...`; a user not listed has no document tenant (SPEC §3)
+    # Set OIDC_ISSUER to require bearer tokens from that issuer instead of HTTP Basic (ADR 0016).
+    oidc_issuer: str | None = None
+    oidc_audience: str | None = None
+    oidc_user_claim: str = "sub"
 
     approval_ttl_s: int = 3600
 
@@ -75,6 +79,15 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = None
     langfuse_base_url: str = "https://us.cloud.langfuse.com"
     log_level: str = "INFO"
+
+    @model_validator(mode="after")
+    def _one_login_method(self) -> "Settings":
+        """OIDC needs an audience, and is never combined with Basic: one way in, no fallback."""
+        if self.oidc_issuer and not self.oidc_audience:
+            raise ValueError("OIDC_ISSUER needs OIDC_AUDIENCE")
+        if self.oidc_issuer and self.auth_users.get_secret_value():
+            raise ValueError("set OIDC_ISSUER or AUTH_USERS, not both")
+        return self
 
     @model_validator(mode="after")
     def _lease_outlives_retries(self) -> "Settings":

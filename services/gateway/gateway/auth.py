@@ -31,8 +31,9 @@ def parse_users(raw: str) -> dict[str, str]:
     return users
 
 
-def parse_user_tenants(raw: str, users: dict[str, str]) -> dict[str, str]:
+def parse_user_tenants(raw: str, users: dict[str, str] | None) -> dict[str, str]:
     """Parse `user:tenant,...`; a malformed entry, duplicate or unknown user fails startup loudly.
+    With OIDC (`users` None) the user ids are the issuer's and are not known at startup.
 
     The tenant a request runs under comes only from here, keyed by the authenticated username.
     """
@@ -41,7 +42,7 @@ def parse_user_tenants(raw: str, users: dict[str, str]) -> dict[str, str]:
         name, sep, tenant = entry.partition(":")
         if not sep or not name or not tenant:
             raise ValueError("USER_TENANTS entries must look like user:tenant")
-        if name not in users:
+        if users is not None and name not in users:
             raise ValueError(f"USER_TENANTS names {name!r}, which is not in AUTH_USERS")
         if name in tenants:
             raise ValueError(f"USER_TENANTS lists {name!r} twice")

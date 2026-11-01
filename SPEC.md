@@ -21,7 +21,12 @@ Normative data contract. Anything not written here is not guaranteed. Source: th
 
 `thread_id`: UUID or `[A-Za-z0-9_-]{1,64}`. `message_id`: client-generated UUID.
 
-## 2 · HTTP API (gateway :8000, HTTP Basic on every endpoint except `/healthz` and `/readyz`)
+## 2 · HTTP API (gateway :8000, authenticated on every endpoint except `/healthz` and `/readyz`)
+
+One login method per deployment, never both: HTTP Basic against `AUTH_USERS`, or, when `OIDC_ISSUER`
+is set, `Authorization: Bearer <JWT>` from that issuer with `aud` = `OIDC_AUDIENCE`, signed with an
+asymmetric key from its JWKS, unexpired; the user id is the `OIDC_USER_CLAIM` claim (default `sub`).
+A missing or invalid token is 401 with a `Bearer` challenge; an unreachable issuer is 503.
 
 | Endpoint | Success | Errors |
 |---|---|---|
