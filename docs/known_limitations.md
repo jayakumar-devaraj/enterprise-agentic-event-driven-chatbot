@@ -234,7 +234,8 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   an independent judge, and DeepEval is not used.
 - **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
   every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
-  missing or wrong credentials. Redis, Kafka, Qdrant, Jaeger and Ollama have no authentication, and
+  missing or wrong credentials. Kafka, Qdrant, Jaeger and Ollama have no authentication (Redis has
+  since 2026-11-01, ADR 0015), and
   the direct gateway ports carry Basic credentials in clear, so any local process can read or write
   all state. Not suitable beyond one trusted host as configured.
 - **RAG client credentials (ADR 0011, 2026-10-29).** `RAG_TENANT_CLIENTS` is implemented and unit-tested against a test double of the token endpoint only; no real identity provider was run. Secrets come from the environment, not a secrets manager. Static `RAG_TENANT_TOKENS` remain the default until the deployment sets the client variables.

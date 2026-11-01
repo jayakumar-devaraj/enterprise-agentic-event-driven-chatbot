@@ -10,6 +10,7 @@ records are decoded before searching, because base64 is an encoding, not scrubbi
 
 import base64
 import json
+import os
 import random
 import subprocess
 import time
@@ -21,7 +22,8 @@ import redis
 from confluent_kafka import Consumer, Producer, TopicPartition
 
 pytestmark = pytest.mark.stack
-KAFKA, REDIS_URL, JAEGER = "127.0.0.1:19092", "redis://127.0.0.1:16379/0", "http://127.0.0.1:16686"
+KAFKA, JAEGER = "127.0.0.1:19092", "http://127.0.0.1:16686"
+REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
 AUTH = ("demo", "demo-pw")
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml"]
 

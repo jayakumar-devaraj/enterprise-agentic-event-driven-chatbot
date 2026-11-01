@@ -41,6 +41,8 @@ jobs:
           enable-cache: true
       - name: Sync
         run: uv sync --locked
+      - name: Generate infrastructure credentials
+        run: echo "REDIS_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
       - name: Start infrastructure
         run: |
           docker compose -f deploy/compose.yaml --profile audit up -d --wait kafka redis qdrant jaeger audit-db
@@ -77,6 +79,8 @@ jobs:
           enable-cache: true
       - name: Sync
         run: uv sync --locked
+      - name: Generate infrastructure credentials
+        run: echo "REDIS_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
       - name: Durability tests
         run: uv run pytest -m durability -v
 

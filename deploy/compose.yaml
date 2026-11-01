@@ -71,13 +71,32 @@ services:
     image: redis:8.10.2
     # AOF fsynced every second (RPO ≤ 1 s for acknowledged writes) on a named volume, so streams,
     # checkpoints, owners, refunds and the audit trail survive a crash or a recreated container.
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    # One ACL user, `chatbot`, with the password from REDIS_PASSWORD; the passwordless default user
+    # is off, so no client on the network or the host port gets in without it.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --user
+      - default
+      - "off"
+      - --user
+      - chatbot
+      - "on"
+      - ">${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}"
+      - "~*"
+      - "&*"
+      - "+@all"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}
     volumes:
       - redis-data:/data
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning --user chatbot --pass \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -145,6 +164,7 @@ services:
     environment:
       # Real inference: `MOCK_LLM=false docker compose --profile llm up -d` (A9).
       MOCK_LLM: ${MOCK_LLM:-true}
+      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -172,6 +192,7 @@ services:
     environment:
       # Exported in the shell: `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"`.
       AUTH_USERS: ${AUTH_USERS:-}
+      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
     depends_on:
       kafka-init:
         condition: service_completed_successfully
@@ -304,7 +325,7 @@ services:
       context: ..
       dockerfile: services/audit/Dockerfile
     environment:
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
       AUDIT_DATABASE_URL: postgresql://audit_writer:${AUDIT_WRITER_PASSWORD:-}@audit-db:5432/audit
     depends_on:
       redis:
