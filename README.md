@@ -33,7 +33,9 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   `Last-Event-ID` resume), `POST /approve/{thread_id}/{message_id}` (human approval of a paused refund,
   LangGraph `interrupt()` / `Command(resume=...)`), `GET /healthz` (liveness), `GET /readyz` (Redis + Kafka readiness).
 - **Security (access control):** HTTP Basic against `AUTH_USERS` (stdlib scrypt, run once per accepted pair per process; generate entries with
-  `uv run python -m gateway.auth <user> <password>`), thread ownership bound in Redis (401/403).
+  `uv run python -m gateway.auth <user> <password>`), or OIDC bearer tokens from any issuer when `OIDC_ISSUER`
+  and `OIDC_AUDIENCE` are set (pyjwt 2.15.1, JWKS from the issuer's discovery document, ADR 0016);
+  thread ownership bound in Redis (401/403).
 - **Validation:** pydantic 2.14.1 (wire contracts in `chat_common.schemas`, strict, extra fields
   rejected), pydantic-settings 2.16.0 (`chat_common.settings`; startup fails on an unsafe dedupe lease).
 - **Security (PII):** presidio-analyzer 2.2.366 + presidio-anonymizer 2.2.366 with spaCy 3.8.16 and

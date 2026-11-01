@@ -35,6 +35,7 @@ from redis.exceptions import RedisError
 
 from gateway import auth
 from gateway.metrics import MetricsMiddleware
+from gateway.oidc import InvalidToken, IssuerUnavailable, OidcVerifier
 from gateway.producer import DependencyUnavailable, EnvelopeSink, KafkaEnvelopeProducer
 from gateway.sse import expired_event, relay
 
@@ -52,6 +53,7 @@ class Deps:
     scrub: Callable[[str], Awaitable[str]]
     users: dict[str, str]
     tenants: dict[str, str] = field(default_factory=dict)  # username → document tenant (SPEC §3)
+    oidc: OidcVerifier | None = None  # set: bearer tokens only, Basic off (ADR 0016)
     verify: auth.Verifier = field(init=False)
 
     def __post_init__(self) -> None:
@@ -81,8 +83,22 @@ def _deps(request: Request) -> Deps:
 async def current_user(
     creds: Annotated[HTTPBasicCredentials | None, Depends(_basic)],
     deps: Annotated[Deps, Depends(_deps)],
+    authorization: Annotated[str | None, Header()] = None,
 ) -> str:
-    """401 unless the Basic credentials match AUTH_USERS; scrypt runs off the loop, once a pair."""
+    """The caller's user id. With OIDC: a valid bearer token from the issuer, else 401, and 503
+    when the issuer cannot be reached. Without: Basic credentials matching AUTH_USERS (scrypt off
+    the loop, once a pair)."""
+    if deps.oidc is not None:
+        scheme, _, token = (authorization or "").partition(" ")
+        challenge = {"WWW-Authenticate": 'Bearer error="invalid_token"'}
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bearer token required", challenge)
+        try:
+            return await deps.oidc(token)
+        except InvalidToken as exc:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token", challenge) from exc
+        except IssuerUnavailable as exc:
+            raise DependencyUnavailable(f"identity provider: {exc}") from exc
     if creds is None or not await asyncio.to_thread(deps.verify, creds.username, creds.password):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "invalid credentials", {"WWW-Authenticate": "Basic"}
@@ -177,13 +193,19 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         start_http_server(settings.metrics_port)
         scrubber = get_scrubber(settings.spacy_model)
         users = auth.parse_users(settings.auth_users.get_secret_value())
+        oidc = (
+            OidcVerifier(settings.oidc_issuer, settings.oidc_audience, settings.oidc_user_claim)
+            if settings.oidc_issuer and settings.oidc_audience
+            else None
+        )
         return Deps(
             settings=settings,
             redis=make_redis(settings),
             producer=KafkaEnvelopeProducer(settings.kafka_bootstrap_servers, settings.kafka_topic),
             scrub=scrubber.ascrub,
             users=users,
-            tenants=auth.parse_user_tenants(settings.user_tenants, users),
+            tenants=auth.parse_user_tenants(settings.user_tenants, None if oidc else users),
+            oidc=oidc,
         )
 
     @asynccontextmanager
