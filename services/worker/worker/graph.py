@@ -314,6 +314,12 @@ def make_processor(
         scratch_token = current_scratch.set(Scratch())
         try:
             snapshot = await compiled.aget_state(config)
+            if any(task.result is not None for task in snapshot.tasks):
+                # An attempt died after a node's writes were saved but before the checkpoint that
+                # applies them. State reads include such writes; a run started with new input does
+                # not, and a resumed approval no longer looks paused. Finish that step first.
+                await compiled.ainvoke(None, config)
+                snapshot = await compiled.aget_state(config)
             values = snapshot.values
             # Ownership is checked here too, not only at the gateway. A missing binding (Redis
             # restore, lost write) is restored to the user the history belongs to, or to this
@@ -327,11 +333,6 @@ def make_processor(
             paused = values.get("message_id") if "await_approval" in snapshot.next else None
             if values.get("answered") == mid and not snapshot.next:
                 # An earlier attempt checkpointed this reply, then died before `done`: re-send it.
-                if snapshot.tasks:
-                    # It died after the reply node's writes were saved but before the checkpoint
-                    # that applies them; state reads include such writes, the next turn's run does
-                    # not. Apply them now, or that turn would drop this reply.
-                    await compiled.ainvoke(None, config)
                 if env.kind == "approval":
                     await redis.delete(approval.pending_key(env.thread_id, str(env.ref_message_id)))
                 for part in values["turns"][-1]["text"].split(" "):

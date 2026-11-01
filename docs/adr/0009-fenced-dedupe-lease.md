@@ -62,6 +62,15 @@ offset commit, because the consumer-group generation fences it. Redis writes had
   now applies pending writes (`ainvoke(None)`) before re-sending
   (`test_crash_between_the_reply_writes_and_their_checkpoint`, real Redis; it fails without the fix).
   Several records in flight per worker (ADR 0012) widened the window; it existed before.
+- **Addendum 2026-11-01: every step a dead attempt left half-written is finished first.** The same gap
+  broke the refund approval: a crash after the resumed approval's writes were saved, before their
+  checkpoint, made the redelivery see the thread as no longer paused, so it answered
+  `approval_not_pending`, never applied the approved refund, and the next chat lost the thread's history.
+  Processing now starts by applying any completed task's pending writes (`ainvoke(None)`) and re-reading
+  the state, for every envelope kind; this replaces the replay-only step above
+  (`test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome` crashes each checkpoint write of
+  the refund ask, the approval and the next chat and compares history, refunds, audit and terminal
+  events with an uncrashed run; real Redis, it fails without the fix).
 - `LeaseLost` restarts the worker process. This is acceptable because a lease is lost only after a
   stall longer than `DEDUPE_LEASE_S`.
 - Every fenced script names the lease key with the keys it writes. A move to Redis Cluster would
