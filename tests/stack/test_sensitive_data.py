@@ -24,7 +24,10 @@ from confluent_kafka import Consumer, Producer, TopicPartition
 
 pytestmark = pytest.mark.stack
 KAFKA, JAEGER = "127.0.0.1:19092", "http://127.0.0.1:16686"
-REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
+REDIS_URL = (
+    f"rediss://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
+    f"?ssl_ca_certs={os.environ['INFRA_CA_FILE']}"
+)
 AUTH = ("demo", "demo-pw")
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml"]
 

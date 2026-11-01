@@ -6,9 +6,13 @@ import pytest
 
 KAFKA = os.getenv("IT_KAFKA_BOOTSTRAP", "127.0.0.1:19092")
 REDIS_URL = os.getenv(
-    "REDIS_URL", f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
+    "REDIS_URL",
+    (
+        f"rediss://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
+        f"?ssl_ca_certs={os.environ['INFRA_CA_FILE']}"
+    ),
 )
-QDRANT_URL = os.getenv("IT_QDRANT_URL", "http://127.0.0.1:16333")
+QDRANT_URL = os.getenv("IT_QDRANT_URL", "https://127.0.0.1:16333")
 QDRANT_GRPC_PORT = int(os.getenv("IT_QDRANT_GRPC_PORT", "16334"))
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 

@@ -101,12 +101,15 @@ uv sync                                                    # Python 3.13.18 + al
 export REDIS_PASSWORD=$(openssl rand -hex 16)               # Redis ACL user `chatbot`; compose refuses to start without it
 export QDRANT_API_KEY=$(openssl rand -hex 16)               # Qdrant API key, the same rule
 export KAFKA_PASSWORD=$(openssl rand -hex 16)               # Kafka SASL user `chatbot`, the same rule
+# Redis, Kafka and Qdrant speak TLS only; the one-shot `certs` service writes a development CA to
+# deploy/certs/ (gitignored) on first start, and host-side clients trust deploy/certs/ca.crt.
+# On Windows Git Bash write $(pwd -W) where $PWD appears below: Python needs a C:/ path.
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
-QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main  # reads QDRANT_API_KEY
+QDRANT_URL=https://127.0.0.1:16333 INFRA_CA_FILE=$PWD/deploy/certs/ca.crt uv run python -m seed.main  # reads QDRANT_API_KEY
 
 # one terminal each (host endpoints; MOCK_LLM=true is the default)
-export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0   QDRANT_URL=http://127.0.0.1:16333 QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
+export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=rediss://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0?ssl_ca_certs=$PWD/deploy/certs/ca.crt   QDRANT_URL=https://127.0.0.1:16333   INFRA_CA_FILE=$PWD/deploy/certs/ca.crt GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=$PWD/deploy/certs/ca.crt QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
 uv run python -m worker.main
 uv run uvicorn gateway.app:create_app --factory --host 0.0.0.0 --port 8000
 
@@ -152,7 +155,7 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Dead-letter queue: `docker compose -f deploy/compose.yaml exec worker python -m worker.dlq list`
   prints one JSON line per record (no message text); `... python -m worker.dlq replay --offset 3 7`
   or `replay --all` re-produces the failed envelopes (SPEC §7). From the host, run it with
-  `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0 uv run python -m worker.dlq list`.
+  `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=rediss://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0?ssl_ca_certs=$PWD/deploy/certs/ca.crt INFRA_CA_FILE=$PWD/deploy/certs/ca.crt uv run python -m worker.dlq list`.
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.

@@ -5,7 +5,7 @@
 set -e
 props=$(mktemp)
 trap 'rm -f "$props"' EXIT
-printf 'security.protocol=SASL_PLAINTEXT\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="chatbot" password="%s";\n' "$KAFKA_PASSWORD" > "$props"
+printf 'security.protocol=SASL_SSL\nssl.truststore.type=PEM\nssl.truststore.location=/certs/ca.crt\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="chatbot" password="%s";\n' "$KAFKA_PASSWORD" > "$props"
 tool=$1
 shift
 "/opt/kafka/bin/$tool" --bootstrap-server kafka:9092 --command-config "$props" "$@"
