@@ -21,7 +21,7 @@ from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.aio import AIOConsumer, AIOProducer
-from conftest import KAFKA, QDRANT_GRPC_PORT, QDRANT_URL, REDIS_URL
+from conftest import KAFKA, QDRANT_API_KEY, QDRANT_GRPC_PORT, QDRANT_URL, REDIS_URL
 from gateway import auth
 from gateway.app import Deps, create_app
 from gateway.producer import KafkaEnvelopeProducer
@@ -110,7 +110,7 @@ async def collections() -> AsyncIterator[Settings]:
         }
     )
     yield s
-    q = AsyncQdrantClient(url=QDRANT_URL)
+    q = AsyncQdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
     for name in (s.qdrant_collection, s.qdrant_injection_collection, s.qdrant_benign_collection):
         await q.delete_collection(name)
     await q.close()
@@ -127,7 +127,9 @@ async def running_stack(
     for fut in admin.create_topics([NewTopic(n, 1, 1) for n in (topic, dlq)]).values():
         fut.result(60)
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    qdrant = AsyncQdrantClient(url=QDRANT_URL, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True)
+    qdrant = AsyncQdrantClient(
+        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True
+    )
     router = Router(
         get_embedder(collections.embed_model),
         qdrant,

@@ -1,6 +1,6 @@
 # 0015 · Authentication on the data stores
 
-**Status:** Accepted 2026-11-01 (Redis); Qdrant, Kafka and TLS follow as addenda.
+**Status:** Accepted 2026-11-01 (Redis, Qdrant); Kafka and TLS follow as addenda.
 
 ## Context
 Redis, Kafka and Qdrant accepted any client that could reach them: on the compose network, and on the
@@ -24,3 +24,9 @@ history (`docs/known_limitations.md`, "Loopback is the trust boundary").
 - The password appears in the container's command line and environment (`docker inspect`), so anyone
   with Docker access on the host still reads it; an ACL file from a secrets store is the step beyond.
 - Traffic is still plaintext until the TLS addendum.
+
+## Addendum 2026-11-01: Qdrant
+Qdrant runs with `QDRANT__SERVICE__API_KEY` set from `QDRANT_API_KEY`, which then guards every REST and
+gRPC call. The worker and the seed pass the same key (`Settings.qdrant_api_key`); compose refuses to start
+without it, CI generates one per job and host-side tests read it from the environment. Until TLS the key
+travels in clear, and qdrant-client warns about it.

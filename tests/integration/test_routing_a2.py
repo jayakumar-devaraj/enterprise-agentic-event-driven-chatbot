@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from chat_common.settings import Settings
-from conftest import QDRANT_GRPC_PORT, QDRANT_URL
+from conftest import QDRANT_API_KEY, QDRANT_GRPC_PORT, QDRANT_URL
 from qdrant_client import AsyncQdrantClient
 from seed.main import seed
 from worker.embedding import get_embedder
@@ -32,7 +32,9 @@ async def router() -> AsyncIterator[Router]:
     """Seed via the real seed path, then a gRPC Router with the configured cuts."""
     settings = Settings(qdrant_url=QDRANT_URL)
     await seed(settings)
-    qdrant = AsyncQdrantClient(url=QDRANT_URL, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True)
+    qdrant = AsyncQdrantClient(
+        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True
+    )
     yield Router(
         get_embedder(settings.embed_model),
         qdrant,

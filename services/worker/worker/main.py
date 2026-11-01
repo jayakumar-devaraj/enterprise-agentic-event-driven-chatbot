@@ -56,8 +56,10 @@ async def run(settings: Settings) -> None:
     start_http_server(settings.metrics_port)
     scrubber = get_scrubber(settings.spacy_model)
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    qdrant_key = settings.qdrant_api_key
     qdrant = AsyncQdrantClient(
         url=settings.qdrant_url,
+        api_key=qdrant_key.get_secret_value() if qdrant_key else None,
         grpc_port=settings.qdrant_grpc_port,
         prefer_grpc=settings.qdrant_prefer_grpc,
     )

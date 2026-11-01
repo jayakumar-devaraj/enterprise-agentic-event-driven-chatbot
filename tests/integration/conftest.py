@@ -10,6 +10,7 @@ REDIS_URL = os.getenv(
 )
 QDRANT_URL = os.getenv("IT_QDRANT_URL", "http://127.0.0.1:16333")
 QDRANT_GRPC_PORT = int(os.getenv("IT_QDRANT_GRPC_PORT", "16334"))
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 
 @pytest.fixture
