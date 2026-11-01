@@ -91,8 +91,8 @@ process without committing, so a worker that stalled past its lease cannot chang
 lease or refund records of the attempt that took over. Checkpoint writes are preceded by a lease
 check, and a thread's state is read from the checkpoint named by `thread_head:{thread_id}`, which
 only a lease holder can move (fenced in the same Lua script). A checkpoint written by such a worker
-after its check passed is never read as the thread's history. `pending_approval:*` and audit writes
-are not fenced atomically (ADR 0009, Consequences).
+after its check passed is never read as the thread's history. The approval window
+(`pending_approval:*`) and its audit entry change together in one script fenced by the same lease.
 
 ## 6 · Token stream
 

@@ -102,7 +102,7 @@ sequenceDiagram
   participant R as Redis
   W->>W: billing node detects refund request (deterministic rule on scrubbed text)
   W->>W: interrupt() — graph state checkpointed, nothing applied
-  W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S, then audit refund_proposed
+  W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S and audit refund_proposed (one fenced script)
   W->>R: XADD ApprovalRequiredEvent ⇒ stream closes
   C->>G: POST /approve/{thread}/{msg} {message_id: new, approved}
   G->>R: owner check (403), pending exists or decision already delivered (404 if neither)

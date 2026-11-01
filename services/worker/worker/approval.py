@@ -58,6 +58,43 @@ return 1
 )
 
 
+# The approval window marker and its audit entry in one fenced script, so a worker that lost its
+# dedupe lease changes neither and a crash cannot leave one without the other. ARGV[1] is 'set',
+# 'del' or 'none' (audit only); an empty audit array writes no entry.
+_MARK = (
+    FENCE
+    + """
+if ARGV[1] == 'set' then
+  redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
+elseif ARGV[1] == 'del' then
+  redis.call('DEL', KEYS[1])
+end
+local audit = cjson.decode(ARGV[4])
+if #audit > 0 then
+  redis.call('XADD', KEYS[2], 'MAXLEN', '~', ARGV[5], '*', unpack(audit))
+end
+return 1
+"""
+)
+
+
+async def mark(
+    redis: Any,
+    lease: Lease,
+    *,
+    pending: str | None = None,
+    owner: str | None = None,
+    ttl_s: int = 0,
+    audit: dict[str, str] | None = None,
+) -> None:
+    """Open (`owner` given) or close the approval window `pending` and append `audit`, atomically
+    and only while `lease` is held (LeaseLost otherwise)."""
+    op = "none" if pending is None else ("set" if owner else "del")
+    keys = [pending or AUDIT_STREAM, AUDIT_STREAM]
+    args = [op, owner or "", ttl_s, _flat(audit or {}), AUDIT_MAXLEN]
+    await lease.run(redis, _MARK, keys, args)
+
+
 def _flat(fields: dict[str, str]) -> str:
     """Stream fields as the JSON array [k1, v1, k2, v2, ...] the script unpacks."""
     return json.dumps([item for pair in fields.items() for item in pair])

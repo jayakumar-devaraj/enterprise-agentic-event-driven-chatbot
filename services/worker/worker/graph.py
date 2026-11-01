@@ -255,11 +255,15 @@ def build_graph(
             )
             text = approval.APPROVED_TEXT
         else:
-            await AuditLog(redis).record(
-                "refund_rejected",
-                actor=decision["user_id"],
-                thread_id=thread_id,
-                ref_message_id=ref,
+            await approval.mark(
+                redis,
+                current_writer.get().lease,
+                audit=AuditLog.entry(
+                    "refund_rejected",
+                    actor=decision["user_id"],
+                    thread_id=thread_id,
+                    ref_message_id=ref,
+                ),
             )
             text = approval.REJECTED_TEXT
         reply = await stream_reply(_single(text))
@@ -334,7 +338,10 @@ def make_processor(
             if values.get("answered") == mid and not snapshot.next:
                 # An earlier attempt checkpointed this reply, then died before `done`: re-send it.
                 if env.kind == "approval":
-                    await redis.delete(approval.pending_key(env.thread_id, str(env.ref_message_id)))
+                    ref = str(env.ref_message_id)
+                    await approval.mark(
+                        redis, writer.lease, pending=approval.pending_key(env.thread_id, ref)
+                    )
                 for part in values["turns"][-1]["text"].split(" "):
                     await writer.token(part)
                 if values.get("doc_refs"):
@@ -354,9 +361,16 @@ def make_processor(
                     seconds=approval_ttl_s
                 )
                 if not deadline or env.ts > deadline:  # no proposed_at: paused before it existed
-                    await redis.delete(approval.pending_key(env.thread_id, ref))
-                    await AuditLog(redis).record(
-                        "refund_expired", actor=env.user_id, thread_id=env.thread_id, message_id=ref
+                    await approval.mark(
+                        redis,
+                        writer.lease,
+                        pending=approval.pending_key(env.thread_id, ref),
+                        audit=AuditLog.entry(
+                            "refund_expired",
+                            actor=env.user_id,
+                            thread_id=env.thread_id,
+                            message_id=ref,
+                        ),
                     )
                     await writer.error("approval_expired", "the refund approval window has closed")
                     return
@@ -371,17 +385,23 @@ def make_processor(
                     ),
                     config,
                 )
-                await redis.delete(approval.pending_key(env.thread_id, ref))
+                await approval.mark(
+                    redis, writer.lease, pending=approval.pending_key(env.thread_id, ref)
+                )
             else:
                 if paused is not None and paused != mid:
                     # A new chat supersedes the paused refund; /approve on it now gets 404.
-                    await redis.delete(approval.pending_key(env.thread_id, paused))
-                    await AuditLog(redis).record(
-                        "refund_abandoned",
-                        actor=env.user_id,
-                        thread_id=env.thread_id,
-                        message_id=paused,
-                        superseded_by=mid,
+                    await approval.mark(
+                        redis,
+                        writer.lease,
+                        pending=approval.pending_key(env.thread_id, paused),
+                        audit=AuditLog.entry(
+                            "refund_abandoned",
+                            actor=env.user_id,
+                            thread_id=env.thread_id,
+                            message_id=paused,
+                            superseded_by=mid,
+                        ),
                     )
                 if paused == mid:  # paused by an earlier attempt that died before announcing it
                     interrupted = True
@@ -404,14 +424,18 @@ def make_processor(
                         return
                     interrupted = bool(result.get("__interrupt__"))
                 if interrupted:
-                    await redis.set(
-                        approval.pending_key(env.thread_id, mid), env.user_id, ex=approval_ttl_s
-                    )
-                    await AuditLog(redis).record(
-                        "refund_proposed",
-                        actor=env.user_id,
-                        thread_id=env.thread_id,
-                        message_id=mid,
+                    await approval.mark(
+                        redis,
+                        writer.lease,
+                        pending=approval.pending_key(env.thread_id, mid),
+                        owner=env.user_id,
+                        ttl_s=approval_ttl_s,
+                        audit=AuditLog.entry(
+                            "refund_proposed",
+                            actor=env.user_id,
+                            thread_id=env.thread_id,
+                            message_id=mid,
+                        ),
                     )
                     await writer.approval_required("A refund request needs your approval.")
                     return

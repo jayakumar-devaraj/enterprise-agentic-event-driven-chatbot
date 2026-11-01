@@ -71,6 +71,13 @@ offset commit, because the consumer-group generation fences it. Redis writes had
   (`test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome` crashes each checkpoint write of
   the refund ask, the approval and the next chat and compares history, refunds, audit and terminal
   events with an uncrashed run; real Redis, it fails without the fix).
+- **Addendum 2026-11-01: approval windows and their audit entries are fenced.** Opening, closing and
+  expiring `pending_approval:*`, and the `refund_proposed`, `refund_expired`, `refund_abandoned` and
+  `refund_rejected` audit entries, now go through one Lua script (`approval.mark`) that checks the lease
+  token first, so a stale worker changes neither and a crash cannot leave the marker without its entry.
+  Before, a worker whose lease was taken after the graph returned still opened or closed the window
+  (`test_stale_worker_cannot_open_close_or_audit_an_approval`, real Redis; it fails without the fence).
+  The DLQ produce remains preceded by a non-atomic lease check.
 - `LeaseLost` restarts the worker process. This is acceptable because a lease is lost only after a
   stall longer than `DEDUPE_LEASE_S`.
 - Every fenced script names the lease key with the keys it writes. A move to Redis Cluster would

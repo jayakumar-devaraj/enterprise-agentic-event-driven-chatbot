@@ -341,6 +341,55 @@ async def test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome(
             assert await outcome(crashed) == expected, (step, n)
 
 
+class _StealAfterInvoke:
+    """Compiled-graph wrapper: another attempt takes the dedupe lease as soon as the run returns."""
+
+    def __init__(self, compiled: Any, redis: Any) -> None:
+        """Wrap `compiled`; the stolen lease is `dedupe:{message_id}` of the envelope being run."""
+        self._compiled, self._redis, self.message_id = compiled, redis, ""
+        self.audit_len = -1  # audit entries when the lease was taken
+
+    def __getattr__(self, name: str) -> Any:
+        """Everything else is the real graph."""
+        return getattr(self._compiled, name)
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> Any:
+        """Run, then hand the lease to someone else before the processor's follow-up writes."""
+        result = await self._compiled.ainvoke(*args, **kwargs)
+        self.audit_len = await self._redis.xlen("audit:events")
+        await self._redis.set(f"dedupe:{self.message_id}", "processing:another-attempt")
+        return result
+
+
+@pytest.mark.parametrize("decided", [False, True])
+async def test_stale_worker_cannot_open_close_or_audit_an_approval(
+    stack, monkeypatch, decided: bool
+) -> None:
+    """A worker whose lease was taken over after the graph returned must not open the approval
+    window, close it, or write its audit entry: they are fenced like the stream (ADR 0009)."""
+    redis, worker, consumer, graph, saver = stack
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "I want a refund for last month")
+    if decided:
+        await worker.handle(Msg(ask))  # pending opened by a healthy run
+    env = _decision(ask) if decided else ask
+    stealing = _StealAfterInvoke(graph.compile(checkpointer=saver), redis)
+    stealing.message_id = str(env.message_id)
+    stale = Worker(
+        SETTINGS,
+        consumer=Consumer(),
+        dlq_producer=NoDLQ(),
+        redis=redis,
+        process=make_processor(stealing, redis=redis),
+    )
+    pending_before = await redis.get(approval.pending_key(thread, str(ask.message_id)))
+
+    with pytest.raises(LeaseLost):
+        await stale.handle(Msg(env))
+    assert await redis.get(approval.pending_key(thread, str(ask.message_id))) == pending_before
+    assert await redis.xlen("audit:events") == stealing.audit_len
+
+
 async def test_chat_while_approval_pending_abandons_it(stack) -> None:
     """A new chat supersedes the paused refund: pending cleared, audited, later approval refused."""
     redis, worker, consumer, graph, saver = stack
