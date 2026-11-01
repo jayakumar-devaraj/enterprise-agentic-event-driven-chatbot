@@ -5,6 +5,7 @@ import logging
 import signal
 
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.logjson import configure_logging
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
@@ -73,14 +74,14 @@ async def run(settings: Settings) -> None:
         injection_margin=settings.injection_margin,
     )
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": settings.kafka_bootstrap_servers,
+        client_config(settings.kafka_bootstrap_servers)
+        | {
             "group.id": settings.kafka_consumer_group,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
         }
     )
-    dlq = AIOProducer({"bootstrap.servers": settings.kafka_bootstrap_servers})
+    dlq = AIOProducer(client_config(settings.kafka_bootstrap_servers))
     rag = RagClient(
         settings.rag_base_url,
         settings.rag_timeout_s,

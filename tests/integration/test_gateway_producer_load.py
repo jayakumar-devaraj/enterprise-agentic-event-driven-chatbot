@@ -11,6 +11,7 @@ import time
 import uuid
 
 import pytest
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from confluent_kafka.admin import AdminClient, NewTopic
 from conftest import KAFKA
@@ -23,7 +24,7 @@ SENDERS, SENDS_EACH = 20, 10
 async def test_sustained_concurrent_sends_are_all_acked_quickly() -> None:
     """20 senders, each sending back to back: every send is acked, p95 under 1 s."""
     topic = f"it-prod-{uuid.uuid4().hex[:8]}"
-    admin = AdminClient({"bootstrap.servers": KAFKA})
+    admin = AdminClient(client_config(KAFKA))
     for fut in admin.create_topics([NewTopic(topic, 4, 1)]).values():
         fut.result(60)
     producer = KafkaEnvelopeProducer(KAFKA, topic)

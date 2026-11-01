@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import redis
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope, stream_key
 from chat_common.settings import Settings
 from confluent_kafka import Consumer, KafkaException, Producer, TopicPartition
@@ -51,8 +52,8 @@ class DlqRecord:
 def read(bootstrap: str, topic: str) -> list[DlqRecord]:
     """Every record currently in `topic`, without joining a group or committing anything."""
     consumer = Consumer(
-        {
-            "bootstrap.servers": bootstrap,
+        client_config(bootstrap)
+        | {
             "group.id": f"dlq-inspect-{uuid.uuid4().hex}",
             "enable.auto.commit": False,
         }
@@ -86,7 +87,7 @@ def replay(records: list[DlqRecord], *, bootstrap: str, topic: str, redis: Any) 
     that as an outcome already recorded and dead-letter the message again, so replay deletes that
     stream first. A stream that ends any other way (a later success) is left alone.
     """
-    producer = Producer({"bootstrap.servers": bootstrap, "enable.idempotence": True})
+    producer = Producer(client_config(bootstrap) | {"enable.idempotence": True})
     replayed: list[str] = []
     for record in records:
         env = record.envelope

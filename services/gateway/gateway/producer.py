@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 from typing import Protocol
 
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from confluent_kafka import KafkaException
 from confluent_kafka.aio import AIOProducer
@@ -53,8 +54,8 @@ class KafkaEnvelopeProducer:
         self._topic = topic
         self._timeout_s = timeout_s
         self._producer = AIOProducer(
-            {
-                "bootstrap.servers": bootstrap,
+            client_config(bootstrap)
+            | {
                 "enable.idempotence": True,
                 "message.timeout.ms": int(timeout_s * 1000),
             },

@@ -68,8 +68,8 @@ def _restore() -> None:
 
 def _rewind() -> None:
     """The README procedure: with no worker running, replay the topic from its earliest record."""
-    _compose("exec", "-T", "kafka", "/opt/kafka/bin/kafka-consumer-groups.sh",
-             "--bootstrap-server", "kafka:9092", "--group", "chat-workers",
+    _compose("exec", "-T", "kafka", "sh", "/opt/chatbot/cli.sh", "kafka-consumer-groups.sh",
+             "--group", "chat-workers",
              "--topic", "chat-requests", "--reset-offsets", "--to-earliest",
              "--execute")  # fmt: skip
 

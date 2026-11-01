@@ -11,6 +11,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
+from chat_common.kafka import client_config
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.aio import AIOConsumer, AIOProducer
 
@@ -21,7 +22,7 @@ pytestmark = pytest.mark.integration
 async def topic(kafka_bootstrap: str) -> AsyncIterator[str]:
     """A throwaway single-partition topic."""
     name = f"spike-{uuid.uuid4().hex[:8]}"
-    admin = AdminClient({"bootstrap.servers": kafka_bootstrap})
+    admin = AdminClient(client_config(kafka_bootstrap))
     admin.create_topics([NewTopic(name, num_partitions=1, replication_factor=1)])[name].result(15)
     yield name
     admin.delete_topics([name])
@@ -29,15 +30,15 @@ async def topic(kafka_bootstrap: str) -> AsyncIterator[str]:
 
 async def test_aio_roundtrip_preserves_key_and_value(kafka_bootstrap: str, topic: str) -> None:
     """Async produce, then async consume with a manual commit, returns the same key and value."""
-    producer = AIOProducer({"bootstrap.servers": kafka_bootstrap})
+    producer = AIOProducer(client_config(kafka_bootstrap))
     delivered = await producer.produce(topic, value=b'{"x":1}', key=b"thread-1")
     await delivered
     await producer.flush()
     await producer.close()
 
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": kafka_bootstrap,
+        client_config(kafka_bootstrap)
+        | {
             "group.id": f"spike-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
@@ -61,7 +62,7 @@ async def test_aio_roundtrip_preserves_key_and_value(kafka_bootstrap: str, topic
 
 async def test_aio_producer_rejects_per_message_headers(kafka_bootstrap: str, topic: str) -> None:
     """Pinned 2.16.0 behaviour: headers are not supported on the async producer."""
-    producer = AIOProducer({"bootstrap.servers": kafka_bootstrap})
+    producer = AIOProducer(client_config(kafka_bootstrap))
     try:
         with pytest.raises(NotImplementedError, match="Headers are not supported"):
             await producer.produce(topic, value=b"v", key=b"k", headers=[("traceparent", b"x")])

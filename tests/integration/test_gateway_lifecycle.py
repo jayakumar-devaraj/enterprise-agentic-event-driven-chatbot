@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
@@ -64,8 +65,8 @@ async def test_owner_binding_has_no_expiry(client) -> None:
 async def _count_records(message_id: str, settle_s: float = 5.0) -> int:
     """Records on chat-requests carrying `message_id`, read from the start until quiet."""
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": f"acc-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import httpx
 import pytest
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
 from confluent_kafka.admin import AdminClient, NewTopic
@@ -123,7 +124,7 @@ async def running_stack(
     """Gateway app + worker over fresh topics; the worker's RAG client is the one under test."""
     sfx = uuid.uuid4().hex[:8]
     topic, dlq = f"it-rag-{sfx}", f"it-rag-dlq-{sfx}"
-    admin = AdminClient({"bootstrap.servers": KAFKA})
+    admin = AdminClient(client_config(KAFKA))
     for fut in admin.create_topics([NewTopic(n, 1, 1) for n in (topic, dlq)]).values():
         fut.result(60)
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
@@ -143,14 +144,14 @@ async def running_stack(
     rag = RagClient(rag_url, SETTINGS.rag_timeout_s, parse_tenant_tokens(rag_tokens))
     scrub = get_scrubber().ascrub
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": f"it-{sfx}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
         }
     )
-    dlq_producer = AIOProducer({"bootstrap.servers": KAFKA})
+    dlq_producer = AIOProducer(client_config(KAFKA))
     stop = asyncio.Event()
 
     async def deps() -> Deps:
@@ -303,7 +304,7 @@ async def test_an_unreachable_service_retries_boundedly_then_dead_letters_the_sc
 
 async def _dlq_records(topic: str, wait_s: float) -> list[dict]:
     consumer = AIOConsumer(
-        {"bootstrap.servers": KAFKA, "group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
+        client_config(KAFKA) | {"group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
     )
     await consumer.subscribe([topic])
     out: list[dict] = []

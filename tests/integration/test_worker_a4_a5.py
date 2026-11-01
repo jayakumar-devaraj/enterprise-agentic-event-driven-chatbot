@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 import pytest
 import redis as redis_sync
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from chat_common.settings import Settings
 from confluent_kafka import KafkaException, TopicPartition
@@ -31,7 +32,7 @@ async def topics() -> AsyncIterator[tuple[str, str]]:
     """Fresh request and DLQ topics per test."""
     suffix = uuid.uuid4().hex[:8]
     names = (f"it-req-{suffix}", f"it-dlq-{suffix}")
-    admin = AdminClient({"bootstrap.servers": KAFKA})
+    admin = AdminClient(client_config(KAFKA))
     for fut in admin.create_topics([NewTopic(n, 1, 1) for n in names]).values():
         fut.result(60)
     yield names
@@ -40,7 +41,7 @@ async def topics() -> AsyncIterator[tuple[str, str]]:
 
 async def _produce(topic: str, values: list[bytes]) -> None:
     """Produce raw values keyed by a fixed thread."""
-    producer = AIOProducer({"bootstrap.servers": KAFKA})
+    producer = AIOProducer(client_config(KAFKA))
     for v in values:
         await (await producer.produce(topic, value=v, key=b"t-it"))
     await producer.flush()
@@ -53,14 +54,14 @@ async def _run_worker(
     """Run a real Worker until `group` (default: new) has committed `expected_commits` (≤ 60 s)."""
     group = group or f"it-{uuid.uuid4().hex[:8]}"
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": group,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
         }
     )
-    dlq_producer = AIOProducer({"bootstrap.servers": KAFKA})
+    dlq_producer = AIOProducer(client_config(KAFKA))
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     stop = asyncio.Event()
     worker = Worker(
@@ -95,7 +96,7 @@ async def _run_worker(
 async def _read_topic(topic: str, expected: int) -> list[dict]:
     """Read `expected` JSON records from a topic."""
     consumer = AIOConsumer(
-        {"bootstrap.servers": KAFKA, "group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
+        client_config(KAFKA) | {"group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
     )
     await consumer.subscribe([topic])
     out: list[dict] = []

@@ -234,7 +234,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   an independent judge, and DeepEval is not used.
 - **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
   every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
-  missing or wrong credentials. Kafka, Jaeger and Ollama have no authentication (Redis and Qdrant
+  missing or wrong credentials. Jaeger and Ollama have no authentication (Redis, Qdrant and Kafka
   have since 2026-11-01, ADR 0015), and
   the direct gateway ports carry Basic credentials in clear, so any local process can read or write
   all state. Not suitable beyond one trusted host as configured.
