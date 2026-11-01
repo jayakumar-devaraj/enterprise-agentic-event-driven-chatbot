@@ -105,6 +105,9 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.19.2
+    environment:
+      # Every REST and gRPC call needs this key (ADR 0015).
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
     ports:
       - "127.0.0.1:${QDRANT_HOST_PORT:-16333}:6333"
       - "127.0.0.1:${QDRANT_GRPC_HOST_PORT:-16334}:6334"
@@ -148,6 +151,8 @@ services:
     depends_on:
       qdrant:
         condition: service_healthy
+    environment:
+      QDRANT_API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
     # ONNX embedding sizes its thread pool to every host core; cap it so calibration cannot starve
     # the other stacks sharing the Docker VM.
     cpus: 2
@@ -165,6 +170,7 @@ services:
       # Real inference: `MOCK_LLM=false docker compose --profile llm up -d` (A9).
       MOCK_LLM: ${MOCK_LLM:-true}
       REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
+      QDRANT_API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
     depends_on:
       seed:
         condition: service_completed_successfully

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
 
     qdrant_url: str = "http://qdrant:6333"
+    qdrant_api_key: SecretStr | None = None  # required by the compose Qdrant (ADR 0015)
     qdrant_grpc_port: int = 6334
     qdrant_prefer_grpc: bool = True
     qdrant_collection: str = "intents"

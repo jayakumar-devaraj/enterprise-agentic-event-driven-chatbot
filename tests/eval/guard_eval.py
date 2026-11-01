@@ -37,6 +37,7 @@ async def measure() -> dict[str, object]:
     settings = Settings(qdrant_url=os.getenv("QDRANT_URL", "http://127.0.0.1:16333"))
     qdrant = AsyncQdrantClient(
         url=settings.qdrant_url,
+        api_key=os.getenv("QDRANT_API_KEY"),
         grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "16334")),
         prefer_grpc=True,
     )

@@ -57,7 +57,10 @@ async def seed(settings: Settings, data_dir: Path = DATA_DIR) -> dict[str, float
     intents = read_jsonl(data_dir / "intents.seed.jsonl")
     injections = read_jsonl(data_dir / "injection.seed.jsonl")
     benign = read_jsonl(data_dir / "benign.seed.jsonl")
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url, timeout=30)
+    key = settings.qdrant_api_key
+    qdrant = AsyncQdrantClient(
+        url=settings.qdrant_url, api_key=key.get_secret_value() if key else None, timeout=30
+    )
     try:
         intent_vecs = await load_collection(qdrant, embedder, settings.qdrant_collection, intents)
         inj_vecs = await load_collection(

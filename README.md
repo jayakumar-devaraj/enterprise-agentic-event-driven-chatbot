@@ -99,9 +99,10 @@ Prerequisites: Docker, uv, network access for first-time model downloads (spaCy,
 ```bash
 uv sync                                                    # Python 3.13.18 + all packages
 export REDIS_PASSWORD=$(openssl rand -hex 16)               # Redis ACL user `chatbot`; compose refuses to start without it
+export QDRANT_API_KEY=$(openssl rand -hex 16)               # Qdrant API key, the same rule
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
-QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main
+QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main  # reads QDRANT_API_KEY
 
 # one terminal each (host endpoints; MOCK_LLM=true is the default)
 export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0   QDRANT_URL=http://127.0.0.1:16333 QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
@@ -130,7 +131,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Full stack in containers (Task 12 images; gateway on a host port from 127.0.0.1:8000–8003, see
   `docker compose -f deploy/compose.yaml port gateway 8000`; the chat UI at :5173 proxies to it):
   `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"` and
-  `export REDIS_PASSWORD=$(openssl rand -hex 16)` (keep it: the data volumes outlive it), then
+  `export REDIS_PASSWORD=$(openssl rand -hex 16) QDRANT_API_KEY=$(openssl rand -hex 16)` (keep both:
+  the data volumes outlive them), then
   `docker compose -f deploy/compose.yaml up -d --build --wait`. On Windows Git Bash also export
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.
 
