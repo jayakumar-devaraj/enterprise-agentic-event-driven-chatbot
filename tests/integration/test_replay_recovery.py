@@ -263,6 +263,84 @@ async def test_approval_crash_after_settle_before_done(stack, monkeypatch) -> No
     assert len(await _turns(saver, graph, thread)) == 2
 
 
+def _decision(ask: Envelope) -> Envelope:
+    """An approval of the refund `ask` proposed."""
+    return Envelope(
+        message_id=uuid.uuid4(),
+        thread_id=ask.thread_id,
+        user_id="alice",
+        text="",
+        trace_id="t",
+        kind="approval",
+        ref_message_id=ask.message_id,
+        approved=True,
+    )
+
+
+async def _refund_thread(
+    worker: Worker, monkeypatch, crash: tuple[str, int] | None
+) -> dict[str, Any]:
+    """Ask for a refund, approve it, say thanks. With `crash=(step, n)` the nth checkpoint write of
+    that step dies (the node writes before it already saved) and the step is redelivered once the
+    lease expires. Returns the checkpoint writes per step; a clean run sizes the crashing ones."""
+    thread = f"rp-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "I want a refund for last month")
+    steps = {"ask": ask, "approve": _decision(ask), "thanks": _chat(thread, "Thanks")}
+    original, counts = AsyncRedisSaver.aput, {}
+    for name, env in steps.items():
+        calls = {"n": 0, "crash_at": crash[1] if crash and crash[0] == name else None}
+
+        async def counting(
+            self: AsyncRedisSaver, *args: Any, _calls: dict = calls, **kwargs: Any
+        ) -> Any:
+            _calls["n"] += 1
+            if _calls["n"] == _calls["crash_at"]:
+                raise Crash("aput")
+            return await original(self, *args, **kwargs)
+
+        monkeypatch.setattr(AsyncRedisSaver, "aput", counting)
+        if calls["crash_at"] is None:
+            await worker.handle(Msg(env))
+        else:
+            with pytest.raises(Crash):
+                await worker.handle(Msg(env))
+            monkeypatch.setattr(AsyncRedisSaver, "aput", original)
+            await asyncio.sleep(SETTINGS.dedupe_lease_s + 0.5)  # the dead worker's lease expires
+            await worker.handle(Msg(env))
+        counts[name] = calls["n"]
+    monkeypatch.setattr(AsyncRedisSaver, "aput", original)
+    return {"thread": thread, "ask": ask, "steps": steps, "counts": counts}
+
+
+async def test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome(
+    stack, monkeypatch
+) -> None:
+    """As for a reply (#97), at every checkpoint write of the refund ask, the approval and the next
+    chat: the redelivery leaves the history, pending approval, refunds, audit trail and terminal
+    events of an uncrashed run. A crash before the settle checkpoint dropped the settled turn and
+    the history before it until the replay path applied pending writes."""
+    redis, worker, consumer, graph, saver = stack
+
+    async def outcome(run: dict[str, Any]) -> dict[str, Any]:
+        thread, ask = run["thread"], run["ask"]
+        refunds = [f for _, f in await redis.xrange(approval.REFUNDS_STREAM)]
+        audit = await redis.xrange("audit:events")
+        return {
+            "turns": [(t["role"], t["text"]) for t in await _turns(saver, graph, thread)],
+            "refunds": sum(1 for f in refunds if f["ref_message_id"] == str(ask.message_id)),
+            "audit": [f["event"] for _, f in audit if f["thread_id"] == thread],
+            "last": {n: (await _events(redis, e))[-1][1]["type"] for n, e in run["steps"].items()},
+            "pending": await redis.get(approval.pending_key(thread, str(ask.message_id))),
+        }
+
+    clean = await _refund_thread(worker, monkeypatch, None)
+    expected = await outcome(clean)
+    for step, writes in clean["counts"].items():
+        for n in range(1, writes + 1):
+            crashed = await _refund_thread(worker, monkeypatch, (step, n))
+            assert await outcome(crashed) == expected, (step, n)
+
+
 async def test_chat_while_approval_pending_abandons_it(stack) -> None:
     """A new chat supersedes the paused refund: pending cleared, audited, later approval refused."""
     redis, worker, consumer, graph, saver = stack
