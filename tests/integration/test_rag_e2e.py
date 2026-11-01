@@ -111,7 +111,9 @@ async def collections() -> AsyncIterator[Settings]:
         }
     )
     yield s
-    q = AsyncQdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    q = AsyncQdrantClient(
+        verify=os.environ["INFRA_CA_FILE"], url=QDRANT_URL, api_key=QDRANT_API_KEY
+    )
     for name in (s.qdrant_collection, s.qdrant_injection_collection, s.qdrant_benign_collection):
         await q.delete_collection(name)
     await q.close()
@@ -129,7 +131,11 @@ async def running_stack(
         fut.result(60)
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     qdrant = AsyncQdrantClient(
-        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True
+        verify=os.environ["INFRA_CA_FILE"],
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        grpc_port=QDRANT_GRPC_PORT,
+        prefer_grpc=True,
     )
     router = Router(
         get_embedder(collections.embed_model),

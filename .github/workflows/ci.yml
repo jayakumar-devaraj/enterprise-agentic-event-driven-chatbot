@@ -55,7 +55,8 @@ jobs:
           AUDIT_WRITER_PASSWORD: ci-writer-password
       - name: Seed Qdrant
         env:
-          QDRANT_URL: http://127.0.0.1:16333
+          QDRANT_URL: https://127.0.0.1:16333
+          INFRA_CA_FILE: ${{ github.workspace }}/deploy/certs/ca.crt
         run: uv run python -m seed.main
       - name: Integration tests
         run: uv run pytest -m integration -v --cov=chat_common --cov=gateway --cov=worker --cov=seed

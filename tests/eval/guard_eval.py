@@ -34,8 +34,9 @@ def _rows(path: Path) -> list[dict]:
 
 async def measure() -> dict[str, object]:
     """Route every sample once and summarise refusals per dataset."""
-    settings = Settings(qdrant_url=os.getenv("QDRANT_URL", "http://127.0.0.1:16333"))
+    settings = Settings(qdrant_url=os.getenv("QDRANT_URL", "https://127.0.0.1:16333"))
     qdrant = AsyncQdrantClient(
+        verify=os.environ["INFRA_CA_FILE"],
         url=settings.qdrant_url,
         api_key=os.getenv("QDRANT_API_KEY"),
         grpc_port=int(os.getenv("QDRANT_GRPC_PORT", "16334")),
