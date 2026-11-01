@@ -2,6 +2,7 @@
 .env.*
 *.pem
 *.key
+deploy/certs/
 credentials.json
 !.env.example
 __pycache__/

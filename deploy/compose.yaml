@@ -5,6 +5,37 @@
 name: chatbot
 
 services:
+  # One-shot: a development CA and one server certificate for redis, kafka, qdrant, localhost and
+  # 127.0.0.1, written to deploy/certs (gitignored) once and reused. Host-side clients trust ca.crt.
+  certs:
+    image: apache/kafka:4.3.1
+    user: "0"
+    volumes:
+      - ./certs:/certs
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        cd /certs
+        if [ -s server.pem ] && [ -s ca.crt ]; then exit 0; fi
+        # Key usage and identifiers as strict verifiers (Python 3.13+) require them.
+        openssl req -x509 -newkey rsa:3072 -nodes -days 825 -subj "/CN=chatbot development CA" \
+          -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+          -addext "subjectKeyIdentifier=hash" -keyout ca.key -out ca.crt
+        openssl req -newkey rsa:3072 -nodes -subj "/CN=chatbot-infra" -keyout server.key -out server.csr
+        printf '%s\n' 'subjectAltName=DNS:redis,DNS:kafka,DNS:qdrant,DNS:localhost,IP:127.0.0.1' \
+          'basicConstraints=critical,CA:FALSE' 'keyUsage=critical,digitalSignature,keyEncipherment' \
+          'extendedKeyUsage=serverAuth' 'subjectKeyIdentifier=hash' 'authorityKeyIdentifier=keyid,issuer' \
+          > san.ext
+        openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 \
+          -extfile san.ext -out server.crt
+        cat server.key server.crt > server.pem
+        rm -f server.csr san.ext ca.srl
+        # Readable by the non-root redis and kafka users; a development key, never a production one.
+        chmod 644 ca.crt server.crt server.key server.pem
+        chmod 600 ca.key
+    restart: "no"
+
   kafka:
     image: apache/kafka:4.3.1
     environment:
@@ -12,8 +43,12 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:19092
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:${KAFKA_HOST_PORT:-19092}
-      # Every listener, the controller's included, needs SASL/PLAIN as `chatbot` (ADR 0015).
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+      # Every listener, the controller's included, is TLS and needs SASL/PLAIN as `chatbot` (ADR 0015).
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SASL_SSL,INTERNAL:SASL_SSL,EXTERNAL:SASL_SSL
+      KAFKA_SSL_KEYSTORE_TYPE: PEM
+      KAFKA_SSL_KEYSTORE_LOCATION: /certs/server.pem
+      KAFKA_SSL_TRUSTSTORE_TYPE: PEM
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/ca.crt
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
@@ -37,8 +72,12 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
       - ./kafka/cli.sh:/opt/chatbot/cli.sh:ro
+      - ./certs:/certs:ro
     ports:
       - "127.0.0.1:${KAFKA_HOST_PORT:-19092}:19092"
+    depends_on:
+      certs:
+        condition: service_completed_successfully
     # A TCP probe, not a Kafka CLI tool: each CLI call starts a JVM (~2 CPU-seconds), which at a
     # 5 s interval kept the container near 200 % CPU while idle. kafka-init below performs the real
     # broker round trip once, before topics are created.
@@ -62,6 +101,7 @@ services:
       KAFKA_PASSWORD: ${KAFKA_PASSWORD:?export KAFKA_PASSWORD, e.g. $(openssl rand -hex 16)}
     volumes:
       - ./kafka/cli.sh:/opt/chatbot/cli.sh:ro
+      - ./certs:/certs:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -103,14 +143,30 @@ services:
       - "~*"
       - "&*"
       - "+@all"
+      - --port
+      - "0"
+      - --tls-port
+      - "6379"
+      - --tls-cert-file
+      - /certs/server.crt
+      - --tls-key-file
+      - /certs/server.key
+      - --tls-ca-cert-file
+      - /certs/ca.crt
+      - --tls-auth-clients
+      - "no"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}
     volumes:
       - redis-data:/data
+      - ./certs:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning --user chatbot --pass \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /certs/ca.crt --no-auth-warning --user chatbot --pass \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -122,6 +178,14 @@ services:
     environment:
       # Every REST and gRPC call needs this key (ADR 0015).
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
+      QDRANT__SERVICE__ENABLE_TLS: "true"
+      QDRANT__TLS__CERT: /certs/server.crt
+      QDRANT__TLS__KEY: /certs/server.key
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      certs:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${QDRANT_HOST_PORT:-16333}:6333"
       - "127.0.0.1:${QDRANT_GRPC_HOST_PORT:-16334}:6334"
@@ -167,6 +231,9 @@ services:
         condition: service_healthy
     environment:
       QDRANT_API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
+      QDRANT_URL: https://qdrant:6333
+    volumes:
+      - ./certs:/certs:ro
     # ONNX embedding sizes its thread pool to every host core; cap it so calibration cannot starve
     # the other stacks sharing the Docker VM.
     cpus: 2
@@ -183,8 +250,10 @@ services:
     environment:
       # Real inference: `MOCK_LLM=false docker compose --profile llm up -d` (A9).
       MOCK_LLM: ${MOCK_LLM:-true}
-      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
+      REDIS_URL: rediss://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0?ssl_ca_certs=/certs/ca.crt
       QDRANT_API_KEY: ${QDRANT_API_KEY:?export QDRANT_API_KEY, e.g. $(openssl rand -hex 16)}
+      QDRANT_URL: https://qdrant:6333
+      GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: /certs/ca.crt
       KAFKA_PASSWORD: ${KAFKA_PASSWORD:?export KAFKA_PASSWORD, e.g. $(openssl rand -hex 16)}
     depends_on:
       seed:
@@ -199,6 +268,8 @@ services:
         condition: service_healthy
         required: false
     cpus: 2
+    volumes:
+      - ./certs:/certs:ro
     mem_limit: 1536m
     restart: unless-stopped
 
@@ -213,7 +284,7 @@ services:
     environment:
       # Exported in the shell: `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"`.
       AUTH_USERS: ${AUTH_USERS:-}
-      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
+      REDIS_URL: rediss://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0?ssl_ca_certs=/certs/ca.crt
       KAFKA_PASSWORD: ${KAFKA_PASSWORD:?export KAFKA_PASSWORD, e.g. $(openssl rand -hex 16)}
     depends_on:
       kafka-init:
@@ -223,6 +294,8 @@ services:
     ports:
       - "127.0.0.1:${GATEWAY_HOST_PORTS:-8000-8003}:8000"
     cpus: 1
+    volumes:
+      - ./certs:/certs:ro
     mem_limit: 1536m
     restart: unless-stopped
 
@@ -347,13 +420,15 @@ services:
       context: ..
       dockerfile: services/audit/Dockerfile
     environment:
-      REDIS_URL: redis://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0
+      REDIS_URL: rediss://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0?ssl_ca_certs=/certs/ca.crt
       AUDIT_DATABASE_URL: postgresql://audit_writer:${AUDIT_WRITER_PASSWORD:-}@audit-db:5432/audit
     depends_on:
       redis:
         condition: service_healthy
       audit-db:
         condition: service_healthy
+    volumes:
+      - ./certs:/certs:ro
     mem_limit: 512m
     restart: unless-stopped
 
@@ -367,6 +442,8 @@ services:
     command:
       - --kafka.server=kafka:9092
       - --kafka.version=3.9.0
+      - --tls.enabled
+      - --tls.ca-file=/certs/ca.crt
       - --sasl.enabled
       - --sasl.mechanism=plain
       - --sasl.username=chatbot
@@ -376,6 +453,8 @@ services:
     depends_on:
       kafka-init:
         condition: service_completed_successfully
+    volumes:
+      - ./certs:/certs:ro
     mem_limit: 128m
     restart: unless-stopped
 

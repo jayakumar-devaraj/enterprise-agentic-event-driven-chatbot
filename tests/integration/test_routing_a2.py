@@ -5,6 +5,7 @@ seeds or the margin cannot silently regress them.
 """
 
 import json
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -33,7 +34,11 @@ async def router() -> AsyncIterator[Router]:
     settings = Settings(qdrant_url=QDRANT_URL)
     await seed(settings)
     qdrant = AsyncQdrantClient(
-        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC_PORT, prefer_grpc=True
+        verify=os.environ["INFRA_CA_FILE"],
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        grpc_port=QDRANT_GRPC_PORT,
+        prefer_grpc=True,
     )
     yield Router(
         get_embedder(settings.embed_model),

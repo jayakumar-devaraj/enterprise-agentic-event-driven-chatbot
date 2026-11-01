@@ -48,8 +48,11 @@ ENV = {
     "QDRANT_GRPC_HOST_PORT": "26334",
 }
 KAFKA = "127.0.0.1:29092"
-REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
-QDRANT_URL, QDRANT_GRPC = "http://127.0.0.1:26333", 26334
+REDIS_URL = (
+    f"rediss://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
+    f"?ssl_ca_certs={os.environ['INFRA_CA_FILE']}"
+)
+QDRANT_URL, QDRANT_GRPC = "https://127.0.0.1:26333", 26334
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
 # 3 * (1 + 1) + 0.2 * 1 = 6.2 < 10: satisfies the lease formula.
 SETTINGS = Settings(
@@ -109,7 +112,11 @@ async def _run_worker_until(topic: str, dlq: str, commits: int) -> None:
     dlq_producer = AIOProducer(client_config(KAFKA))
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     qdrant = AsyncQdrantClient(
-        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC, prefer_grpc=True
+        verify=os.environ["INFRA_CA_FILE"],
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        grpc_port=QDRANT_GRPC,
+        prefer_grpc=True,
     )
     router = Router(
         get_embedder(SETTINGS.embed_model),
@@ -189,7 +196,11 @@ async def _events(env: Envelope) -> list[dict]:
 async def _wait_until_qdrant_serves() -> None:
     """The compose healthcheck only opens a TCP port; wait until gRPC answers for the collection."""
     qdrant = AsyncQdrantClient(
-        url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC, prefer_grpc=True
+        verify=os.environ["INFRA_CA_FILE"],
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        grpc_port=QDRANT_GRPC,
+        prefer_grpc=True,
     )
     try:
         async with asyncio.timeout(60):

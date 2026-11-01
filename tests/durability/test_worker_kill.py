@@ -44,7 +44,10 @@ ENV = {
     "MOCK_LLM": "true",
 }
 KAFKA = "127.0.0.1:29092"
-REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
+REDIS_URL = (
+    f"rediss://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
+    f"?ssl_ca_certs={os.environ['INFRA_CA_FILE']}"
+)
 THREADS, PER_THREAD, KILLS = 6, 50, 3
 
 

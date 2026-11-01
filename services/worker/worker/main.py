@@ -63,6 +63,7 @@ async def run(settings: Settings) -> None:
         api_key=qdrant_key.get_secret_value() if qdrant_key else None,
         grpc_port=settings.qdrant_grpc_port,
         prefer_grpc=settings.qdrant_prefer_grpc,
+        verify=settings.infra_ca_file,  # REST; gRPC trusts GRPC_DEFAULT_SSL_ROOTS_FILE_PATH
     )
     router = Router(
         get_embedder(settings.embed_model),

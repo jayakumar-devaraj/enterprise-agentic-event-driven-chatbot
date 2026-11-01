@@ -1,6 +1,6 @@
 # 0015 · Authentication on the data stores
 
-**Status:** Accepted 2026-11-01 (Redis, Qdrant, Kafka); TLS follows as an addendum.
+**Status:** Accepted 2026-11-01 (Redis, Qdrant, Kafka, TLS).
 
 ## Context
 Redis, Kafka and Qdrant accepted any client that could reach them: on the compose network, and on the
@@ -23,7 +23,7 @@ history (`docs/known_limitations.md`, "Loopback is the trust boundary").
   (ACLs are not stored in the AOF), and the same password must be used again for the services to connect.
 - The password appears in the container's command line and environment (`docker inspect`), so anyone
   with Docker access on the host still reads it; an ACL file from a secrets store is the step beyond.
-- Traffic is still plaintext until the TLS addendum.
+- Traffic was plaintext until the TLS addendum below.
 
 ## Addendum 2026-11-01: Qdrant
 Qdrant runs with `QDRANT__SERVICE__API_KEY` set from `QDRANT_API_KEY`, which then guards every REST and
@@ -39,3 +39,14 @@ would need an unauthenticated bootstrap path; PLAIN's weakness, the password in 
 removes. Every client starts from `chat_common.kafka.client_config`; CLI tools in the containers run
 through `deploy/kafka/cli.sh`, and the lag exporter authenticates with the same user. No ACL
 authorizer: there is one principal, and every service needs what it can do.
+
+## Addendum 2026-11-01: TLS
+Redis (TLS port only), every Kafka listener (`SASL_SSL`) and Qdrant (REST and gRPC) now encrypt traffic,
+so the passwords and the API key above no longer cross the network in clear. A one-shot `certs` service
+writes a development CA and one server certificate (SANs `redis`, `kafka`, `qdrant`, `localhost`,
+`127.0.0.1`) to `deploy/certs/` on first start and reuses them after; every client verifies the server
+against that CA (`INFRA_CA_FILE`, `ssl_ca_certs` in `REDIS_URL`, `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` for
+Qdrant's gRPC). Clients do not present certificates: identity stays the password or key.
+Consequences: the CA and server key are development material, readable by the containers and anyone with
+the checkout; a deployment replaces `deploy/certs/` with certificates from its own CA and keeps the same
+paths. The certificate lasts 825 days and is not renewed automatically.
