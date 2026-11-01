@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 import redis
+from chat_common.kafka import client_config
 from confluent_kafka import Consumer, Producer, TopicPartition
 from confluent_kafka.admin import AdminClient, NewTopic
 
@@ -54,15 +55,13 @@ def _write_state(topic: str, group: str, key: str) -> None:
     r.xadd("audit:events", {"event": "durability_probe", "thread_id": key})
     r.close()
 
-    admin = AdminClient({"bootstrap.servers": KAFKA})
+    admin = AdminClient(client_config(KAFKA))
     for fut in admin.create_topics([NewTopic(topic, 1, 1)]).values():
         fut.result(60)
-    producer = Producer({"bootstrap.servers": KAFKA, "acks": "all"})
+    producer = Producer(client_config(KAFKA) | {"acks": "all"})
     producer.produce(topic, value=key.encode())
     assert producer.flush(30) == 0
-    consumer = Consumer(
-        {"bootstrap.servers": KAFKA, "group.id": group, "auto.offset.reset": "earliest"}
-    )
+    consumer = Consumer(client_config(KAFKA) | {"group.id": group, "auto.offset.reset": "earliest"})
     consumer.assign([TopicPartition(topic, 0, 1)])
     consumer.commit(offsets=[TopicPartition(topic, 0, 1)], asynchronous=False)
     consumer.close()
@@ -87,8 +86,8 @@ def _assert_state(topic: str, group: str, key: str) -> None:
     r.close()
 
     consumer = Consumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": group,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,

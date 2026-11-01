@@ -19,6 +19,7 @@ import uuid
 import httpx
 import pytest
 import redis
+from chat_common.kafka import client_config
 from confluent_kafka import Consumer, Producer, TopicPartition
 
 pytestmark = pytest.mark.stack
@@ -63,7 +64,7 @@ def _found(text: str, pii: dict[str, str]) -> list[str]:
 def _topic_text(topic: str) -> list[str]:
     """Every record value in `topic`, read to its end offsets without committing."""
     consumer = Consumer(
-        {"bootstrap.servers": KAFKA, "group.id": f"scan-{uuid.uuid4().hex}",
+        client_config(KAFKA) | { "group.id": f"scan-{uuid.uuid4().hex}",
          "enable.auto.commit": False}
     )  # fmt: skip
     values: list[str] = []
@@ -147,7 +148,7 @@ def test_raw_pii_reaches_no_log_topic_store_or_trace() -> None:
         streamed = client.get(accepted.json()["stream_url"]).text
     assert "event: done" in streamed
 
-    producer = Producer({"bootstrap.servers": KAFKA})
+    producer = Producer(client_config(KAFKA))
     producer.produce("chat-requests", value=f"not json: {_message(malformed)}".encode(), key=b"x")
     assert producer.flush(30) == 0
     time.sleep(15)  # the worker dead-letters it; loggers and span processors flush

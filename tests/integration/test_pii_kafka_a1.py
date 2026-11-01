@@ -6,6 +6,7 @@ import uuid
 import httpx
 import pytest
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
@@ -41,8 +42,8 @@ async def _deps() -> Deps:
 async def _consume_envelope(message_id: str) -> Envelope:
     """Read chat-requests from the beginning until the record with `message_id` appears."""
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": f"a1-{uuid.uuid4().hex[:8]}",
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,

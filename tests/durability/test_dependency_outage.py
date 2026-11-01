@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
@@ -80,7 +81,7 @@ async def topics(stack) -> AsyncIterator[tuple[str, str]]:
     """Request and DLQ topics, and the Qdrant collections seeded by the real seed path."""
     await seed(SETTINGS)
     names = (f"a4-req-{uuid.uuid4().hex[:6]}", f"a4-dlq-{uuid.uuid4().hex[:6]}")
-    admin = AdminClient({"bootstrap.servers": KAFKA})
+    admin = AdminClient(client_config(KAFKA))
     for fut in admin.create_topics([NewTopic(n, 1, 1) for n in names]).values():
         fut.result(60)
     yield names
@@ -88,7 +89,7 @@ async def topics(stack) -> AsyncIterator[tuple[str, str]]:
 
 async def _produce(topic: str, env: Envelope) -> None:
     """One envelope keyed by its thread."""
-    producer = AIOProducer({"bootstrap.servers": KAFKA})
+    producer = AIOProducer(client_config(KAFKA))
     await (await producer.produce(topic, value=env.model_dump_json().encode(), key=b"t"))
     await producer.flush()
     await producer.close()
@@ -98,14 +99,14 @@ async def _run_worker_until(topic: str, dlq: str, commits: int) -> None:
     """Production Worker + graph + Router until `commits` offsets are committed (≤ 120 s)."""
     group = f"a4-{uuid.uuid4().hex[:6]}"
     consumer = AIOConsumer(
-        {
-            "bootstrap.servers": KAFKA,
+        client_config(KAFKA)
+        | {
             "group.id": group,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
         }
     )
-    dlq_producer = AIOProducer({"bootstrap.servers": KAFKA})
+    dlq_producer = AIOProducer(client_config(KAFKA))
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     qdrant = AsyncQdrantClient(
         url=QDRANT_URL, api_key=QDRANT_API_KEY, grpc_port=QDRANT_GRPC, prefer_grpc=True
@@ -160,7 +161,7 @@ async def _run_worker_until(topic: str, dlq: str, commits: int) -> None:
 async def _dlq_records(dlq: str, expected: int) -> list[dict]:
     """Read `expected` DLQ records."""
     consumer = AIOConsumer(
-        {"bootstrap.servers": KAFKA, "group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
+        client_config(KAFKA) | {"group.id": uuid.uuid4().hex, "auto.offset.reset": "earliest"}
     )
     await consumer.subscribe([dlq])
     out: list[dict] = []

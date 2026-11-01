@@ -100,6 +100,7 @@ Prerequisites: Docker, uv, network access for first-time model downloads (spaCy,
 uv sync                                                    # Python 3.13.18 + all packages
 export REDIS_PASSWORD=$(openssl rand -hex 16)               # Redis ACL user `chatbot`; compose refuses to start without it
 export QDRANT_API_KEY=$(openssl rand -hex 16)               # Qdrant API key, the same rule
+export KAFKA_PASSWORD=$(openssl rand -hex 16)               # Kafka SASL user `chatbot`, the same rule
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
 QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main  # reads QDRANT_API_KEY
@@ -131,8 +132,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Full stack in containers (Task 12 images; gateway on a host port from 127.0.0.1:8000–8003, see
   `docker compose -f deploy/compose.yaml port gateway 8000`; the chat UI at :5173 proxies to it):
   `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"` and
-  `export REDIS_PASSWORD=$(openssl rand -hex 16) QDRANT_API_KEY=$(openssl rand -hex 16)` (keep both:
-  the data volumes outlive them), then
+  `export REDIS_PASSWORD=$(openssl rand -hex 16) QDRANT_API_KEY=$(openssl rand -hex 16)
+  KAFKA_PASSWORD=$(openssl rand -hex 16)` (keep them: the data volumes outlive them), then
   `docker compose -f deploy/compose.yaml up -d --build --wait`. On Windows Git Bash also export
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.
 
@@ -144,9 +145,9 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   restore by extracting into an empty `chatbot_redis-data` volume (`tar -C /data -xf`) before
   starting Redis again. After a restore, replay what the backup missed (SPEC §12): with the gateways
   and workers stopped (`docker compose -f deploy/compose.yaml stop gateway worker`), run
-  `docker compose -f deploy/compose.yaml exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:9092 --group chat-workers --topic chat-requests --reset-offsets --to-earliest --execute`,
+  `docker compose -f deploy/compose.yaml exec -T kafka sh /opt/chatbot/cli.sh kafka-consumer-groups.sh --group chat-workers --topic chat-requests --reset-offsets --to-earliest --execute`,
   start the workers, wait until
-  `kafka-consumer-groups.sh --bootstrap-server kafka:9092 --describe --group chat-workers` shows a
+  `sh /opt/chatbot/cli.sh kafka-consumer-groups.sh --describe --group chat-workers` shows a
   `LAG` of 0, then start the gateways.
 - Dead-letter queue: `docker compose -f deploy/compose.yaml exec worker python -m worker.dlq list`
   prints one JSON line per record (no message text); `... python -m worker.dlq replay --offset 3 7`

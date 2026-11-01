@@ -1,6 +1,6 @@
 # 0015 · Authentication on the data stores
 
-**Status:** Accepted 2026-11-01 (Redis, Qdrant); Kafka and TLS follow as addenda.
+**Status:** Accepted 2026-11-01 (Redis, Qdrant, Kafka); TLS follows as an addendum.
 
 ## Context
 Redis, Kafka and Qdrant accepted any client that could reach them: on the compose network, and on the
@@ -30,3 +30,12 @@ Qdrant runs with `QDRANT__SERVICE__API_KEY` set from `QDRANT_API_KEY`, which the
 gRPC call. The worker and the seed pass the same key (`Settings.qdrant_api_key`); compose refuses to start
 without it, CI generates one per job and host-side tests read it from the environment. Until TLS the key
 travels in clear, and qdrant-client warns about it.
+
+## Addendum 2026-11-01: Kafka
+Every listener (the broker's `INTERNAL`, the host's `EXTERNAL` and the `CONTROLLER`) is
+`SASL_PLAINTEXT` with mechanism PLAIN and one user, `chatbot`, whose password is `KAFKA_PASSWORD`. PLAIN
+rather than SCRAM: KRaft creates SCRAM users only at storage format or through the controller, which
+would need an unauthenticated bootstrap path; PLAIN's weakness, the password in clear, is what TLS
+removes. Every client starts from `chat_common.kafka.client_config`; CLI tools in the containers run
+through `deploy/kafka/cli.sh`, and the lag exporter authenticates with the same user. No ACL
+authorizer: there is one principal, and every service needs what it can do.

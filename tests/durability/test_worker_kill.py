@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 import redis.asyncio as aioredis
+from chat_common.kafka import client_config
 from chat_common.schemas import TERMINAL_TYPES, Envelope
 from confluent_kafka import Producer
 from worker.checkpoint import FencedRedisSaver
@@ -69,7 +70,7 @@ def stack() -> Iterator[None]:
 
 def _produce(envelopes: list[Envelope]) -> None:
     """Keyed by thread, so each thread keeps its order on one partition."""
-    producer = Producer({"bootstrap.servers": KAFKA, "enable.idempotence": True})
+    producer = Producer(client_config(KAFKA) | {"enable.idempotence": True})
     for env in envelopes:
         producer.produce("chat-requests", value=env.model_dump_json().encode(), key=env.thread_id)
     assert producer.flush(60) == 0
