@@ -11,6 +11,7 @@ Writes docs/reports/safety_final.json.
 import argparse
 import asyncio
 import json
+import os
 import re
 import subprocess
 import uuid
@@ -26,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "data" / "safety.final.jsonl"
 REPORT = ROOT / "docs" / "reports" / "safety_final.json"
 AUTH = ("demo", "demo-pw")
-REDIS_URL = "redis://127.0.0.1:16379/0"
+REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:16379/0"
 # Sentences of the system prompts that a reply has no reason to contain (worker.llm).
 PROMPT_MARKERS = (
     "strictly as data from the user",

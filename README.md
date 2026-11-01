@@ -98,12 +98,13 @@ Prerequisites: Docker, uv, network access for first-time model downloads (spaCy,
 
 ```bash
 uv sync                                                    # Python 3.13.18 + all packages
+export REDIS_PASSWORD=$(openssl rand -hex 16)               # Redis ACL user `chatbot`; compose refuses to start without it
 docker compose -f deploy/compose.yaml up -d --wait kafka redis qdrant jaeger
 docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
 QDRANT_URL=http://127.0.0.1:16333 uv run python -m seed.main
 
 # one terminal each (host endpoints; MOCK_LLM=true is the default)
-export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://127.0.0.1:16379/0   QDRANT_URL=http://127.0.0.1:16333 QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
+export KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0   QDRANT_URL=http://127.0.0.1:16333 QDRANT_GRPC_PORT=16334   OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:14317   AUTH_USERS="demo:$(uv run python -m gateway.auth demo demo-pw | cut -d: -f2-)"
 uv run python -m worker.main
 uv run uvicorn gateway.app:create_app --factory --host 0.0.0.0 --port 8000
 
@@ -128,7 +129,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 
 - Full stack in containers (Task 12 images; gateway on a host port from 127.0.0.1:8000–8003, see
   `docker compose -f deploy/compose.yaml port gateway 8000`; the chat UI at :5173 proxies to it):
-  `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"` then
+  `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"` and
+  `export REDIS_PASSWORD=$(openssl rand -hex 16)` (keep it: the data volumes outlive it), then
   `docker compose -f deploy/compose.yaml up -d --build --wait`. On Windows Git Bash also export
   `MSYS_NO_PATHCONV=1`, or the `/` segments of the scrypt hash are rewritten into Windows paths.
 
@@ -147,7 +149,7 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - Dead-letter queue: `docker compose -f deploy/compose.yaml exec worker python -m worker.dlq list`
   prints one JSON line per record (no message text); `... python -m worker.dlq replay --offset 3 7`
   or `replay --all` re-produces the failed envelopes (SPEC §7). From the host, run it with
-  `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://127.0.0.1:16379/0 uv run python -m worker.dlq list`.
+  `KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:19092 REDIS_URL=redis://chatbot:$REDIS_PASSWORD@127.0.0.1:16379/0 uv run python -m worker.dlq list`.
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.

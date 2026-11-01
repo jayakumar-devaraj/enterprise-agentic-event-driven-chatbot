@@ -46,7 +46,8 @@ ENV = {
     "QDRANT_HOST_PORT": "26333",
     "QDRANT_GRPC_HOST_PORT": "26334",
 }
-KAFKA, REDIS_URL = "127.0.0.1:29092", "redis://127.0.0.1:26379/0"
+KAFKA = "127.0.0.1:29092"
+REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
 QDRANT_URL, QDRANT_GRPC = "http://127.0.0.1:26333", 26334
 # 3 * (1 + 1) + 0.2 * 1 = 6.2 < 10: satisfies the lease formula.
 SETTINGS = Settings(

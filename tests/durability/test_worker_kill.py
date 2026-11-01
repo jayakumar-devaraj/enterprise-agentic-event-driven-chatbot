@@ -42,7 +42,8 @@ ENV = {
     "QDRANT_GRPC_HOST_PORT": "26334",
     "MOCK_LLM": "true",
 }
-KAFKA, REDIS_URL = "127.0.0.1:29092", "redis://127.0.0.1:26379/0"
+KAFKA = "127.0.0.1:29092"
+REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
 THREADS, PER_THREAD, KILLS = 6, 50, 3
 
 

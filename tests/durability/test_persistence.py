@@ -21,7 +21,7 @@ pytestmark = pytest.mark.durability
 COMPOSE = Path(__file__).resolve().parents[2] / "deploy" / "compose.yaml"
 PROJECT = "chatbot-dur"
 ENV = {**os.environ, "REDIS_HOST_PORT": "26379", "KAFKA_HOST_PORT": "29092"}
-REDIS_URL = "redis://127.0.0.1:26379/0"
+REDIS_URL = f"redis://chatbot:{os.environ.get('REDIS_PASSWORD', '')}@127.0.0.1:26379/0"
 KAFKA = "127.0.0.1:29092"
 REDIS_IMAGE = "redis:8.10.2"
 
