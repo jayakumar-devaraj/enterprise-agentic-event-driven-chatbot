@@ -12,7 +12,10 @@ groups:
           summary: No worker is scraped as up; chat requests are not being consumed.
 
       - alert: ConsumerLagHigh
-        expr: sum(kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests"}) > 100
+        # The exporter reports -1 for a partition with no committed offset; count it as 0.
+        expr: |
+          sum(clamp_min(kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests"}, 0))
+            > 100
         for: 5m
         labels:
           severity: warning

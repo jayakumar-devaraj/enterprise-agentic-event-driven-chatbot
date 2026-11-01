@@ -38,6 +38,22 @@ tests:
             exp_annotations:
               summary: "180 chat requests are waiting; workers are not keeping up."
 
+  - name: partitions with no committed offset (exporter reports -1) do not lower the lag
+    input_series:
+      - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="0"}'
+        values: "101x14"
+      - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="1"}'
+        values: "-1x14"
+      - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="2"}'
+        values: "-1x14"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ConsumerLagHigh
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "101 chat requests are waiting; workers are not keeping up."
+
   - name: one dead-lettered record fires
     input_series:
       - series: 'kafka_topic_partition_current_offset{topic="chat-requests.dlq", partition="0"}'
