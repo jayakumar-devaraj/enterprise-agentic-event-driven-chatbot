@@ -45,8 +45,9 @@ markers = [
     "stack: needs the full compose stack up (gateway, worker, Jaeger) as in the README",
     "rag: needs the compose rag profile (rag-db, rag-api, rag-seed) and Ollama",
     "oidc: needs Keycloak from the compose profile oidc, plus Redis and Kafka",
+    "ops: starts its own compose project (Prometheus, Alertmanager, a webhook sink)",
 ]
-addopts = "-m 'not integration and not scale and not llm and not durability and not stack and not rag and not oidc'"
+addopts = "-m 'not integration and not scale and not llm and not durability and not stack and not rag and not oidc and not ops'"
 
 [tool.ruff]
 line-length = 100

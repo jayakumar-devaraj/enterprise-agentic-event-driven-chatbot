@@ -444,8 +444,8 @@ services:
     restart: unless-stopped
 
   # Metrics and alerts (profile `ops`): Prometheus scrapes the gateway and worker on their unpublished
-  # port 9100 and the lag exporter; rules in prometheus/alerts.yml. No Alertmanager: where alerts go
-  # is a deployment decision, so firing alerts show at http://127.0.0.1:19090/alerts.
+  # port 9100 and the lag exporter; rules in prometheus/alerts.yml; the alertmanager service below
+  # delivers firing alerts to ALERT_WEBHOOK_URL.
   kafka-exporter:
     profiles: ["ops"]
     image: danielqsj/kafka-exporter:v1.11.0
@@ -478,6 +478,27 @@ services:
     ports:
       - "127.0.0.1:${PROMETHEUS_HOST_PORT:-19090}:9090"
     mem_limit: 512m
+    restart: unless-stopped
+
+  # Delivers alerts to ALERT_WEBHOOK_URL (Slack/Teams/PagerDuty/Opsgenie webhook or any receiver);
+  # routing in alertmanager/alertmanager.yml. Refuses to start without a destination.
+  alertmanager:
+    profiles: ["ops"]
+    image: prom/alertmanager:v0.34.2
+    environment:
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        [ -n "$$ALERT_WEBHOOK_URL" ] || { echo "export ALERT_WEBHOOK_URL: where alerts are sent" >&2; exit 1; }
+        printf '%s' "$$ALERT_WEBHOOK_URL" > /tmp/alert-webhook-url
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_HOST_PORT:-19093}:9093"
+    mem_limit: 128m
     restart: unless-stopped
 
   # Local OIDC issuer (profile `oidc`, ADR 0016): realm `chatbot` from keycloak/realm.json, at
@@ -542,6 +563,7 @@ services:
     restart: "no"
 
 volumes:
+  alertmanager-data:
   prometheus-data:
   redis-data:
   kafka-data:

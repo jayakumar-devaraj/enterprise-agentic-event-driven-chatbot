@@ -34,3 +34,13 @@ API port is reachable through Caddy's `/api/*`, so anything served there is publ
   5xx, retries, dead letters or latency.
 - Histogram buckets bound how precisely a quantile can be read; the queue-delay and accept-latency targets
   fall on bucket boundaries (0.5 s, 1 s).
+
+## Addendum 2026-11-02: alerts are delivered
+Alertmanager v0.34.2 (profile `ops`) receives Prometheus's alerts and sends them, grouped by name and with
+resolved notices, to one webhook: `ALERT_WEBHOOK_URL`, which Slack, Teams, PagerDuty, Opsgenie and most
+on-call tools accept. Critical alerts repeat hourly, the rest every 4 hours. The URL can carry a token, so
+it is never committed: the container writes it to the receiver's `url_file` at start, and refuses to start
+without it rather than accept alerts it cannot send. `tests/ops/test_alert_delivery.py` (marker `ops`, in
+the CI `alerts` job) runs Prometheus and Alertmanager with no worker and a local webhook: `NoWorkerUp`
+arrives firing, with its severity and summary. Per-team routes, silences and inhibition are a deployment's
+to add in `deploy/alertmanager/alertmanager.yml`.

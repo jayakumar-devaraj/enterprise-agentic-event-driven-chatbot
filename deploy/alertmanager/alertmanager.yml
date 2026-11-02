@@ -1,0 +1,18 @@
+# Routes every alert of deploy/prometheus/alerts.yml to one webhook (ADR 0013 addendum). The URL can
+# carry a secret, so it is never committed: the container writes ALERT_WEBHOOK_URL to url_file at start.
+route:
+  receiver: webhook
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: webhook
+      repeat_interval: 1h
+
+receivers:
+  - name: webhook
+    webhook_configs:
+      - url_file: /tmp/alert-webhook-url
+        send_resolved: true

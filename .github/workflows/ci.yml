@@ -130,14 +130,29 @@ jobs:
       - run: npm test
 
   alerts:
-    # Each alert rule fires on the synthetic series it is meant for and stays quiet otherwise.
+    # Each alert rule fires on the synthetic series it is meant for and stays quiet otherwise, and a
+    # firing alert reaches a webhook through Alertmanager.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
       - name: Prometheus config and alert rule tests
         run: |
           docker run --rm -v "$PWD/deploy/prometheus:/etc/prometheus:ro" --entrypoint promtool             prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
           docker run --rm -v "$PWD/deploy/prometheus:/etc/prometheus:ro" -w /etc/prometheus             --entrypoint promtool prom/prometheus:v3.15.1 test rules alerts_test.yml
+      - name: Alertmanager config
+        run: |
+          docker run --rm -v "$PWD/deploy/alertmanager:/etc/alertmanager:ro" --entrypoint amtool \
+            prom/alertmanager:v0.34.2 check-config /etc/alertmanager/alertmanager.yml
+      - name: Generate infrastructure credentials
+        run: |
+          for name in REDIS_PASSWORD QDRANT_API_KEY KAFKA_PASSWORD; do
+            echo "$name=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          done
+      - name: Alert delivery
+        run: uv sync --locked && uv run pytest -m ops -v
 
   docs:
     # Documents must not point at anything that does not exist, and every diagram must render.
