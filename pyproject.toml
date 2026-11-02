@@ -44,8 +44,9 @@ markers = [
     "durability: starts its own compose project (redis, kafka) and kills/recreates it",
     "stack: needs the full compose stack up (gateway, worker, Jaeger) as in the README",
     "rag: needs the compose rag profile (rag-db, rag-api, rag-seed) and Ollama",
+    "oidc: needs Keycloak from the compose profile oidc, plus Redis and Kafka",
 ]
-addopts = "-m 'not integration and not scale and not llm and not durability and not stack and not rag'"
+addopts = "-m 'not integration and not scale and not llm and not durability and not stack and not rag and not oidc'"
 
 [tool.ruff]
 line-length = 100

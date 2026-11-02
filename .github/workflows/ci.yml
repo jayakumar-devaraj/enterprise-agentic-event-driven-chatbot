@@ -91,6 +91,32 @@ jobs:
       - name: Durability tests
         run: uv run pytest -m durability -v
 
+  oidc:
+    # The gateway's OIDC validation against a real issuer: Keycloak's development realm (ADR 0016).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+      - name: Sync
+        run: uv sync --locked
+      - name: Generate infrastructure credentials
+        run: |
+          for name in REDIS_PASSWORD QDRANT_API_KEY KAFKA_PASSWORD KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_DEMO_PASSWORD; do
+            echo "$name=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          done
+      - name: Start Kafka, Redis and Keycloak
+        run: |
+          docker compose -f deploy/compose.yaml --profile oidc up -d --wait kafka redis keycloak
+          docker compose -f deploy/compose.yaml --profile oidc up --exit-code-from keycloak-init keycloak-init
+          docker compose -f deploy/compose.yaml up --exit-code-from kafka-init kafka-init
+      - name: OIDC tests
+        run: uv run pytest -m oidc -v
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose.yaml --profile oidc logs --tail 100
+
   frontend:
     runs-on: ubuntu-latest
     container: node:24.22.0-slim
