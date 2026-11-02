@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fakes import FakeRedis, RecordingProducer
 from gateway.app import Deps, create_app
-from gateway.oidc import OidcVerifier
+from gateway.oidc import InvalidToken, OidcVerifier
 from test_gateway_chat import body
 
 AUDIENCE = "chatbot-gateway"
@@ -175,6 +175,16 @@ async def test_a_rotated_key_is_picked_up_without_a_restart(client, issuer) -> N
         "/chat", json=body(thread="t2"), headers={"Authorization": f"Bearer {issuer.token('k2')}"}
     )
     assert r.status_code == 202
+
+
+async def test_discovery_can_come_from_another_address_while_iss_stays_the_issuer(issuer) -> None:
+    """Compose: the browser sees localhost:18080, the gateway reaches keycloak:8080. The token's
+    `iss` must still be OIDC_ISSUER; a token claiming the discovery address is refused."""
+    discovery = f"{issuer.url}/.well-known/openid-configuration"
+    verifier = OidcVerifier("https://public.example/realms/r", AUDIENCE, discovery_url=discovery)
+    assert await verifier(issuer.token(iss="https://public.example/realms/r")) == "alice"
+    with pytest.raises(InvalidToken):
+        await verifier(issuer.token())  # iss = the discovery host, not the configured issuer
 
 
 async def test_an_unreachable_issuer_is_503_not_401(client, issuer) -> None:

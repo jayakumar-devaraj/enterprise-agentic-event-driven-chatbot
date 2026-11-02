@@ -27,8 +27,7 @@ provider-neutral design rather than one vendor.
 - Works with Entra ID, Okta, Auth0, Keycloak or Google by configuration alone; scopes, roles and group
   claims are not used yet.
 - Revocation is bounded by token lifetime: a revoked user's unexpired token is accepted until `exp`.
-- The browser client still sends Basic credentials; it needs an authorization-code-with-PKCE login
-  before an OIDC deployment can serve it, and a local issuer (Keycloak) is needed to run one end to end.
+- The browser client signed in with Basic only; see the addenda for its PKCE login and the local issuer.
 
 ## Addendum 2026-11-01: a local issuer
 Compose profile `oidc` runs Keycloak 26.8.1 in development mode with realm `chatbot`
@@ -39,3 +38,12 @@ two add `chatbot-gateway` to `aud`. No user or password is committed: `keycloak-
 real tokens from Keycloak to the gateway over real Redis and Kafka: the gateway's token is accepted and
 its subject owns the thread, another application's token is 401, and Basic is off. The realm's password
 grant client exists only for tests and must not be imported into a production realm.
+
+## Addendum 2026-11-02: the browser signs in
+With `VITE_OIDC_ISSUER` set (compose passes `OIDC_ISSUER`), the chat window replaces the Basic form with
+"Sign in": authorization code with PKCE S256 and no client secret (`frontend/src/oidc.ts`, WebCrypto, no
+library). The verifier and `state` wait in `sessionStorage` across the redirect and are used once; a
+response whose `state` is not the tab's is refused. Tokens stay in memory and are refreshed 30 s before
+expiry. In compose the gateway reaches Keycloak at `keycloak:8080` while browsers and tokens use
+`localhost:18080`, so `OIDC_DISCOVERY_URL` names where the gateway fetches discovery while `iss` is still
+checked against `OIDC_ISSUER`.

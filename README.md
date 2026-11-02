@@ -165,6 +165,10 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   then `docker compose -f deploy/compose.yaml --profile oidc up -d --wait keycloak` and
   `docker compose -f deploy/compose.yaml --profile oidc up keycloak-init` (creates user `demo`). Issuer
   `http://localhost:18080/realms/chatbot`, audience `chatbot-gateway`; admin console at http://localhost:18080.
+  To run the whole stack on it, also export `OIDC_ISSUER=http://localhost:18080/realms/chatbot`,
+  `OIDC_DISCOVERY_URL=http://keycloak:8080/realms/chatbot/.well-known/openid-configuration` and an empty
+  `AUTH_USERS`, then `docker compose -f deploy/compose.yaml --profile oidc up -d --build --wait`: the chat window at
+  http://localhost:5173 shows "Sign in", which goes through Keycloak (authorization code + PKCE).
 - Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter prometheus`
   → http://127.0.0.1:19090 (`/alerts` lists firing alerts; no Alertmanager is configured).
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):

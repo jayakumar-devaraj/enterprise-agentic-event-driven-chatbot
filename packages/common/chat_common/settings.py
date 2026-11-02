@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     oidc_issuer: str | None = None
     oidc_audience: str | None = None
     oidc_user_claim: str = "sub"
+    # Where the gateway fetches discovery when it reaches the issuer at another address than the
+    # browser does (compose: keycloak:8080); `iss` is still checked against OIDC_ISSUER.
+    oidc_discovery_url: str | None = None
 
     approval_ttl_s: int = 3600
 

@@ -194,7 +194,12 @@ def create_app(deps_factory: Callable[[], Awaitable[Deps]] | None = None) -> Fas
         scrubber = get_scrubber(settings.spacy_model)
         users = auth.parse_users(settings.auth_users.get_secret_value())
         oidc = (
-            OidcVerifier(settings.oidc_issuer, settings.oidc_audience, settings.oidc_user_claim)
+            OidcVerifier(
+                settings.oidc_issuer,
+                settings.oidc_audience,
+                settings.oidc_user_claim,
+                discovery_url=settings.oidc_discovery_url,
+            )
             if settings.oidc_issuer and settings.oidc_audience
             else None
         )

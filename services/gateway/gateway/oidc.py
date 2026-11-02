@@ -35,6 +35,7 @@ class OidcVerifier:
         user_claim: str = "sub",
         leeway_s: int = 30,
         cooldown_s: float = 30,
+        discovery_url: str | None = None,
     ) -> None:
         """Bind to one issuer and audience; nothing is fetched yet."""
         self._issuer = issuer.rstrip("/")
@@ -42,14 +43,14 @@ class OidcVerifier:
         self._user_claim = user_claim
         self._leeway_s = leeway_s
         self._cooldown_s = cooldown_s
+        self._discovery_url = discovery_url or f"{self._issuer}/.well-known/openid-configuration"
         self._jwks: jwt.PyJWKClient | None = None
 
     def _client(self) -> jwt.PyJWKClient:
         """The JWKS client, discovering `jwks_uri` on first call."""
         if self._jwks is None:
-            url = f"{self._issuer}/.well-known/openid-configuration"
             try:
-                with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 (https issuer URL)
+                with urllib.request.urlopen(self._discovery_url, timeout=10) as resp:  # noqa: S310 (https issuer URL)
                     jwks_uri = json.load(resp)["jwks_uri"]
             except (OSError, ValueError, KeyError) as exc:
                 raise IssuerUnavailable(f"discovery failed: {type(exc).__name__}") from exc

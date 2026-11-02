@@ -1,8 +1,8 @@
 {
-  "unit_tests": 230,
+  "unit_tests": 231,
   "integration_tests": 61,
   "durability_tests": 8,
-  "frontend_tests": 11,
+  "frontend_tests": 16,
   "coverage": {
     "percent": 89,
     "statements": 1606,
