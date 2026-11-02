@@ -165,3 +165,10 @@ fell by 1.4 points for routing (0.9722 to 0.9583) and 2.3 points for the injecti
 "What does the handbook say about remote work?" does too (0.629), but "What is the parental leave
 policy?" scores 0.566, below the cut, and routes to `general`. A document question that names no
 document and is far from every exemplar is answered by the plain assistant, not from the documents.
+
+**Addendum 2026-11-02: reseeding under live workers.** The seed deleted and recreated each collection, so a
+worker routing at that moment got "Collection doesn't exist" and could dead-letter the message. Each name
+(`intents`, `injection_patterns`, `benign_patterns`) is now a Qdrant alias: the seed loads
+`{name}_{version}`, where the version hashes the rows, the model and the dimension, then moves the alias in
+one atomic call and deletes older versions afterwards. Unchanged data rewrites nothing. Calibration still
+runs every time; it reads the same vectors.

@@ -84,7 +84,7 @@ flowchart TB
 | Worker | Dedupe, LangGraph run (route → node → inference), output guard, token publish | None beyond Redis |
 | Redis 8 | Token streams, LangGraph checkpoints, dedupe leases, rate-limit counters, thread owners, refunds, audit stream | All shared mutable state |
 | Qdrant | Intent exemplars and injection exemplars (384-dim cosine) | Seeded once |
-| Seed | Embeds and loads the seed files; fails loud | One-shot |
+| Seed | Embeds and loads the seed files; fails loud | One-shot; safe to rerun under live workers (aliases) |
 | RAG service (profile `rag`) | Tenant-isolated document retrieval over HTTP (`/v1/retrieve`); the worker writes the answer (ADR 0010) | Its own Postgres + pgvector |
 | React chat window | Vite + React + TypeScript SPA: sends turns, renders tokens incrementally, shows error and approval-required states, approve/reject buttons | Credentials and thread id in memory only |
 | Ollama | Local CPU inference (`llama3.2:1b`); vLLM on GPU is the documented production path behind the same URL | Model cache |

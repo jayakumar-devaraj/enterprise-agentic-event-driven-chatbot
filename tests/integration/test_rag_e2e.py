@@ -28,7 +28,7 @@ from gateway.app import Deps, create_app
 from gateway.producer import KafkaEnvelopeProducer
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from qdrant_client import AsyncQdrantClient
-from seed.main import seed
+from seed.main import drop_collection, seed
 from worker.consumer import Worker
 from worker.embedding import get_embedder
 from worker.graph import NOT_FOUND_TEXT, build_graph, make_processor
@@ -115,7 +115,7 @@ async def collections() -> AsyncIterator[Settings]:
         verify=os.environ["INFRA_CA_FILE"], url=QDRANT_URL, api_key=QDRANT_API_KEY
     )
     for name in (s.qdrant_collection, s.qdrant_injection_collection, s.qdrant_benign_collection):
-        await q.delete_collection(name)
+        await drop_collection(q, name)
     await q.close()
 
 
