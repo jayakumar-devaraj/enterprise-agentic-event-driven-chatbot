@@ -170,7 +170,8 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   `AUTH_USERS`, then `docker compose -f deploy/compose.yaml --profile oidc up -d --build --wait`: the chat window at
   http://localhost:5173 shows "Sign in", which goes through Keycloak (authorization code + PKCE).
 - Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter prometheus`
-  → http://127.0.0.1:19090 (`/alerts` lists firing alerts; no Alertmanager is configured).
+  → http://127.0.0.1:19090. Add `alertmanager` with `ALERT_WEBHOOK_URL` exported (a Slack, Teams, PagerDuty or
+  any webhook URL) and firing alerts are delivered there (http://127.0.0.1:19093); it refuses to start without one.
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):
   `MOCK_LLM=false docker compose -f deploy/compose.yaml --profile llm up -d --build --wait`.
 - Generate a user: `uv run python -m gateway.auth <user> <password>` → append to `AUTH_USERS`.
@@ -191,6 +192,7 @@ uv run pytest -m durability   # own compose project: SIGKILL, replacement, backu
 uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
 uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
 uv run pytest -m stack     # running stack: raw PII absent from logs, Kafka, DLQ, Redis and traces
+uv run pytest -m ops       # an alert reaches a webhook: own compose project (Prometheus, Alertmanager, sink)
 uv run pytest -m oidc      # gateway OIDC against Keycloak: compose profile oidc + kafka, redis (KEYCLOAK_DEMO_PASSWORD)
 uv run pytest -m rag       # document questions end to end: compose profile rag + Ollama (IT_RAG_URL, IT_RAG_TOKENS, IT_LLM_URL)
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report

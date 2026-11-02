@@ -1,0 +1,10 @@
+# Overlay for tests/ops/test_alert_delivery.py: a webhook sink the alerts are sent to.
+services:
+  webhook-sink:
+    image: python:3.13.18-slim
+    command: ["python", "/sink/webhook_sink.py"]
+    volumes:
+      # Relative to deploy/, the directory of the first compose file.
+      - ../tests/ops/webhook_sink.py:/sink/webhook_sink.py:ro
+    ports:
+      - "127.0.0.1:29094:8080"
