@@ -30,7 +30,7 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `worker.rag_client` | `/v1/retrieve` client: one pool, one deadline, status mapping, contract models |
 | `worker.numeric` | `numeric_groundedness`, copied from the RAG service with a parity test |
 | `worker.approval` | Refund proposal, interrupt/resume, apply |
-| `seed.main` / `seed.calibrate` | Load collections; leave-one-out threshold calibration |
+| `seed.main` / `seed.calibrate` | Load versioned collections behind atomically switched aliases (ADR 0004 addendum); leave-one-out threshold calibration |
 | `frontend/src/api.ts` | `postChat`, `postApprove`, `streamMessage` (fetch + SSE parser, Basic header, `Last-Event-ID` resume) |
 | `frontend/src/ChatWindow.tsx` | Chat state machine (§11), message list, incremental token rendering, input box, error banner, approve/reject panel |
 | `frontend/src/App.tsx` | Username/password form; credentials held in React state only |
