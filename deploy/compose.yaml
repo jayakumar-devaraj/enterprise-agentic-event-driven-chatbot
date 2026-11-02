@@ -327,6 +327,9 @@ services:
       DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
       # The same value the worker reads as RAG_TENANT_TOKENS, so the two cannot disagree.
       TENANT_TOKENS: ${RAG_TENANT_TOKENS:-}
+      # This profile authenticates with static tokens, which the RAG service accepts only when told to
+      # (opt-in since multi-tenant-agentic-rag#35); v0.1.0 ignores the variable.
+      ALLOW_STATIC_TOKENS: "true"
       FASTEMBED_MODEL: BAAI/bge-small-en-v1.5
       # Its sufficiency check uses the chatbot's OpenAI-compatible endpoint; no real key is needed.
       OPENAI_API_KEY: unused
