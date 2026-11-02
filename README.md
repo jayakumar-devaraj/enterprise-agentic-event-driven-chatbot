@@ -161,6 +161,10 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
 - HTTPS entry point (Tier 3): `docker compose -f deploy/compose.yaml up -d --wait caddy` →
   https://localhost:8443 (UI) and https://localhost:8443/api/... (gateway), HTTP/2, Caddy internal CA.
   The direct dev ports (gateway 8000–8003, Vite 5173) are plain HTTP on 127.0.0.1.
+- OIDC login against a local issuer (ADR 0016): export `KEYCLOAK_ADMIN_PASSWORD` and `KEYCLOAK_DEMO_PASSWORD`,
+  then `docker compose -f deploy/compose.yaml --profile oidc up -d --wait keycloak` and
+  `docker compose -f deploy/compose.yaml --profile oidc up keycloak-init` (creates user `demo`). Issuer
+  `http://localhost:18080/realms/chatbot`, audience `chatbot-gateway`; admin console at http://localhost:18080.
 - Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter prometheus`
   → http://127.0.0.1:19090 (`/alerts` lists firing alerts; no Alertmanager is configured).
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):
@@ -183,6 +187,7 @@ uv run pytest -m durability   # own compose project: SIGKILL, replacement, backu
 uv run pytest -m scale     # A10: stack scaled to 2 gateways + 2 workers
 uv run pytest -m llm       # A9: stack with MOCK_LLM=false and --profile llm
 uv run pytest -m stack     # running stack: raw PII absent from logs, Kafka, DLQ, Redis and traces
+uv run pytest -m oidc      # gateway OIDC against Keycloak: compose profile oidc + kafka, redis (KEYCLOAK_DEMO_PASSWORD)
 uv run pytest -m rag       # document questions end to end: compose profile rag + Ollama (IT_RAG_URL, IT_RAG_TOKENS, IT_LLM_URL)
 uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
 docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
@@ -194,7 +199,7 @@ Acceptance-test map and results: `docs/master_plan.md`, `docs/reports/`.
 ## Deployment / CI
 
 `.github/workflows/ci.yml` runs lint + unit, integration (compose stack + seed), durability (Redis
-and Kafka restart/replacement/restore), alert rule tests (`promtool`), and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
+and Kafka restart/replacement/restore), alert rule tests (`promtool`), OIDC against Keycloak, and frontend jobs on every pull request and on every push to `main`. Gateway, worker and seed images build from `services/*/Dockerfile`
 (multi-stage, non-root, models baked in) and run with the whole stack via `deploy/compose.yaml`;
 there is no registry push or production deployment target yet.
 `.github/workflows/security.yml` builds each service image and fails on a fixable HIGH or CRITICAL

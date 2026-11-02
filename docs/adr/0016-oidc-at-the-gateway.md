@@ -29,3 +29,13 @@ provider-neutral design rather than one vendor.
 - Revocation is bounded by token lifetime: a revoked user's unexpired token is accepted until `exp`.
 - The browser client still sends Basic credentials; it needs an authorization-code-with-PKCE login
   before an OIDC deployment can serve it, and a local issuer (Keycloak) is needed to run one end to end.
+
+## Addendum 2026-11-01: a local issuer
+Compose profile `oidc` runs Keycloak 26.8.1 in development mode with realm `chatbot`
+(`deploy/keycloak/realm.json`): `chatbot-web` (public, authorization code with PKCE S256, for the browser),
+`chatbot-test` (password grant, for automated tests only) and `other-app` (no gateway audience). The first
+two add `chatbot-gateway` to `aud`. No user or password is committed: `keycloak-init` creates `demo` with
+`KEYCLOAK_DEMO_PASSWORD`. `tests/integration/test_oidc_keycloak.py` (marker `oidc`, its own CI job) takes
+real tokens from Keycloak to the gateway over real Redis and Kafka: the gateway's token is accepted and
+its subject owns the thread, another application's token is 401, and Basic is off. The realm's password
+grant client exists only for tests and must not be imported into a production realm.
