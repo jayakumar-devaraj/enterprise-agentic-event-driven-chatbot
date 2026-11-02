@@ -284,6 +284,11 @@ services:
     environment:
       # Exported in the shell: `export AUTH_USERS="$(uv run python -m gateway.auth demo demo-pw)"`.
       AUTH_USERS: ${AUTH_USERS:-}
+      # OIDC instead of Basic (ADR 0016): with profile `oidc`, OIDC_ISSUER=http://localhost:18080/realms/chatbot
+      # and OIDC_DISCOVERY_URL=http://keycloak:8080/realms/chatbot/.well-known/openid-configuration.
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-chatbot-gateway}
+      OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
       REDIS_URL: rediss://chatbot:${REDIS_PASSWORD:?export REDIS_PASSWORD, e.g. $(openssl rand -hex 16)}@redis:6379/0?ssl_ca_certs=/certs/ca.crt
       KAFKA_PASSWORD: ${KAFKA_PASSWORD:?export KAFKA_PASSWORD, e.g. $(openssl rand -hex 16)}
     depends_on:
@@ -367,6 +372,9 @@ services:
     build: ../frontend
     environment:
       GATEWAY_URL: ${GATEWAY_URL:-http://gateway:8000}
+      # Set with OIDC_ISSUER so the window signs in through the same issuer.
+      VITE_OIDC_ISSUER: ${OIDC_ISSUER:-}
+      VITE_OIDC_CLIENT_ID: chatbot-web
     depends_on:
       gateway:
         condition: service_healthy

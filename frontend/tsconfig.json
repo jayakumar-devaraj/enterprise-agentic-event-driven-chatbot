@@ -8,7 +8,7 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node", "vite/client"]
   },
   "include": ["src", "vite.config.ts"]
 }
