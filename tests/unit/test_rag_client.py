@@ -101,7 +101,13 @@ async def test_a_connection_error_is_retryable() -> None:
 
 @pytest.mark.parametrize(
     ("status", "code"),
-    [(401, "rag_unauthorized"), (422, "rag_bad_request"), (500, "rag_error"), (404, "rag_error")],
+    [
+        (401, "rag_unauthorized"),
+        (422, "rag_bad_request"),
+        (500, "rag_error"),
+        (404, "rag_error"),
+        (429, "rag_error"),  # the tenant's query limit (contract since v0.2.0): final, not retried
+    ],
 )
 async def test_other_statuses_end_the_turn_with_a_fixed_error(status: int, code: str) -> None:
     client, rec = _client(_reply(status))

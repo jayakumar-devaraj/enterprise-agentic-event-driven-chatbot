@@ -40,6 +40,18 @@ groups:
         annotations:
           summary: More than 5% of gateway requests end in a 5xx.
 
+      - alert: RagErrorRateHigh
+        # The RAG service's own count (multi-tenant-agentic-rag ADR 0004); 503 means its database or
+        # model provider is down, which the worker answers as a failed document question.
+        expr: |
+          sum(rate(rag_api_requests_total{status=~"5.."}[5m]))
+            / sum(rate(rag_api_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 5% of RAG service requests end in a 5xx.
+
       - alert: ChatAcceptSlow
         expr: |
           histogram_quantile(0.95,

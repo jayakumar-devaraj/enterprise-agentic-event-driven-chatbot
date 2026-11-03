@@ -68,6 +68,16 @@
               }
             }
           },
+          "429": {
+            "description": "The tenant's per-minute query limit is used up; retry after `Retry-After` seconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Model provider or database unavailable, or no provider configured.",
             "content": {

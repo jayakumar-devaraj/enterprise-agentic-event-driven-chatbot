@@ -96,6 +96,35 @@ tests:
             exp_annotations:
               summary: More than 5% of gateway requests end in a 5xx.
 
+  - name: RAG caller errors (401, 429) and 2% 5xx do not fire
+    input_series:
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="200"}'
+        values: "0+40x20"
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="401"}'
+        values: "0+30x20"
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="429"}'
+        values: "0+28x20"
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="503"}'
+        values: "0+2x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: RagErrorRateHigh
+        exp_alerts: []  # 2 of 100 per minute
+
+  - name: RAG 10% 5xx sustained for 5m fires
+    input_series:
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="200"}'
+        values: "0+90x20"
+      - series: 'rag_api_requests_total{method="POST", route="/v1/retrieve", status="503"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: RagErrorRateHigh
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: More than 5% of RAG service requests end in a 5xx.
+
   - name: POST /chat p95 above 1 s for 10m fires, and other routes do not count
     input_series:
       # Every request lands in (1, 2.5], so p95 is above 1 s.

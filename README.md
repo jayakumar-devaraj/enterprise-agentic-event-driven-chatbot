@@ -121,12 +121,12 @@ docker compose -f deploy/compose.yaml up -d --build frontend   # http://localhos
 Document questions (optional): needs Ollama running (`--profile llm`) for the RAG service's sufficiency check.
 
 ```bash
-export RAG_TENANT_TOKENS=<token>:T1 RAG_DB_PASSWORD=<password>   # placeholders; set USER_TENANTS=demo:T1 on the gateway
-docker compose -f deploy/compose.yaml --profile rag up -d rag-db rag-api   # http://127.0.0.1:18000/health
+export RAG_TENANT_TOKENS=<token>:T1 RAG_DB_PASSWORD=<password> RAG_APP_DB_PASSWORD=<password>   # placeholders; set USER_TENANTS=demo:T1 on the gateway
+docker compose -f deploy/compose.yaml --profile rag up -d --wait rag-api   # role, migrations, then http://127.0.0.1:18000/health
 docker compose -f deploy/compose.yaml --profile rag up rag-seed            # uploads deploy/rag/handbook.txt as tenant T1
 ```
 
-The image is `RAG_API_IMAGE` (default: release `v0.1.0` of `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag`, pinned by digest `sha256:f8ef8a010565f1e479748e199d12475321444c05eae56614883c5046049d280e`; moving to another release changes both).
+The images are `RAG_API_IMAGE` and `RAG_MIGRATE_IMAGE` (default: release `v0.2.1` of `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag` and `…-rag-migrate`, pinned by digest `sha256:45d6a56cca95e89ed33f5fbd53becf809c62191115a40ed8c232ee3200be1eb3` and `sha256:0934afae9b4c905094d05d78aae547209d240b0508cd3c3323273fb9b80cbb48`; moving to another release changes all four). `rag-db-role` creates the API's role `rag_app` (row-level security applies to it) and `rag-migrate` brings the schema to the release's revision; both are one-shots that `rag-api` waits for. With `--profile ops`, Prometheus scrapes the service's `/metrics` (port 9100, not published).
 `uv run pytest -m rag` shows the settings the host-run worker needs (`tests/integration/test_rag_e2e.py`).
 
 Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`,

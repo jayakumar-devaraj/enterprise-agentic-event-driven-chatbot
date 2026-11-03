@@ -305,8 +305,9 @@ services:
     restart: unless-stopped
 
   # Document questions (profile `rag`): the RAG service from its published image, never its source,
-  # plus its own pgvector database. Export RAG_TENANT_TOKENS (token:tenant,...) and RAG_DB_PASSWORD
-  # in the shell, as with AUTH_USERS. The service reaches the same Ollama as the worker.
+  # plus its own pgvector database. Export RAG_TENANT_TOKENS (token:tenant,...), RAG_DB_PASSWORD (the
+  # schema owner) and RAG_APP_DB_PASSWORD (the API's role) in the shell, as with AUTH_USERS. The
+  # service reaches the same Ollama as the worker.
   rag-db:
     profiles: ["rag"]
     image: pgvector/pgvector:pg16
@@ -324,17 +325,55 @@ services:
     mem_limit: 512m
     restart: unless-stopped
 
+  # One-shot: the non-owner role the RAG API connects as, so row-level security applies to it (the
+  # owner is a superuser and bypasses it). Idempotent, so it also runs against an existing volume.
+  rag-db-role:
+    profiles: ["rag"]
+    image: pgvector/pgvector:pg16
+    environment:
+      PGPASSWORD: ${RAG_DB_PASSWORD:-}
+      APP_DB_PASSWORD: ${RAG_APP_DB_PASSWORD:-}
+    depends_on:
+      rag-db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        [ -n "$$APP_DB_PASSWORD" ] || { echo "export RAG_APP_DB_PASSWORD" >&2; exit 1; }
+        psql -v ON_ERROR_STOP=1 -v app_pw="$$APP_DB_PASSWORD" -h rag-db -U rag -d rag <<'SQL'
+        SELECT format(CASE WHEN EXISTS (SELECT FROM pg_roles WHERE rolname = 'rag_app')
+                           THEN 'ALTER ROLE rag_app LOGIN PASSWORD %L'
+                           ELSE 'CREATE ROLE rag_app LOGIN PASSWORD %L' END
+                      || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS', :'app_pw') \gexec
+        SQL
+    restart: "no"
+
+  # One-shot: the RAG schema, as the owner, then grants to rag_app. The API refuses an unmigrated
+  # database. Same release as rag-api; moving one moves both.
+  rag-migrate:
+    profiles: ["rag"]
+    image: ${RAG_MIGRATE_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag-migrate:v0.2.1@sha256:0934afae9b4c905094d05d78aae547209d240b0508cd3c3323273fb9b80cbb48}
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
+      APP_DB_ROLE: rag_app
+    depends_on:
+      rag-db-role:
+        condition: service_completed_successfully
+    restart: "no"
+
   rag-api:
     profiles: ["rag"]
-    # Release v0.1.0 of the RAG service's published image, pinned by its index digest: a re-pushed tag
-    # cannot change what runs here. Its API contract is docs/contracts/.
-    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.1.0@sha256:f8ef8a010565f1e479748e199d12475321444c05eae56614883c5046049d280e}
+    # Release v0.2.1 of the RAG service's published image, pinned by its index digest: a re-pushed tag
+    # cannot change what runs here. Its API contract is docs/contracts/. Prometheus scrapes its
+    # /metrics on port 9100, which is not published.
+    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.2.1@sha256:45d6a56cca95e89ed33f5fbd53becf809c62191115a40ed8c232ee3200be1eb3}
     environment:
-      DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
+      DATABASE_URL: postgresql://rag_app:${RAG_APP_DB_PASSWORD:-}@rag-db:5432/rag
       # The same value the worker reads as RAG_TENANT_TOKENS, so the two cannot disagree.
       TENANT_TOKENS: ${RAG_TENANT_TOKENS:-}
       # This profile authenticates with static tokens, which the RAG service accepts only when told to
-      # (opt-in since multi-tenant-agentic-rag#35); v0.1.0 ignores the variable.
+      # (opt-in since multi-tenant-agentic-rag#35).
       ALLOW_STATIC_TOKENS: "true"
       FASTEMBED_MODEL: BAAI/bge-small-en-v1.5
       # Its sufficiency check uses the chatbot's OpenAI-compatible endpoint; no real key is needed.
@@ -343,8 +382,8 @@ services:
       OPENAI_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
       RETRIEVE_LLM_MAX_RETRIES: "0"
     depends_on:
-      rag-db:
-        condition: service_healthy
+      rag-migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${RAG_API_HOST_PORT:-18000}:8000"
     mem_limit: 1536m
