@@ -15,7 +15,7 @@ when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
 - **Tests collected:** 233 unit, 63 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 16 frontend.
-- **Coverage:** 89 % of 1606 statements. Report header: "Coverage at efe4fea from CI run 40929094525 (unit + integration; scale, llm, durability and stack tests need special stacks)".
+- **Coverage:** 91 % of 1924 statements. Report header: "Coverage at 882bb6a from CI run 41703727217 (unit + integration; scale, llm, durability and stack tests need special stacks)".
 <!-- figures:end -->
 
 Crash recovery is tested by injecting failures at each step, by stopping Qdrant live, and by killing the
@@ -28,8 +28,11 @@ live worker container under load. The measured results below come from pre-regis
 | Safety, off-topic questions wrongly refused | 4 of 10 | ≤ 1 | Fail |
 | PII, structured identifiers redacted | 10/14 = 0.71 | ≥ 0.90 | Fail |
 | PII, locations redacted | 16/30 = 0.53 | ≥ 0.80 | Fail |
-| Latency, mock engine, 200 turns, worker concurrency (2026-10-30, two runs) | `POST /chat` p95 0.6–0.8 s; first reply word p95 1.2–1.3 s; completion p95 1.2–1.4 s; queue delay p95 0.77–0.81 s; 20.5–22.7 turns/s | queue ≤ 0.5 s | Fail |
+| Latency, mock engine, 200 turns at 75% of capacity (2026-11-03, two runs) | queue delay p95 55 and 105 ms; `POST /chat` p95 79–95 ms; first reply word p95 0.27–0.31 s; completion p95 0.33–0.36 s | queue ≤ 0.5 s | Pass |
+| Latency, same runs, no growing backlog | queue delay p95 of the last 50 turns 3.6–4.7× the first 50, under 0.2 s | ≤ 2× | Fail as written |
+| Latency, mock engine at saturation, 20 users with no pauses (same session) | queue delay p95 0.87–0.99 s; completion p95 1.2–1.5 s; 20.1–25.4 turns/s | reported | n/a |
 | Latency, real model, 20 turns | accept request p95 0.7 s passes; full reply p95 63 s | ≤ 60 s | Fail (confounded run) |
+| Throughput, real model on 4 CPUs, 16 turns per setting (2026-11-02) | 0.18–0.24 turns/s at every worker and model-server concurrency tried | reported | n/a |
 | Reply quality, real model, 20 questions | mean 3.4 of 5; 16/20 without invented specifics | ≥ 3.5; ≥ 18/20 | Fail (scored by the build agent, not independent) |
 
 **The most important trade-off.** Reliability over immediacy: the system answers "accepted" as soon
@@ -40,18 +43,19 @@ single web server. Data survives restarts; a whole-machine crash can lose up to 
 state (ADR 0008).
 
 **Remaining work, in priority order.**
-1. Latency: on the mock engine only queue delay still fails (p95 0.77–0.81 s against 0.5 s). Workers
-   now run 4 records at once, one per thread (ADR 0012): against a model that takes about 1.8 s per reply,
-   throughput rose about 4× (`latency-2026-10-30-worker-concurrency.md`). Not yet measured with a real
-   model server.
-2. Tenant security: end users still use HTTP Basic, and static tokens remain the default for calls to
-   the document service. ADR 0011 (accepted) moves tenant authentication to short-lived signed
-   tokens and the audit trail to a durable store. Built: the document service validates signed
-   tokens, the worker can use per-tenant client credentials, and an optional exporter copies the
-   audit stream into an append-only database. Not built: writing refund and access-denial events
-   straight to that database, and any run against a real identity provider.
+1. Latency: below capacity queue delay meets its target, but the pre-registered backlog check fails
+   during a burst near capacity, and these 14-second runs cannot tell a burst from growth; a longer run
+   would (`latency-2026-11-03-queue-delay.md`). With the real model the model server is the bottleneck:
+   more worker concurrency only moves the wait into it (`latency-2026-11-02-real-model.md`).
+2. Tenant security: the gateway accepts signed tokens from any OIDC issuer and the chat window signs in
+   with PKCE, tested against a local Keycloak (ADR 0016); HTTP Basic remains when no issuer is set. Static
+   tokens to the document service are now opt-in there, and the `rag` profile still opts in. Built from ADR
+   0011: the document service validates signed tokens, the worker can use per-tenant client credentials
+   (tested against a test double), and an optional exporter copies the audit stream into an append-only
+   database. Not built: writing refund and access-denial events straight to that database, and any run
+   against a production identity provider.
 3. Detection quality: harmless off-topic questions are refused, and location names and some
    structured identifiers slip through the PII scrubber.
 4. Reply quality and independent scoring: the local 1B model deflects most billing questions.
-5. A deployment target (image registry, production hosting) and closing the plain-HTTP development
-   ports.
+5. A deployment target (image registry for this repository's images, production hosting, certificates
+   from a real CA in place of the development one) and closing the plain-HTTP development ports.
