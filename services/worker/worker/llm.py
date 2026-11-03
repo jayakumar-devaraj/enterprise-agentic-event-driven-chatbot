@@ -1,7 +1,9 @@
 """Prompt assembly (guardrail L4, structural) and the inference engines: mock, OpenAI-compatible."""
 
 import logging
+import time
 from collections.abc import AsyncIterator, Sequence
+from contextlib import aclosing
 from typing import Protocol
 
 from openai import (
@@ -13,6 +15,7 @@ from openai import (
 )
 
 from worker.consumer import TransientDependencyError
+from worker.metrics import LLM_CALLS, LLM_FIRST_TOKEN, LLM_SECONDS
 from worker.rag_client import Section
 
 log = logging.getLogger("worker.llm")
@@ -169,18 +172,22 @@ class OpenAICompatEngine:
     async def stream(self, intent: str, user_text: str, history: list[Turn]) -> AsyncIterator[str]:
         """Yield content deltas; transport faults become TransientDependencyError."""
         # Injection defence: build_messages keeps user/history text out of the system prompt.
-        async for delta in self._stream(build_messages(intent, user_text, history)):
-            yield delta
+        # aclosing: a caller that stops early closes the model stream now, not at collection.
+        async with aclosing(self._stream(build_messages(intent, user_text, history))) as deltas:
+            async for delta in deltas:
+                yield delta
 
     async def stream_documents(
         self, question: str, history: list[Turn], documents: str
     ) -> AsyncIterator[str]:
         """Yield deltas of an answer grounded in `documents` (escaped, delimited fields only)."""
-        async for delta in self._stream(build_rag_messages(question, history, documents)):
-            yield delta
+        async with aclosing(self._stream(build_rag_messages(question, history, documents))) as d:
+            async for delta in d:
+                yield delta
 
     async def condense(self, user_text: str, history: list[Turn]) -> str:
         """One non-streamed call; transport faults become TransientDependencyError."""
+        start, outcome = time.perf_counter(), "cancelled"
         try:
             response = await self._client.chat.completions.create(
                 model=self._model,
@@ -188,11 +195,19 @@ class OpenAICompatEngine:
                 max_tokens=128,
                 stream=False,
             )
+            outcome = "ok"
         except _TRANSIENT as exc:
+            outcome = "transient"
             raise TransientDependencyError(f"llm: {exc}") from exc
+        except Exception:
+            outcome = "error"
+            raise
+        finally:
+            _observe("condense", outcome, start)
         return (response.choices[0].message.content or "").strip()
 
     async def _stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        start, outcome, first = time.perf_counter(), "cancelled", True
         try:
             response = await self._client.chat.completions.create(
                 model=self._model,
@@ -202,6 +217,22 @@ class OpenAICompatEngine:
             )
             async for chunk in response:
                 if chunk.choices and chunk.choices[0].delta.content:
+                    if first:
+                        LLM_FIRST_TOKEN.observe(time.perf_counter() - start)
+                        first = False
                     yield chunk.choices[0].delta.content
+            outcome = "ok"
         except _TRANSIENT as exc:
+            outcome = "transient"
             raise TransientDependencyError(f"llm: {exc}") from exc
+        except Exception:
+            outcome = "error"
+            raise
+        finally:  # a consumer that stops early (cancellation, aclose) leaves "cancelled"
+            _observe("stream", outcome, start)
+
+
+def _observe(call: str, outcome: str, start: float) -> None:
+    """Count one model-server call and its duration."""
+    LLM_CALLS.labels(call, outcome).inc()
+    LLM_SECONDS.labels(call).observe(time.perf_counter() - start)

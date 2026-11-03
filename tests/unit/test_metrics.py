@@ -1,14 +1,18 @@
 """Prometheus counters for the gateway and worker, read from the default registry."""
 
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from gateway.metrics import MetricsMiddleware
+from openai import APIConnectionError
 from prometheus_client import REGISTRY
 from test_gateway_chat import ALICE, body, h  # noqa: F401  (h is a fixture)
 from test_worker_consumer import FakeMsg, _env, _ok, _worker
 from worker.consumer import TransientDependencyError
+from worker.llm import OpenAICompatEngine
 
 
 def _value(name: str, **labels: str) -> float:
@@ -73,3 +77,54 @@ async def test_worker_counts_each_recorded_outcome() -> None:
     after = {o: _value("chatbot_worker_records_total", outcome=o) for o in names}
     assert {o: after[o] - before[o] for o in names} == dict.fromkeys(names, 1)
     assert _value("chatbot_worker_retries_total") - retries == 2  # max_retries=2 in SETTINGS
+
+
+class _Completions:
+    """TEST DOUBLE for `AsyncOpenAI().chat.completions`: streams `deltas` or raises `exc`."""
+
+    def __init__(self, deltas: list[str], exc: Exception | None = None) -> None:
+        self.deltas, self.exc = deltas, exc
+
+    async def create(self, **kwargs):
+        if self.exc is not None:
+            raise self.exc
+        if not kwargs["stream"]:
+            message = SimpleNamespace(content=" ".join(self.deltas))
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+        async def chunks():
+            for d in self.deltas:
+                yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=d))])
+
+        return chunks()
+
+
+def _engine(deltas: list[str], exc: Exception | None = None) -> OpenAICompatEngine:
+    engine = OpenAICompatEngine("http://model.invalid/v1", "m", max_tokens=16, timeout_s=5)
+    engine._client = SimpleNamespace(chat=SimpleNamespace(completions=_Completions(deltas, exc)))
+    return engine
+
+
+def _calls(call: str, outcome: str) -> float:
+    return _value("chatbot_worker_llm_calls_total", call=call, outcome=outcome)
+
+
+async def test_model_calls_are_counted_by_outcome_with_first_token_time() -> None:
+    """ok, transient, abandoned (cancelled) and condense calls each land in their own series."""
+    first = _value("chatbot_worker_llm_first_token_seconds_count")
+    before = {o: _calls("stream", o) for o in ("ok", "transient", "cancelled")}
+    condensed = _calls("condense", "ok")
+
+    assert [d async for d in _engine(["a", "b"]).stream("general", "hi", [])] == ["a", "b"]
+    down = httpx.Request("POST", "http://model.invalid/v1/chat/completions")
+    with pytest.raises(TransientDependencyError):
+        [d async for d in _engine([], APIConnectionError(request=down)).stream("general", "hi", [])]
+    abandoned = _engine(["a", "b"]).stream("general", "hi", [])
+    assert await anext(abandoned) == "a"
+    await abandoned.aclose()  # the caller stops reading after the first delta
+    assert await _engine(["short"]).condense("hi", []) == "short"
+
+    after = {o: _calls("stream", o) for o in ("ok", "transient", "cancelled")}
+    assert {o: after[o] - before[o] for o in before} == {"ok": 1, "transient": 1, "cancelled": 1}
+    assert _calls("condense", "ok") - condensed == 1
+    assert _value("chatbot_worker_llm_first_token_seconds_count") - first == 2  # ok + abandoned
