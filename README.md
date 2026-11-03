@@ -195,7 +195,8 @@ uv run pytest -m stack     # running stack: raw PII absent from logs, Kafka, DLQ
 uv run pytest -m ops       # an alert reaches a webhook: own compose project (Prometheus, Alertmanager, sink)
 uv run pytest -m oidc      # gateway OIDC against Keycloak: compose profile oidc + kafka, redis (KEYCLOAK_DEMO_PASSWORD)
 uv run pytest -m rag       # document questions end to end: compose profile rag + Ollama (IT_RAG_URL, IT_RAG_TOKENS, IT_LLM_URL)
-uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report
+uv run python tests/load/latency_a11.py --requests 200 --concurrency 20   # A11 report (closed loop)
+uv run python tests/load/latency_a11.py --requests 200 --rate 15          # open loop, 15 turns/s
 docker run --rm -v "$PWD/frontend":/app -w /app node:24.22.0-slim sh -c "npm ci && npm test"
 docker run --rm -v "$PWD/deploy/prometheus":/etc/prometheus -w /etc/prometheus --entrypoint promtool prom/prometheus:v3.15.1 test rules alerts_test.yml
 ```
