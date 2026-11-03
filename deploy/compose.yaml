@@ -353,7 +353,7 @@ services:
   # database. Same release as rag-api; moving one moves both.
   rag-migrate:
     profiles: ["rag"]
-    image: ${RAG_MIGRATE_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag-migrate:v0.2.1@sha256:0934afae9b4c905094d05d78aae547209d240b0508cd3c3323273fb9b80cbb48}
+    image: ${RAG_MIGRATE_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag-migrate:v0.2.2@sha256:39900edf2fc1eb28d0ccfa153452c3d8135be89f8b7323925cd3c35d312f950a}
     environment:
       MIGRATION_DATABASE_URL: postgresql://rag:${RAG_DB_PASSWORD:-}@rag-db:5432/rag
       APP_DB_ROLE: rag_app
@@ -364,10 +364,10 @@ services:
 
   rag-api:
     profiles: ["rag"]
-    # Release v0.2.1 of the RAG service's published image, pinned by its index digest: a re-pushed tag
+    # Release v0.2.2 of the RAG service's published image, pinned by its index digest: a re-pushed tag
     # cannot change what runs here. Its API contract is docs/contracts/. Prometheus scrapes its
     # /metrics on port 9100, which is not published.
-    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.2.1@sha256:45d6a56cca95e89ed33f5fbd53becf809c62191115a40ed8c232ee3200be1eb3}
+    image: ${RAG_API_IMAGE:-ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag:v0.2.2@sha256:1aaf68b034a0c274f20afc6f1d0d8fca3e5d50704f36d878a64b091e5d476a6e}
     environment:
       DATABASE_URL: postgresql://rag_app:${RAG_APP_DB_PASSWORD:-}@rag-db:5432/rag
       # The same value the worker reads as RAG_TENANT_TOKENS, so the two cannot disagree.
