@@ -50,8 +50,10 @@ Versions read from `pyproject.toml` / `uv.lock` / `frontend/package.json`.
   Cloud, linked by trace id (`worker.observability`, disabled when keys are absent).
 - **Observability (metrics, profile `ops`):** prometheus-client 0.26.0 on `METRICS_PORT` (9100, never
   published) in the gateway (`gateway.metrics`, requests by route template and status) and the worker
-  (`worker.metrics`, outcomes, queue delay, in-flight records, retries); `prom/prometheus:v3.15.1` scrapes
-  them and `danielqsj/kafka-exporter:v1.11.0` (consumer lag, DLQ offsets) and evaluates
+  (`worker.metrics`, outcomes, queue delay, in-flight records, retries, and its model-server calls by outcome,
+  first token and duration, since Ollama exports none); `prom/prometheus:v3.15.1` scrapes them,
+  Qdrant's own `/metrics` (TLS, API key), `oliver006/redis_exporter:v1.96.0` (Redis up, memory, clients, AOF)
+  and `danielqsj/kafka-exporter:v1.11.0` (consumer lag, DLQ offsets) and evaluates
   `deploy/prometheus/alerts.yml` (ADR 0013).
 - **Observability (logs):** stdlib `logging` with `chat_common.logjson.JsonFormatter` (one JSON object per
   line, `trace_id`/`thread_id` as keys).
@@ -169,7 +171,7 @@ Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`
   `OIDC_DISCOVERY_URL=http://keycloak:8080/realms/chatbot/.well-known/openid-configuration` and an empty
   `AUTH_USERS`, then `docker compose -f deploy/compose.yaml --profile oidc up -d --build --wait`: the chat window at
   http://localhost:5173 shows "Sign in", which goes through Keycloak (authorization code + PKCE).
-- Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter prometheus`
+- Metrics and alerts: `docker compose -f deploy/compose.yaml --profile ops up -d kafka-exporter redis-exporter prometheus`
   → http://127.0.0.1:19090. Add `alertmanager` with `ALERT_WEBHOOK_URL` exported (a Slack, Teams, PagerDuty or
   any webhook URL) and firing alerts are delivered there (http://127.0.0.1:19093); it refuses to start without one.
 - Real inference instead of the mock (A9, `llama3.2:1b` baked into the Ollama image):

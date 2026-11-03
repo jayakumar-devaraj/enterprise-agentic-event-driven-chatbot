@@ -19,6 +19,98 @@ tests:
             exp_annotations:
               summary: No worker is scraped as up; chat requests are not being consumed.
 
+  - name: Redis down fires after 1m, and not while it is up
+    input_series:
+      - series: 'redis_up{job="redis", instance="redis-exporter:9121"}'
+        values: "1 1 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: RedisDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: Redis is not reported up; streams, checkpoints and dedupe are unavailable.
+
+  - name: Qdrant down fires after 1m, and another job being up does not hide it
+    input_series:
+      - series: 'up{job="qdrant", instance="qdrant:6333"}'
+        values: "1 1 0 0 0"
+      - series: 'up{job="worker", instance="w1:9100"}'
+        values: "1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: QdrantDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: QdrantDown
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: Qdrant is not scraped as up; intent routing and the injection guard cannot run.
+
+  - name: model calls failing at 10% for 5m fire
+    input_series:
+      - series: 'chatbot_worker_llm_calls_total{call="stream", outcome="ok"}'
+        values: "0+90x20"
+      - series: 'chatbot_worker_llm_calls_total{call="stream", outcome="transient"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ModelErrorsHigh
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: More than 5% of model-server calls fail.
+
+  - name: 2% model errors do not fire, and cancelled calls are not errors
+    input_series:
+      - series: 'chatbot_worker_llm_calls_total{call="stream", outcome="ok"}'
+        values: "0+48x20"
+      - series: 'chatbot_worker_llm_calls_total{call="stream", outcome="cancelled"}'
+        values: "0+50x20"
+      - series: 'chatbot_worker_llm_calls_total{call="condense", outcome="error"}'
+        values: "0+2x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ModelErrorsHigh
+        exp_alerts: []
+
+  - name: model first-token p95 above 10 s for 10m fires, below does not
+    input_series:
+      # Every call lands in (10, 20], so p95 is above 10 s.
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="10"}'
+        values: "0x30"
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="20"}'
+        values: "0+10x30"
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="+Inf"}'
+        values: "0+10x30"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ModelFirstTokenSlow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ModelFirstTokenSlow
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: The model server's first-token p95 is above 10 s.
+
+  - name: model first-token p95 under 10 s does not fire
+    input_series:
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="5"}'
+        values: "0+10x30"
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="10"}'
+        values: "0+10x30"
+      - series: 'chatbot_worker_llm_first_token_seconds_bucket{le="+Inf"}'
+        values: "0+10x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ModelFirstTokenSlow
+        exp_alerts: []
+
   - name: lag must stay above 100 for 5m, and only the workers' group counts
     input_series:
       - series: 'kafka_consumergroup_lag{consumergroup="chat-workers", topic="chat-requests", partition="0"}'

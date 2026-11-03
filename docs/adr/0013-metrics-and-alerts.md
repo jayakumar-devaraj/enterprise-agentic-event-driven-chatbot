@@ -54,3 +54,19 @@ own port 9100 since v0.2.0 (multi-tenant-agentic-rag ADR 0004), with no tenant l
 migrate image the service now needs: `rag-db-role` and `rag-migrate` run before `rag-api`, which connects as
 the non-owner `rag_app` so row-level security applies to it. Redis, Qdrant and the model server are still
 not scraped.
+
+## Addendum 2026-11-03: Redis, Qdrant and the model server
+- **Redis:** `redis-exporter` (oliver006/redis_exporter v1.96.0, profile `ops`) connects over TLS as
+  `chatbot`, the only ACL user, so it holds full Redis permissions; a restricted user would need a second
+  Redis secret in every compose run. `RedisDown` (critical) fires when `redis_up` has not been 1 for 1 minute,
+  which also covers a stopped exporter.
+- **Qdrant:** scraped directly at `https://qdrant:6333/metrics`. That endpoint needs the API key (401 without
+  it), so the Prometheus container writes `QDRANT_API_KEY` to a file at start, the way Alertmanager writes its
+  webhook URL, and verifies Qdrant's certificate with the development CA. `QdrantDown` (critical).
+- **Model server:** Ollama serves no `/metrics` (0.40.6 answers 404), so the worker counts its own calls:
+  `chatbot_worker_llm_calls_total{call,outcome}`, `chatbot_worker_llm_first_token_seconds` and
+  `chatbot_worker_llm_call_seconds{call}`. This works for any OpenAI-compatible server, hosted ones included.
+  `ModelErrorsHigh` (more than 5% `transient` or `error`) and `ModelFirstTokenSlow` (p95 above the 10 s
+  real-model target) are warnings; a chat that fails also shows in the gateway's 5xx and in dead letters.
+- CI's `promtool check config` now runs with `--syntax-only`, because the key file and the CA exist only in the
+  running container; `promtool check rules` still validates every rule, and `test rules` still runs.

@@ -11,6 +11,45 @@ groups:
         annotations:
           summary: No worker is scraped as up; chat requests are not being consumed.
 
+      - alert: RedisDown
+        # redis_up comes from the exporter; a stopped exporter or Redis both leave no 1.
+        expr: absent(redis_up == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redis is not reported up; streams, checkpoints and dedupe are unavailable.
+
+      - alert: QdrantDown
+        expr: absent(up{job="qdrant"} == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Qdrant is not scraped as up; intent routing and the injection guard cannot run.
+
+      - alert: ModelErrorsHigh
+        # The worker's own count of its model-server calls; the server exports no metrics.
+        expr: |
+          sum(rate(chatbot_worker_llm_calls_total{outcome=~"transient|error"}[5m]))
+            / sum(rate(chatbot_worker_llm_calls_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 5% of model-server calls fail.
+
+      - alert: ModelFirstTokenSlow
+        # The real-model first-token target (latency-targets-2026-10-24.md), on the server's part alone.
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(chatbot_worker_llm_first_token_seconds_bucket[5m])))
+            > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The model server's first-token p95 is above 10 s.
+
       - alert: ConsumerLagHigh
         # The exporter reports -1 for a partition with no committed offset; count it as 0.
         expr: |

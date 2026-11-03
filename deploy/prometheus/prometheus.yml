@@ -1,5 +1,5 @@
-# Scrapes the gateway, worker and RAG service /metrics (port 9100, never published) and the Kafka lag
-# exporter.
+# Scrapes the gateway, worker and RAG service /metrics (port 9100, never published), Qdrant's own
+# /metrics, and the Redis and Kafka exporters. The model server is measured by the worker, its client.
 # Docker DNS returns one address per replica, so `--scale` needs no change here.
 global:
   scrape_interval: 15s
@@ -30,6 +30,17 @@ scrape_configs:
       - names: [rag-api]
         type: A
         port: 9100
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+  - job_name: qdrant
+    scheme: https
+    authorization:
+      credentials_file: /tmp/qdrant-api-key  # written by the container at start (compose.yaml)
+    tls_config:
+      ca_file: /certs/ca.crt
+    static_configs:
+      - targets: ["qdrant:6333"]
   - job_name: kafka
     static_configs:
       - targets: ["kafka-exporter:9308"]
