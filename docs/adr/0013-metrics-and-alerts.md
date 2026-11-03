@@ -50,7 +50,8 @@ The RAG service exposes `rag_api_requests_total{method,route,status}` and `rag_a
 own port 9100 since v0.2.0 (multi-tenant-agentic-rag ADR 0004), with no tenant label. Prometheus scrapes
 `rag-api:9100` through Docker DNS (job `rag-api`; without profile `rag` the job has no targets), and
 `RagErrorRateHigh` (warning) fires when more than 5% of its requests end in a 5xx for 5 minutes; its 401 and
-429 are caller outcomes and do not count. Compose pins v0.2.1, the first release that also publishes the
+429 are caller outcomes and do not count. Compose pinned v0.2.1 (v0.2.2 since, which adds only fastembed on
+one ONNX Runtime thread), the first release that also publishes the
 migrate image the service now needs: `rag-db-role` and `rag-migrate` run before `rag-api`, which connects as
 the non-owner `rag_app` so row-level security applies to it. Redis, Qdrant and the model server are still
 not scraped.

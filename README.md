@@ -128,7 +128,7 @@ docker compose -f deploy/compose.yaml --profile rag up -d --wait rag-api   # rol
 docker compose -f deploy/compose.yaml --profile rag up rag-seed            # uploads deploy/rag/handbook.txt as tenant T1
 ```
 
-The images are `RAG_API_IMAGE` and `RAG_MIGRATE_IMAGE` (default: release `v0.2.1` of `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag` and `…-rag-migrate`, pinned by digest `sha256:45d6a56cca95e89ed33f5fbd53becf809c62191115a40ed8c232ee3200be1eb3` and `sha256:0934afae9b4c905094d05d78aae547209d240b0508cd3c3323273fb9b80cbb48`; moving to another release changes all four). `rag-db-role` creates the API's role `rag_app` (row-level security applies to it) and `rag-migrate` brings the schema to the release's revision; both are one-shots that `rag-api` waits for. With `--profile ops`, Prometheus scrapes the service's `/metrics` (port 9100, not published).
+The images are `RAG_API_IMAGE` and `RAG_MIGRATE_IMAGE` (default: release `v0.2.2` of `ghcr.io/jayakumar-devaraj/multi-tenant-agentic-rag` and `…-rag-migrate`, pinned by digest `sha256:1aaf68b034a0c274f20afc6f1d0d8fca3e5d50704f36d878a64b091e5d476a6e` and `sha256:39900edf2fc1eb28d0ccfa153452c3d8135be89f8b7323925cd3c35d312f950a`; moving to another release changes all four). `rag-db-role` creates the API's role `rag_app` (row-level security applies to it) and `rag-migrate` brings the schema to the release's revision; both are one-shots that `rag-api` waits for. With `--profile ops`, Prometheus scrapes the service's `/metrics` (port 9100, not published).
 `uv run pytest -m rag` shows the settings the host-run worker needs (`tests/integration/test_rag_e2e.py`).
 
 Traces: Jaeger UI at http://localhost:16686. LangFuse: set `LANGFUSE_PUBLIC_KEY`,
