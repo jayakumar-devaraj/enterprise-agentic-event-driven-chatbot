@@ -30,3 +30,11 @@ turn per 0.9 s (`docs/reports/latency-2026-10-30-worker-concurrency.md`). Adding
 - The model server sees up to `WORKER_CONCURRENCY` × replicas concurrent calls and must be sized for them.
 - A crash or `LeaseLost` now abandons up to `WORKER_CONCURRENCY` records instead of one; all are redelivered.
 - One hot thread still runs serially: concurrency is across threads, never within one.
+
+## Addendum 2026-11-02: a real model server
+Against Ollama with `llama3.2:1b` on 4 CPUs (`docs/reports/latency-2026-11-02-real-model.md`), throughput stayed
+about 0.2 turns/s whatever the setting. With Ollama's default `OLLAMA_NUM_PARALLEL=1`, concurrency 4 moved the
+wait from Kafka into Ollama and raised first-token p95 from 20.6 s to 36.9 s; with `OLLAMA_NUM_PARALLEL=4` the
+median first token fell to 4.6 s but completion p95 rose to 43.1 s. The decision stands: concurrency raises
+throughput only when the model server has spare capacity. Size the server's parallelism to
+`WORKER_CONCURRENCY` × replicas, and scale the server rather than the workers when it is saturated.

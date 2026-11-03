@@ -12,6 +12,7 @@ gateway's `kafka.produce` span start (the record handed to the Kafka client), sa
 import argparse
 import asyncio
 import json
+import os
 import statistics
 import subprocess
 import time
@@ -21,7 +22,8 @@ from pathlib import Path
 import httpx
 
 AUTH = ("demo", "demo-pw")
-JAEGER = "http://127.0.0.1:16686"
+# A second compose project publishes Jaeger elsewhere (JAEGER_UI_HOST_PORT): set JAEGER_URL.
+JAEGER = os.environ.get("JAEGER_URL", "http://127.0.0.1:16686")
 REPORT = Path(__file__).resolve().parents[2] / "docs" / "reports" / "a11-latency.json"
 
 
@@ -115,8 +117,10 @@ def queue_delays(
     return delays
 
 
-def pct(values: list[float]) -> dict[str, float]:
-    """p50/p95/p99 in milliseconds."""
+def pct(values: list[float]) -> dict[str, float] | None:
+    """p50/p95/p99 in milliseconds; None if nothing succeeded, so the errors still print."""
+    if not values:
+        return None
     q = statistics.quantiles(values, n=100, method="inclusive")  # never beyond the observed range
     return {f"p{n}": round(q[n - 1] * 1000, 1) for n in (50, 95, 99)}
 
