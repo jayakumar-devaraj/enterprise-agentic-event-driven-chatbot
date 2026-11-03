@@ -13,16 +13,22 @@ permissions:
 
 jobs:
   images:
-    # A fixable HIGH or CRITICAL vulnerability in any service image fails the build.
+    # A fixable HIGH or CRITICAL vulnerability in any service image, or the frontend's dev image, fails
+    # the build.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        service: [gateway, worker, seed, audit]
+        service: [gateway, worker, seed, audit, frontend]
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Build
-        run: docker build -f services/${{ matrix.service }}/Dockerfile -t chatbot-${{ matrix.service }}:scan .
+        run: |
+          if [ "${{ matrix.service }}" = frontend ]; then
+            docker build -t chatbot-frontend:scan frontend
+          else
+            docker build -f services/${{ matrix.service }}/Dockerfile -t chatbot-${{ matrix.service }}:scan .
+          fi
       - name: Trivy
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.1 \
