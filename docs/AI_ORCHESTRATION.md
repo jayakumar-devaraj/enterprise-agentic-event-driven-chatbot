@@ -98,6 +98,26 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Checkpoint a replayed reply before marking it done | files changed (by path): code 1, docs 3, other 1, tests 1 | fix/replay-pending-writes | #97 | b045e33f |
 | Move to Python 3.13.18 and clear the remaining image findings | files changed (by path): docs 3, other 9 | chore/python-3.13.18 | #98 | b045e33f |
 | Scan service images with Trivy and code with CodeQL in CI | files changed (by path): docs 3, other 1 | ci/security-scans | #99 | b045e33f |
+| Log PRs #93-#99 in the orchestration record | files changed (by path): docs 1 | docs/orchestration-94-99 | #100 | b045e33f |
+| Finish a half-written step before handling any envelope | files changed (by path): code 1, docs 3, other 1, tests 1 | fix/approval-pending-writes | #101 | b045e33f |
+| Fence approval windows and their audit entries with the dedupe lease | files changed (by path): code 2, docs 5, other 1, tests 1 | fix/fence-approval-audit | #102 | b045e33f |
+| Require a password for Redis | files changed (by path): docs 3, other 3, tests 6 | feat/infra-auth | #103 | b045e33f |
+| Require an API key for Qdrant | files changed (by path): code 3, docs 3, other 3, tests 5 | feat/qdrant-api-key | #104 | b045e33f |
+| Require SASL authentication on every Kafka listener | files changed (by path): code 4, docs 4, other 4, tests 11 | feat/kafka-sasl | #105 | b045e33f |
+| Count unset consumer offsets as zero lag in ConsumerLagHigh | files changed (by path): other 2 | fix/lag-alert-unset-offsets | #106 | b045e33f |
+| Encrypt Redis, Kafka and Qdrant traffic with TLS | files changed (by path): code 4, docs 3, other 5, tests 10 | feat/infra-tls | #107 | b045e33f |
+| Accept OIDC bearer tokens at the gateway | files changed (by path): code 4, docs 4, other 4, tests 1 | feat/oidc-bearer | #108 | b045e33f |
+| Add a Keycloak development issuer and test the gateway against it | files changed (by path): docs 3, other 4, tests 1 | feat/keycloak-dev-realm | #109 | b045e33f |
+| Sign the chat window in through OIDC with PKCE | files changed (by path): code 6, docs 4, other 3, tests 1 | feat/frontend-oidc | #110 | b045e33f |
+| Turn on static RAG tokens explicitly in the rag profile | files changed (by path): other 1 | chore/rag-static-tokens-explicit | #111 | b045e33f |
+| Deliver alerts through Alertmanager to a webhook | files changed (by path): docs 4, other 5, tests 3 | feat/alertmanager | #112 | b045e33f |
+| Reseed Qdrant without removing what live searches use | files changed (by path): code 1, docs 5, other 1, tests 2 | fix/seed-no-drop | #113 | b045e33f |
+| Pin the RAG service image by digest | files changed (by path): docs 1, other 1 | chore/pin-rag-image-digest | #114 | b045e33f |
+| Measure worker concurrency against the real model server | files changed (by path): docs 3, other 3, tests 1 | perf/concurrency-real-model | #115 | b045e33f |
+| Scrape the RAG service: run v0.2.1 with its migrate job, alert on its 5xx ratio | files changed (by path): docs 4, other 6, tests 1 | ops/scrape-rag-api | #116 | b045e33f |
+| Judge queue delay under a pre-registered open-loop load | files changed (by path): docs 4, other 4, tests 1 | perf/queue-delay | #117 | b045e33f |
+| Metrics for Redis, Qdrant and the model server | files changed (by path): code 2, docs 4, other 6, tests 1 | ops/infra-metrics | #118 | b045e33f |
+| Scan the frontend image and name the CodeQL triage owner | files changed (by path): docs 4, other 3 | security/frontend-scan-triage | #119 | b045e33f |
 
 
 
@@ -196,4 +216,16 @@ Rows for these PRs are in the table above; titles and file-type counts come from
 - **RAG integration (#73):** document questions via the separate RAG service (ADR 0010).
 - **Cross-service decisions (#74, #75):** ADR 0011, round 1 then round 2.
 - **Enterprise audit follow-ups (#84–#92):** history fencing and the head pointer that closes its race (#84, #89), the durability test seed fix (#88), and two latency fixes measured before and after (#86, #87), a gateway race that reported finished replies as expired (#91), and several records in flight per worker (#92, ADR 0012). Ops and security: Prometheus metrics and alert rules (#94, ADR 0013), a replayed reply dropped from history after a crash between its writes and its checkpoint, found with per-thread diagnostics (#97), image findings cleared (#95, #98) and Trivy and CodeQL in CI (#99, ADR 0014).
+- **Durability and access control (#101, #102):** every half-written step is finished before an envelope is
+  handled, and approval windows and their audit entries are fenced by the dedupe lease.
+- **Infrastructure authentication and TLS (#103-#107):** Redis password, Qdrant API key, Kafka SASL, then TLS
+  on all three (ADR 0015).
+- **OIDC (#108-#111):** the gateway accepts bearer tokens from any issuer, a Keycloak development issuer tests
+  it, the chat window signs in with PKCE (ADR 0016), and the `rag` profile turns static tokens on explicitly.
+- **Operations (#106, #112-#114, #116, #118):** alert delivery through Alertmanager, reseeding Qdrant behind
+  an alias, the RAG image pinned by digest, then v0.2.1 with its migrate job, and metrics for the RAG service,
+  Redis, Qdrant and the model server (ADR 0013 addenda).
+- **Measurements (#115, #117):** worker concurrency against a real model, and queue delay under an open-loop
+  load pre-registered before its runs.
+- **Scanning (#119):** the frontend image joins Trivy, and `SECURITY.md` names the CodeQL triage owner.
 - **Not recorded:** the creating session of #69 and #73, and of #17, #19, #20 (see the table).
