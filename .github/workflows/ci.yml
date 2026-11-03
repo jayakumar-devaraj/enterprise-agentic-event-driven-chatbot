@@ -119,7 +119,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    container: node:24.22.0-slim
+    container: node:24.22.2-slim
     defaults:
       run:
         working-directory: frontend

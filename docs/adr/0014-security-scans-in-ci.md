@@ -20,3 +20,13 @@ longer rebuilt) and 37 more in Python packages; they were cleared in #95 and #98
 - Unfixed CVEs are not gated: there is nothing to upgrade to. The frontend's Vite dev server image is not
   scanned; it is a development container, not a deployable artifact.
 - CodeQL does not fail the build; its alerts are triaged in the Security tab.
+
+## Addendum 2026-11-03: the frontend image is scanned, and CodeQL alerts have an owner
+- The frontend's dev image joins the Trivy matrix (`images (frontend)`). Its first scan found 7 fixable
+  HIGH/CRITICAL Debian findings (`perl-base`, fixed by `node:24.22.0-slim` → `24.22.2-slim`) and 6 in the npm
+  bundled with Node (`brace-expansion` 5.0.9, `undici` 6.28.0). npm 11.21.1 fixes `brace-expansion`, but every
+  npm release up to 12.2.1 bundles `undici` 6.29.0, still below the fixed 6.29.1. The image needs npm only to
+  install, so it removes npm after `npm ci` and runs Vite directly; the scan is then clean. CI's frontend job
+  uses the same Node patch.
+- `SECURITY.md` names the maintainer as owner of CodeQL and scheduled-scan triage, with response times by
+  severity and the rule that a dismissal carries a reason specific to the flagged code.
