@@ -40,3 +40,28 @@ Load: 20 turns, fresh threads, 2 in flight, same replicas.
 | Time to first token p95 | ≤ 10 s | A 1B model on CPU. Prompt processing dominates, and a user still sees progress within 10 s |
 | Completion p95 | ≤ 60 s | `INFERENCE_TIMEOUT_S` is 60 s, so a slower reply fails anyway |
 | `POST /chat` p95, queue delay p95 | same as the mock | Inference does not touch the accept path. Queueing is reported to show whether 2 users already saturate it |
+
+## Addendum 2026-11-03: queue delay under an open-loop load (written before any measurement)
+The mock-engine load above is a closed loop: 20 users, each sending its next turn the moment the last
+one finishes. It keeps about 19 turns in the system (Little's law on the 2026-10-30 runs: 20.5–22.9
+turns/s × 0.81–0.93 s mean completion) against 8 worker slots (2 replicas × `WORKER_CONCURRENCY` 4),
+so about 11 always wait in Kafka, whatever the code does. The queue never drains, and the 500 ms target
+can fail at any capacity. Its stated purpose is that the offered load must not build a growing backlog,
+which a saturating closed loop cannot test. Decided by the lead in chat on 2026-11-03, fixed here before
+any run:
+
+- **Capacity** `X`: throughput of the closed-loop load above (200 turns, 20 in flight), measured in the
+  same session as the open-loop runs, on the same stack.
+- **Open-loop load**: 200 turns on fresh threads, arriving at rate `R = 0.75 × X` with exponential
+  gaps (seeded, so both runs see the same schedule), round-robin over the 2 gateways, each turn
+  independent of when earlier ones finish.
+- **Judged under the open-loop load**: queue delay p95 ≤ 500 ms, and no growing backlog: the queue-delay
+  p95 of the last 50 traced turns is at most twice that of the first 50. Errors, `POST /chat`, first
+  token and completion are judged against the mock targets above, unchanged.
+- **Reported, not judged**: the closed-loop queue delay, as the delay at saturation.
+- **Runs**: a 20-turn warm-up, then closed loop, open loop, closed loop, open loop. Each open-loop run
+  takes its `R` from the closed-loop run just before it. Both pairs are reported; the target passes only
+  if both open-loop runs pass.
+- **Stack**: as above (2 gateways at 1 CPU, 2 workers at 2 CPU, `WORKER_CONCURRENCY` 4), current `main`,
+  no other compose project running, LangFuse keys not set (LLM traces off; Jaeger on, as queue delay is
+  read from it).
