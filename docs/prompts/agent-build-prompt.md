@@ -19,8 +19,8 @@ requirements: single process, single repo, unless I explicitly override.
 
 # INPUT
 - Problem statement: `docs/prompts/problem-statement.md`
-- Rubric (how the repo is scored): `docs/prompts/coding_challenge_eval_prompt.md`
-- This prompt's committed copy (PROMPT_PATH): `docs/prompts/coding_challenge.md`
+- Rubric (how the repo is scored): `docs/prompts/evaluation-rubric.md`
+- This prompt's committed copy (PROMPT_PATH): `docs/prompts/agent-build-prompt.md`
 - Deadline: <HOURS> (an input: ask the lead before Step 0; never assume a default)
 - Start time: <HH:MM> (an input: ask the lead, or read the clock and confirm it)
 - If either input is still a placeholder, stop and ask; every time rule below is computed from them.
