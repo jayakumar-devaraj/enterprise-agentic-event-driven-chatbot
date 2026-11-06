@@ -39,8 +39,9 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   reconciled line by line after the design changes recorded in ADRs 0002–0007.
 - **CLAUDE.md §9 "Open risk" still present:** spike (a) resolved it (ADR 0002), but deleting the
   block needs the lead's permission (asked, not yet answered).
-- **`worker.main` has no automated test** (0 % in `docs/reports/coverage.txt`); it is exercised by
-  the containerized runs (`docs/reports/e2e-containers.md`, A9, A10).
+- **`worker.main` is unit-tested over doubles** (`tests/unit/test_worker_main.py`): startup failures,
+  engine and observer choice, stop signals and client cleanup. Its wiring against real services is
+  exercised only by the containerized runs (`docs/reports/e2e-containers.md`, A9, A10).
 - **Single-turn prompts to the real LLM** include only the last 6 history turns.
 - **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
   user's own, already scrubbed text) at the start of its reply. Harmless for privacy, poor UX; a
