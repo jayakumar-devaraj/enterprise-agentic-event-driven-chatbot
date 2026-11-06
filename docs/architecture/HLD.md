@@ -127,6 +127,7 @@ flowchart TB
 | Burst on one thread | Redis counter | Rejected | 429 |
 | Malformed envelope in Kafka | Pydantic on consume | DLQ immediately, commit, no retry | — |
 | Qdrant / LLM / Redis fault in worker | Exception class + timeout | Bounded retries with backoff → `ErrorEvent{dependency_unavailable}` + DLQ → commit | SSE `error` event, stream closes |
+| Unexpected exception in the pipeline (a defect) | Any other exception class, except `LeaseLost` | No retry → `ErrorEvent{internal_error}` with fixed text + DLQ (exception type name only) → lease released → commit; the partition advances | SSE `error` event, stream closes |
 | Worker crash mid-message | Lease `processing` never reaches `done` | Offset uncommitted; lease expires; redelivered. Terminal event already streamed ⇒ outcome recorded, stream kept; reply already checkpointed ⇒ re-sent; otherwise rerun from `seq` 0 | Delayed answer, one history turn, no duplicate `done` |
 | Worker stalls past its lease, another takes over | Fenced write finds another token (or none) in `dedupe:{id}` | `LeaseLost` before the write → process stops without commit, restarts, re-reads from the last committed offset (ADR 0009) | The new owner's stream and refund records are unchanged |
 | Duplicate delivery / repeated POST | Gateway `accepted`/`delivered` keys / worker `done` key | Same 202 body; worker skips and commits | One stream, one `done` |

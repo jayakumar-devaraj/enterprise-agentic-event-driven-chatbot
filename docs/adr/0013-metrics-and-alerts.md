@@ -15,7 +15,7 @@ API port is reachable through Caddy's `/api/*`, so anything served there is publ
   a pure ASGI middleware. `route` is the route template (`/stream/{thread_id}/{message_id}`) or `unmatched`,
   never the raw path, so thread and message ids cannot become labels. An exception no handler maps is
   counted as a 500. Latency ends when the response headers are sent, so an SSE stream counts until it opens.
-- Worker: `chatbot_worker_records_total{outcome}` (`done`, `duplicate`, `dlq_malformed`, `dlq_dependency`),
+- Worker: `chatbot_worker_records_total{outcome}` (`done`, `duplicate`, `dlq_malformed`, `dlq_dependency`, `dlq_internal`),
   `chatbot_worker_record_seconds`, `chatbot_worker_queue_delay_seconds` (envelope `ts` to the worker owning
   the record), `chatbot_worker_in_flight` and `chatbot_worker_retries_total`.
 - Consumer lag and DLQ growth are read from the broker by `kafka-exporter`, not from the workers: a worker
