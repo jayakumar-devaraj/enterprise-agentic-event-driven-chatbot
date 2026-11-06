@@ -21,8 +21,9 @@ requirements: single process, single repo, unless I explicitly override.
 - Problem statement: `docs/prompts/problem-statement.md`
 - Rubric (how the repo is scored): `docs/prompts/coding_challenge_eval_prompt.md`
 - This prompt's committed copy (PROMPT_PATH): `docs/prompts/coding_challenge.md`
-- Deadline: 5 hours
-- Start time: <HH:MM>
+- Deadline: <HOURS> (an input: ask the lead before Step 0; never assume a default)
+- Start time: <HH:MM> (an input: ask the lead, or read the clock and confirm it)
+- If either input is still a placeholder, stop and ask; every time rule below is computed from them.
 
 All paths are relative to repo root. A field that is blank or holds placeholder text (`<...>`,
 `[fill in]`, `e.g.`) is unset.
