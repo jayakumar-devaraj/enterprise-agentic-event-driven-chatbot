@@ -130,6 +130,9 @@ StreamEvent = Annotated[
 ]
 TERMINAL_TYPES = frozenset({"done", "error", "approval_required"})
 
+DLQ_ERROR_CODES = frozenset({"dependency_unavailable", "internal_error"})
+"""ErrorEvent codes whose message also gets a DLQ record (SPEC §7)."""
+
 
 def stream_key(thread_id: str, message_id: UUID | str) -> str:
     """Redis Stream key for one message's events (ADR 0005)."""

@@ -131,8 +131,11 @@ after later events discards what it has shown for that message.
 ## 7 · Failure path
 
 Infra fault (Qdrant / LLM / Redis) → bounded retries with backoff → `ErrorEvent{code:
-"dependency_unavailable"}` to the stream, record to the DLQ, then commit. Malformed envelope → DLQ
-immediately, no retry. Its bytes skipped the gateway's scrubber, so neither the DLQ record nor the log
+"dependency_unavailable"}` to the stream, record to the DLQ, then commit. Any other exception from
+the pipeline is a defect → no retry, `ErrorEvent{code: "internal_error"}` with a fixed `detail`, record
+to the DLQ holding only the exception's type name, lease released, then commit, so the partition
+advances. `LeaseLost` is the exception: it stops the process without commit (ADR 0009). Malformed
+envelope → DLQ immediately, no retry. Its bytes skipped the gateway's scrubber, so neither the DLQ record nor the log
 keeps any of them: the record holds their SHA-256, their length and the validation error types
 with `Envelope` field locations (other location parts become `?`). A tracing backend that is down or unreachable (Jaeger via OTLP, LangFuse) is
 not a dependency: span export runs in the background and LangFuse calls are caught. Both log the
@@ -140,7 +143,7 @@ failure and drop the trace data, and requests complete as usual.
 
 DLQ records are inspected and replayed with `python -m worker.dlq list | replay --offset N... | --all`
 (worker image or `uv run`). Replay re-produces a record's envelope keyed by its thread. If the failed
-attempt's stream ends in `dependency_unavailable`, replay deletes it first, so the worker processes
+attempt's stream ends in `dependency_unavailable` or `internal_error`, replay deletes it first, so the worker processes
 the message instead of recording the old outcome again. A replayed message joins its thread's order
 when it is replayed, not where it was first sent. Replay is idempotent (dedupe skips a completed
 message). Malformed records have no envelope and are not replayable.

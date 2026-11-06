@@ -15,7 +15,7 @@ from typing import Any
 
 import redis
 from chat_common.kafka import client_config
-from chat_common.schemas import Envelope, stream_key
+from chat_common.schemas import DLQ_ERROR_CODES, Envelope, stream_key
 from chat_common.settings import Settings
 from confluent_kafka import Consumer, KafkaException, Producer, TopicPartition
 
@@ -83,7 +83,8 @@ def read(bootstrap: str, topic: str) -> list[DlqRecord]:
 def replay(records: list[DlqRecord], *, bootstrap: str, topic: str, redis: Any) -> list[str]:
     """Re-produce each record's envelope to `topic`; returns the replayed message ids.
 
-    The failed attempt's stream ends in `ErrorEvent{dependency_unavailable}`. The worker would read
+    The failed attempt's stream ends in `ErrorEvent{dependency_unavailable | internal_error}`. The
+    worker would read
     that as an outcome already recorded and dead-letter the message again, so replay deletes that
     stream first. A stream that ends any other way (a later success) is left alone.
     """
@@ -95,7 +96,7 @@ def replay(records: list[DlqRecord], *, bootstrap: str, topic: str, redis: Any) 
             continue
         key = stream_key(env.thread_id, env.message_id)
         last = redis.xrevrange(key, count=1)
-        if last and json.loads(last[0][1]["data"]).get("code") == "dependency_unavailable":
+        if last and json.loads(last[0][1]["data"]).get("code") in DLQ_ERROR_CODES:
             redis.delete(key)
         producer.produce(topic, value=env.model_dump_json().encode(), key=env.thread_id.encode())
         replayed.append(str(env.message_id))

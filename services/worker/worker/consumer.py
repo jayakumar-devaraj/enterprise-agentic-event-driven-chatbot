@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from chat_common.schemas import TERMINAL_TYPES, Envelope
+from chat_common.schemas import DLQ_ERROR_CODES, TERMINAL_TYPES, Envelope
 from chat_common.settings import Settings
 from confluent_kafka import TopicPartition
 from pydantic import ValidationError
@@ -25,6 +25,14 @@ log = logging.getLogger("worker.consumer")
 class TransientDependencyError(Exception):
     """Qdrant, LLM or Redis fault that may succeed on retry."""
 
+
+_DLQ_OUTCOME = {"dependency_unavailable": "dlq_dependency", "internal_error": "dlq_internal"}
+
+_ERROR_DETAIL = {
+    "dependency_unavailable": "a dependency is unavailable; try again",
+    "internal_error": "something went wrong on our side; try again",
+}
+"""Fixed text per code: the frontend shows `detail`, so it never carries exception text."""
 
 Processor = Callable[[Envelope, StreamWriter], Awaitable[None]]
 """Runs the pipeline for one envelope and writes its events (token…done / approval_required)."""
@@ -254,19 +262,19 @@ class Worker:
             # An earlier attempt wrote its terminal event and died before recording the outcome:
             # keep the stream the client may be reading and finish the bookkeeping only.
             log.info("terminal event already streamed; recording outcome", extra=ctx)
-            if last.get("code") == "dependency_unavailable":
+            if last.get("code") in DLQ_ERROR_CODES:
                 await lease.check(self._redis)
-                await self._to_dlq(msg, "dependency_unavailable", "recovered after restart", env)
+                await self._to_dlq(msg, last["code"], "recovered after restart", env)
                 await lease.release(self._redis)
-                RECORDS.labels("dlq_dependency").inc()
+                RECORDS.labels(_DLQ_OUTCOME[last["code"]]).inc()
             else:
                 await lease.done(self._redis, self._s.dedupe_ttl_s)
                 RECORDS.labels("done").inc()
             await self._commit(msg)
             return
         await writer.reset()  # partial attempt: the retry restarts the stream at seq 0 (SPEC §6)
-        error = await self._run_with_retries(env, writer, ctx)
-        if error is None:
+        failure = await self._run_with_retries(env, writer, ctx)
+        if failure is None:
             try:
                 await lease.done(self._redis, self._s.dedupe_ttl_s)
             except RedisError:
@@ -276,26 +284,29 @@ class Worker:
             await self._commit(msg)
             return
 
+        code, error = failure
         try:
-            await writer.error("dependency_unavailable", "a dependency is unavailable; try again")
+            await writer.error(code, _ERROR_DETAIL[code])
         except RedisError:
             log.error("could not write ErrorEvent", extra=ctx)
         await lease.check(self._redis)
-        await self._to_dlq(msg, "dependency_unavailable", error, env)
+        await self._to_dlq(msg, code, error, env)
         try:
             await lease.release(self._redis)
         except RedisError:
             log.error("could not release dedupe lease; it will expire", extra=ctx)
-        RECORDS.labels("dlq_dependency").inc()
+        RECORDS.labels(_DLQ_OUTCOME[code]).inc()
         await self._commit(msg)
 
     async def _run_with_retries(
         self, env: Envelope, writer: StreamWriter, ctx: dict[str, str]
-    ) -> str | None:
+    ) -> tuple[str, str] | None:
         """Retry transient faults with capped exponential backoff while nothing was streamed.
 
         Once a token has been written a retry would duplicate output, so a later fault is final.
-        Returns None on success, else the last error text.
+        Any other exception is a defect: final at once, reported as `internal_error` with only its
+        type name (the message may hold model output). `LeaseLost` still propagates.
+        Returns None on success, else (ErrorEvent code, error text).
         """
         last = ""
         for attempt in range(self._s.max_retries + 1):
@@ -310,4 +321,10 @@ class Worker:
                     break
                 RETRIES.inc()
                 await asyncio.sleep(min(0.5 * 2**attempt, self._s.retry_backoff_max_s))
-        return last
+            except LeaseLost:
+                raise
+            except Exception as exc:  # noqa: BLE001 - any defect gets a final outcome, not a wedge
+                error = type(exc).__name__
+                log.error("processor failed", extra={**ctx, "error": error})
+                return "internal_error", error
+        return "dependency_unavailable", last

@@ -6,11 +6,12 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from chat_common.schemas import Envelope
 from chat_common.settings import Settings
 from fakes import FakeRedis
 from worker.consumer import TransientDependencyError, Worker
-from worker.lease import Lease
+from worker.lease import Lease, LeaseLost
 from worker.streams import StreamWriter
 
 SETTINGS = Settings(
@@ -200,6 +201,57 @@ async def test_redelivery_after_streamed_dependency_error_still_reaches_dlq() ->
     await redis.delete(writer.lease.key)
     await w.handle(FakeMsg(env.model_dump_json().encode()))
     assert calls == [] and dlq.records[0]["reason"] == "dependency_unavailable"
+    assert await redis.get(f"dedupe:{env.message_id}") is None
+    assert len(consumer.commits) == 1
+
+
+async def test_unexpected_processor_error_gets_internal_error_event_dlq_and_commit() -> None:
+    """A non-transient fault must not wedge the partition: ErrorEvent, DLQ, lease freed, commit."""
+    attempts = []
+
+    async def broken(env: Envelope, writer: StreamWriter) -> None:
+        attempts.append(1)
+        raise ValueError("secret detail")
+
+    w, consumer, dlq, redis = _worker(broken)
+    env = _env()
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    (row,) = redis.streams[f"tokens:t1:{env.message_id}"]
+    assert json.loads(row[1]["data"]) == {
+        "type": "error",
+        "seq": 0,
+        "code": "internal_error",
+        "detail": "something went wrong on our side; try again",
+    }
+    assert len(attempts) == 1  # a code defect is not retried
+    assert len(dlq.records) == 1 and dlq.records[0]["reason"] == "internal_error"
+    assert "secret detail" not in json.dumps(dlq.records[0])
+    assert await redis.get(f"dedupe:{env.message_id}") is None
+    assert len(consumer.commits) == 1
+
+
+async def test_lease_lost_still_propagates_from_the_processor() -> None:
+    """LeaseLost is a stop-without-commit signal, never an internal_error outcome."""
+
+    async def lost(env: Envelope, writer: StreamWriter) -> None:
+        raise LeaseLost("taken over")
+
+    w, consumer, dlq, _ = _worker(lost)
+    with pytest.raises(LeaseLost):
+        await w.handle(FakeMsg(_env().model_dump_json().encode()))
+    assert dlq.records == [] and consumer.commits == []
+
+
+async def test_redelivery_after_streamed_internal_error_still_reaches_dlq() -> None:
+    """The ErrorEvent was written but the DLQ record was not: write it, release, commit."""
+    calls = []
+    w, consumer, dlq, redis = _worker(lambda e, wr: calls.append(e))
+    env = _env()
+    writer = await _crashed_writer(redis, env)
+    await writer.error("internal_error", "something went wrong on our side; try again")
+    await redis.delete(writer.lease.key)
+    await w.handle(FakeMsg(env.model_dump_json().encode()))
+    assert calls == [] and dlq.records[0]["reason"] == "internal_error"
     assert await redis.get(f"dedupe:{env.message_id}") is None
     assert len(consumer.commits) == 1
 
