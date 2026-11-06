@@ -1,5 +1,5 @@
 {
-  "unit_tests": 240,
+  "unit_tests": 254,
   "integration_tests": 64,
   "durability_tests": 8,
   "frontend_tests": 16,
