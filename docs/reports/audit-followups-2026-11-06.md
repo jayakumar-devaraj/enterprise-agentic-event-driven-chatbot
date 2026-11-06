@@ -40,13 +40,28 @@ Rules that bind every item (all from `CLAUDE.md`):
   0 commits, 0 DLQ records and the dedupe lease still `processing:<token>`.
 - **Inferred effect:** `Worker.run` propagates the error and the process stops; the record is
   redelivered after the lease expires and fails the same way, so the partition never advances.
-- **Fix:** after the transient clause, catch `Exception`; write `ErrorEvent` with code
-  `internal_error`, send a DLQ record with reason `internal_error` (the envelope is already scrubbed),
-  release the lease, commit. `LeaseLost` must still propagate. Add the new code to `SPEC.md`
-  (error codes and §7) and to the failure-modes section of `docs/architecture/HLD.md`.
+- **Fix:** after the transient clause, catch `Exception`; write an `ErrorEvent` with a fixed,
+  generic `detail` (the frontend shows `detail` for any code other than `dependency_unavailable`,
+  `frontend/src/ChatWindow.tsx` line 59, so it must never carry the exception text), send a DLQ
+  record (the envelope is already scrubbed), release the lease, commit. `LeaseLost` must still
+  propagate. `ErrorEvent.code` is a free `str` (`packages/common/chat_common/schemas.py` line 91), so
+  no schema change is needed.
+- **Decide first: reuse `dependency_unavailable` or add a new code.** Two other places key on that
+  exact string, and a new code must be handled in both or the fix is wrong:
+  - `consumer.py` lines 253-264: a redelivery that finds a terminal event already streamed treats any
+    code other than `dependency_unavailable` as success and calls `lease.done`. A crash between the
+    new ErrorEvent and the commit would then record the message as done with no DLQ record.
+  - `services/worker/worker/dlq.py` lines 86-98 (`replay`): it deletes the old stream only for
+    `dependency_unavailable`. A replayed record with a new code would be skipped as already finished.
+  Reusing the existing code is the smaller change but mislabels a code defect as a dependency fault;
+  a new code needs both places updated, with a test for each.
+- **Docs in the same PR:** `SPEC.md` §7 (failure path, DLQ replay paragraph) and the failure-modes
+  section of `docs/architecture/HLD.md`.
 - **Done when:** a unit test in `tests/unit/test_worker_consumer.py` shows ErrorEvent, 1 DLQ record,
-  lease released and 1 commit; an integration test against real Kafka and Redis shows the next
-  record on the same partition is processed. Existing tests still pass.
+  lease released and 1 commit; a second unit test shows redelivery after a crash between the
+  ErrorEvent and the commit still reaches the DLQ; a replay test covers the chosen code; an
+  integration test against real Kafka and Redis shows the next record on the same partition is
+  processed. Existing tests still pass.
 - **Rubric effect:** 2a +1, 3a +1.
 
 ### 1.2 `worker.main` has no test
@@ -121,6 +136,6 @@ not add markers to past commits.
 
 ## 3. Expected effect
 
-Items 1.1, 1.2 and 2.1 are worth about +3 to +4 rubric points (85 to about 88-89). The remaining
+Estimate, not a measurement: items 1.1, 1.2 and 2.1 are worth about +3 to +4 rubric points (85 to about 88-89). The remaining
 points depend on provenance that cannot be added to past commits. Items 1.3 to 1.5 are product
 quality and are worth little or nothing on the rubric.
