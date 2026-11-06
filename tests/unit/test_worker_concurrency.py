@@ -9,6 +9,7 @@ from chat_common.schemas import Envelope
 from chat_common.settings import Settings
 from fakes import FakeRedis
 from worker.consumer import Worker
+from worker.lease import LeaseLost
 from worker.streams import StreamWriter
 
 SETTINGS = Settings(
@@ -174,16 +175,16 @@ async def test_in_flight_records_are_bounded_by_worker_concurrency() -> None:
 
 
 async def test_a_failed_record_stops_its_thread_and_the_process_without_commit() -> None:
-    """A later message of the thread must never run ahead of one that did not finish."""
+    """A later message of the thread must never run ahead of one with no durable outcome."""
     a1, a2 = recs = _recs("a", "a")
     calls: list[str] = []
 
     async def process(env: Envelope, writer: StreamWriter) -> None:
         calls.append(str(env.message_id))
-        raise RuntimeError("bug")
+        raise LeaseLost("taken over")
 
     kafka, stop, task = _start(recs, process)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(LeaseLost):
         await asyncio.wait_for(task, 2)
     assert calls == [_id(a1)] and kafka.commits == []
 

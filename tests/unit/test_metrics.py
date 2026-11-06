@@ -58,6 +58,20 @@ async def test_gateway_counts_an_unhandled_error_as_500() -> None:
     assert after - before == 1
 
 
+async def test_worker_counts_a_defect_apart_from_a_dependency_fault() -> None:
+    """An unexpected exception lands in dlq_internal, so dependency alerts do not fire on it."""
+
+    async def _broken(env, writer) -> None:
+        raise ValueError("defect")
+
+    names = ("dlq_internal", "dlq_dependency")
+    before = {o: _value("chatbot_worker_records_total", outcome=o) for o in names}
+    w, *_ = _worker(_broken)
+    await w.handle(FakeMsg(_env().model_dump_json().encode()))
+    after = {o: _value("chatbot_worker_records_total", outcome=o) for o in names}
+    assert {o: after[o] - before[o] for o in names} == {"dlq_internal": 1, "dlq_dependency": 0}
+
+
 async def test_worker_counts_each_recorded_outcome() -> None:
     """done, duplicate, malformed and dependency outcomes each land in their own series."""
 

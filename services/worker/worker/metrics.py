@@ -4,7 +4,7 @@ from prometheus_client import Counter, Gauge, Histogram
 
 RECORDS = Counter(
     "chatbot_worker_records", "Kafka records by recorded outcome.", ["outcome"]
-)  # done | duplicate | dlq_malformed | dlq_dependency
+)  # done | duplicate | dlq_malformed | dlq_dependency | dlq_internal
 RECORD_SECONDS = Histogram(
     "chatbot_worker_record_seconds",
     "Time to handle one record, lease wait included.",

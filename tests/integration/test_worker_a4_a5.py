@@ -143,6 +143,26 @@ async def test_a4_malformed_envelope_lands_in_dlq(topics) -> None:
     assert record["reason"] == "malformed" and len(record["sha256"]) == 64 and record["length"] > 0
 
 
+async def test_unexpected_error_is_dead_lettered_and_the_partition_advances(topics) -> None:
+    """A defect on one record ⇒ internal_error + DLQ + commit; the next record is processed."""
+    req, dlq = topics
+    bad, good = _env(), _env()
+
+    async def process(e: Envelope, writer: StreamWriter) -> None:
+        if e.message_id == bad.message_id:
+            raise ValueError("defect")
+        await writer.done()
+
+    await _produce(req, [bad.model_dump_json().encode(), good.model_dump_json().encode()])
+    await _run_worker(req, dlq, process, expected_commits=2)
+    (record,) = await _read_topic(dlq, 1)
+    assert record["reason"] == "internal_error"
+    assert record["envelope"]["message_id"] == str(bad.message_id)
+    (error,) = await _events(bad.thread_id, bad.message_id)
+    assert error["code"] == "internal_error"
+    assert [e["type"] for e in await _events(good.thread_id, good.message_id)] == ["done"]
+
+
 async def test_a5_same_message_twice_one_done(topics) -> None:
     """The same envelope delivered twice ⇒ processed once, one stream with one done."""
     req, dlq = topics
