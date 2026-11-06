@@ -1,7 +1,7 @@
 # Master plan
 
 Single source of truth for the build. Any agreed cut updates this file in the same commit.
-Process: `docs/prompts/coding_challenge.md`. Requirements: `docs/prompts/problem-statement.md`.
+Process: `docs/prompts/agent-build-prompt.md`. Requirements: `docs/prompts/problem-statement.md`.
 Design transcript: `docs/design_dialogue.md`.
 
 ## Window
