@@ -30,3 +30,9 @@ longer rebuilt) and 37 more in Python packages; they were cleared in #95 and #98
   uses the same Node patch.
 - `SECURITY.md` names the maintainer as owner of CodeQL and scheduled-scan triage, with response times by
   severity and the rule that a dismissal carries a reason specific to the flagged code.
+
+## Addendum 2026-11-09: zlib1g upgraded in the Python images
+- The weekly scan found two fixable HIGH CVEs in `zlib1g` (CVE-2026-76844, CVE-2026-85091) in all four Python
+  images. `python:3.13.18-slim` still ships `1:1.3.dfsg+really1.3.1-1+b1`, and Debian fixed them in
+  `1:1.3.dfsg+really1.3.1-1+deb13u1`. Each runtime stage upgrades only `zlib1g` from Debian, so the rest of the
+  image stays as the tag ships it. The upgrade can go once a rebuilt tag carries the fix.
