@@ -1,11 +1,11 @@
-Coverage at 882bb6a from CI run 41703727217 (unit + integration; scale, llm, durability and stack tests need special stacks):
+Coverage at 3ee1cc6 from CI run 42291685564 (unit + integration; scale, llm, durability and stack tests need special stacks):
 Name                                      Stmts   Miss  Cover
 -------------------------------------------------------------
 packages/common/chat_common/__init__.py       0      0   100%
 packages/common/chat_common/audit.py         24      0   100%
 packages/common/chat_common/kafka.py          4      0   100%
 packages/common/chat_common/logjson.py       20      5    75%
-packages/common/chat_common/schemas.py       73      0   100%
+packages/common/chat_common/schemas.py       75      0   100%
 packages/common/chat_common/scrubber.py      23      0   100%
 packages/common/chat_common/settings.py     109      0   100%
 packages/common/chat_common/tracing.py       19      4    79%
@@ -22,14 +22,14 @@ services/seed/seed/main.py                   89      8    91%
 services/worker/worker/__init__.py            0      0   100%
 services/worker/worker/approval.py           29      0   100%
 services/worker/worker/checkpoint.py         31      1    97%
-services/worker/worker/consumer.py          190      9    95%
+services/worker/worker/consumer.py          200      7    96%
 services/worker/worker/dlq.py                82     28    66%
 services/worker/worker/embedding.py          21      0   100%
 services/worker/worker/graph.py             226      5    98%
 services/worker/worker/guards.py             78      1    99%
 services/worker/worker/lease.py              26      0   100%
 services/worker/worker/llm.py               108     12    89%
-services/worker/worker/main.py               73     73     0%
+services/worker/worker/main.py               73      1    99%
 services/worker/worker/metrics.py             9      0   100%
 services/worker/worker/numeric.py            11      0   100%
 services/worker/worker/observability.py      20      4    80%
@@ -38,4 +38,4 @@ services/worker/worker/rag_client.py         98      1    99%
 services/worker/worker/router.py             35      0   100%
 services/worker/worker/streams.py            54      0   100%
 -------------------------------------------------------------
-TOTAL                                      1924    174    91%
+TOTAL                                      1936    100    95%
