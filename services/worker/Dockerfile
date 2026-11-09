@@ -11,6 +11,9 @@ RUN uv sync --locked --no-dev --no-editable --package worker
 RUN /app/.venv/bin/python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5', cache_dir='/models')"
 FROM python:3.13.18-slim
 # pip is unused at runtime (the app runs from /app/.venv) and its vendored packages carry CVEs.
+# zlib1g: the base tag still ships 1.3.1-1+b1, below the Debian fix for two HIGH CVEs (ADR 0014).
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --create-home app && python -m pip uninstall -y -q pip
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /models /models
