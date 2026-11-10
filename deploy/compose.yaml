@@ -255,7 +255,11 @@ services:
       QDRANT_URL: https://qdrant:6333
       GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: /certs/ca.crt
       KAFKA_PASSWORD: ${KAFKA_PASSWORD:?export KAFKA_PASSWORD, e.g. $(openssl rand -hex 16)}
+      # Refund audit events are written here before the user sees the outcome (ADR 0011).
+      AUDIT_DATABASE_URL: postgresql://audit_writer:${AUDIT_WRITER_PASSWORD:-}@audit-db:5432/audit
     depends_on:
+      audit-db:
+        condition: service_healthy
       seed:
         condition: service_completed_successfully
       kafka-init:
@@ -441,10 +445,10 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
-  # Durable audit record (ADR 0011): the exporter moves `audit:events` from Redis into an append-only
-  # Postgres table. Profile `audit`; export AUDIT_DB_PASSWORD and AUDIT_WRITER_PASSWORD first.
+  # Durable audit record (ADR 0011): the worker writes refund events here synchronously, and the
+  # exporter (profile `audit`) moves the rest of `audit:events` from Redis. Part of the default stack;
+  # export AUDIT_DB_PASSWORD and AUDIT_WRITER_PASSWORD first (without them Postgres will not start).
   audit-db:
-    profiles: ["audit"]
     image: postgres:16.14
     environment:
       POSTGRES_USER: audit_admin

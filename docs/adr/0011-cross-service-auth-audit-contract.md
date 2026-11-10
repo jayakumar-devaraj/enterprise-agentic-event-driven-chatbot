@@ -113,3 +113,30 @@ schema change needs a migration tool (the RAG repository uses Alembic). Rows sur
 being trimmed (tested). Not built: the synchronous tier (refund and access-denial events written straight
 to Postgres), monthly partitioning and the 400-day retention job, the 60-second lag alarm (the exporter
 logs the lag after each batch), and a query endpoint (SQL only).
+
+## Amendment (2026-11-10, synchronous tier for refund events)
+
+Decision C's synchronous tier is implemented for refund events only. After the Redis script that changes
+refund state and appends its entry to `audit:events` commits, the worker inserts the same entry into
+`audit_log` as the `audit_writer` role, before the user sees the outcome and before the Kafka offset can be
+committed. The five events are `refund_proposed`, `refund_applied`, `refund_rejected`, `refund_expired` and
+`refund_abandoned`. Each carries an `event_key` (for example `refund_applied:{message_id}`; an expiry also
+names the approval message). The column is unique, so a redelivery's insert is a no-op, and the exporter's
+later copy of the same Redis entry carries the key and is skipped. Rows the worker writes have no
+`stream_id`.
+
+An unreachable database is a dependency fault: the record is retried and then dead-lettered with
+`ErrorEvent{dependency_unavailable}`, and the retry stores the row once. A refund event with no store
+configured is a defect raised before Redis changes, never a silent skip. The worker refuses to start
+without `AUDIT_DATABASE_URL` or when it cannot reach the table, so `audit-db` leaves the `audit` profile
+and joins the default stack; the exporter stays in the profile for every other event.
+
+The atomic unit is still the Redis script. Postgres is written after it, so a Redis loss of the last
+second (ADR 0008) after the insert leaves a row for state Redis no longer holds. The opposite gap (a
+refund event that reached the user but not Postgres) is closed.
+
+Still not built: access-denial events (401, 403 and `rag_unauthorized` are not audited anywhere), monthly
+partitioning, the retention job, the lag alarm and a query endpoint. A database created before this
+amendment lacks `event_key` and has a `NOT NULL` `stream_id`; recreate the `audit-data` volume or apply
+`ALTER TABLE audit_log ALTER COLUMN stream_id DROP NOT NULL, ADD COLUMN event_key TEXT UNIQUE,
+ADD CHECK (stream_id IS NOT NULL OR event_key IS NOT NULL)` as `audit_admin`.

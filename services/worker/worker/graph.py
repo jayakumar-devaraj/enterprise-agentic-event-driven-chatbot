@@ -16,6 +16,7 @@ from langgraph.types import Command, interrupt
 from opentelemetry import trace
 
 from worker import approval
+from worker.audit_store import AuditStore
 from worker.consumer import TransientDependencyError
 from worker.guards import GroundingGate, guarded_tokens
 from worker.llm import REFUSAL, Engine, Turn, render_documents
@@ -86,8 +87,10 @@ def build_graph(
     rag: RagClient | None = None,
     rag_max_tokens: int = 256,
     rag_context_chars: int = 12000,
+    audit_store: AuditStore | None = None,
 ) -> StateGraph:
-    """Assemble the graph; the caller compiles it with a checkpointer."""
+    """Assemble the graph; the caller compiles it with a checkpointer. Settling a refund needs
+    `audit_store` (ADR 0011)."""
 
     llm_observer: LLMObserver = observer or NullObserver()
 
@@ -252,6 +255,7 @@ def build_graph(
                 ref_message_id=ref,
                 user_id=decision["user_id"],
                 lease=current_writer.get().lease,
+                store=audit_store,
             )
             text = approval.APPROVED_TEXT
         else:
@@ -262,8 +266,10 @@ def build_graph(
                     "refund_rejected",
                     actor=decision["user_id"],
                     thread_id=thread_id,
+                    key=f"refund_rejected:{ref}",
                     ref_message_id=ref,
                 ),
+                store=audit_store,
             )
             text = approval.REJECTED_TEXT
         reply = await stream_reply(_single(text))
@@ -298,9 +304,14 @@ def build_graph(
 
 
 def make_processor(
-    compiled: Any, *, redis: Any = None, approval_ttl_s: int = 3600
+    compiled: Any,
+    *,
+    redis: Any = None,
+    approval_ttl_s: int = 3600,
+    audit_store: AuditStore | None = None,
 ) -> Callable[[Envelope, StreamWriter], Awaitable[None]]:
-    """Adapt a compiled graph to the worker's Processor signature."""
+    """Adapt a compiled graph to the worker's Processor signature. Opening, expiring or
+    abandoning a refund needs `audit_store` (ADR 0011)."""
 
     async def process(env: Envelope, writer: StreamWriter) -> None:
         parent = context_from_traceparent(env.trace_id) if env.trace_id.startswith("00-") else None
@@ -369,8 +380,10 @@ def make_processor(
                             "refund_expired",
                             actor=env.user_id,
                             thread_id=env.thread_id,
+                            key=f"refund_expired:{ref}:{mid}",
                             message_id=ref,
                         ),
+                        store=audit_store,
                     )
                     await writer.error("approval_expired", "the refund approval window has closed")
                     return
@@ -399,9 +412,11 @@ def make_processor(
                             "refund_abandoned",
                             actor=env.user_id,
                             thread_id=env.thread_id,
+                            key=f"refund_abandoned:{paused}",
                             message_id=paused,
                             superseded_by=mid,
                         ),
+                        store=audit_store,
                     )
                 if paused == mid:  # paused by an earlier attempt that died before announcing it
                     interrupted = True
@@ -434,8 +449,10 @@ def make_processor(
                             "refund_proposed",
                             actor=env.user_id,
                             thread_id=env.thread_id,
+                            key=f"refund_proposed:{mid}",
                             message_id=mid,
                         ),
+                        store=audit_store,
                     )
                     await writer.approval_required("A refund request needs your approval.")
                     return

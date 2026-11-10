@@ -11,6 +11,7 @@ from typing import Any
 
 from chat_common.audit import AUDIT_MAXLEN, AUDIT_STREAM, AuditLog
 
+from worker.audit_store import AuditStore
 from worker.lease import FENCE, Lease
 
 REFUND_RE = re.compile(r"\brefunds?\b", re.IGNORECASE)
@@ -86,13 +87,24 @@ async def mark(
     owner: str | None = None,
     ttl_s: int = 0,
     audit: dict[str, str] | None = None,
+    store: AuditStore | None = None,
 ) -> None:
     """Open (`owner` given) or close the approval window `pending` and append `audit`, atomically
-    and only while `lease` is held (LeaseLost otherwise)."""
+    and only while `lease` is held (LeaseLost otherwise); then write `audit` to `store`."""
+    sink = _require(store) if audit else None
     op = "none" if pending is None else ("set" if owner else "del")
     keys = [pending or AUDIT_STREAM, AUDIT_STREAM]
     args = [op, owner or "", ttl_s, _flat(audit or {}), AUDIT_MAXLEN]
     await lease.run(redis, _MARK, keys, args)
+    if sink is not None and audit:
+        await sink.write(audit)
+
+
+def _require(store: AuditStore | None) -> AuditStore:
+    """Refund events are always written to Postgres too; never skip that silently (ADR 0011)."""
+    if store is None:
+        raise RuntimeError("refund audit entries need an AuditStore")
+    return store
 
 
 def _flat(fields: dict[str, str]) -> str:
@@ -101,13 +113,22 @@ def _flat(fields: dict[str, str]) -> str:
 
 
 async def apply_refund(
-    redis: Any, *, thread_id: str, ref_message_id: str, user_id: str, lease: Lease
+    redis: Any,
+    *,
+    thread_id: str,
+    ref_message_id: str,
+    user_id: str,
+    lease: Lease,
+    store: AuditStore | None,
 ) -> bool:
     """Record the refund request at most once per originating message; True if recorded now.
 
     The marker never expires, so the at-most-once guarantee has no retention window. False means
     an earlier call already recorded all three entries. LeaseLost if `lease` is no longer held.
+    The audit entry is then written to `store` either way, so a retry after a failed write
+    completes it.
     """
+    sink = _require(store)
     refund = {
         "thread_id": thread_id,
         "ref_message_id": ref_message_id,
@@ -115,8 +136,14 @@ async def apply_refund(
         "ts": datetime.now(UTC).isoformat(),
     }
     audit = AuditLog.entry(
-        "refund_applied", actor=user_id, thread_id=thread_id, ref_message_id=ref_message_id
+        "refund_applied",
+        actor=user_id,
+        thread_id=thread_id,
+        key=f"refund_applied:{ref_message_id}",
+        ref_message_id=ref_message_id,
     )
     keys = [f"refund_applied:{ref_message_id}", REFUNDS_STREAM, AUDIT_STREAM]
     args = [_flat(refund), _flat(audit), AUDIT_MAXLEN]
-    return bool(await lease.run(redis, _APPLY, keys, args))
+    recorded = bool(await lease.run(redis, _APPLY, keys, args))
+    await sink.write(audit)
+    return recorded

@@ -15,6 +15,7 @@ import pytest
 import redis.asyncio as aioredis
 from audit.export import Exporter
 from chat_common.audit import AuditLog
+from worker.audit_store import AuditStore
 
 pytestmark = pytest.mark.integration
 
@@ -123,3 +124,19 @@ async def test_the_writer_role_can_insert_and_read_but_never_change_or_remove_ro
         ):
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 await c.execute(sql)
+
+
+async def test_an_entry_the_worker_already_stored_is_not_stored_twice(setup):
+    """ADR 0011 decision C: refund events reach the table directly; the exporter's copy of the
+    same Redis entry carries the same `event_key` and is skipped, and the stream is acknowledged."""
+    redis, exporter, stream, thread = setup
+    fields = AuditLog.entry("refund_proposed", actor="alice", thread_id=thread, key=f"k-{thread}")
+    await AuditStore(WRITER).write(fields)
+    await redis.xadd(stream, fields)
+    await _add(redis, stream, "chat_accepted", thread)
+    assert await exporter.export_once() == 2
+    assert await _rows(thread) == [
+        ("refund_proposed", "alice", {}),
+        ("chat_accepted", "alice", {}),
+    ]
+    assert await exporter.lag() == 0

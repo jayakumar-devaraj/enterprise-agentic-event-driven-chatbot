@@ -14,7 +14,7 @@ request is traceable end to end, and key actions are written to an audit log.
 when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
-- **Tests collected:** 268 unit, 64 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 16 frontend.
+- **Tests collected:** 278 unit, 66 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 16 frontend.
 - **Coverage:** 95 % of 1936 statements. Report header: "Coverage at 3ee1cc6 from CI run 42291685564 (unit + integration; scale, llm, durability and stack tests need special stacks)".
 <!-- figures:end -->
 
@@ -51,9 +51,9 @@ state (ADR 0008).
    with PKCE, tested against a local Keycloak (ADR 0016); HTTP Basic remains when no issuer is set. Static
    tokens to the document service are now opt-in there, and the `rag` profile still opts in. Built from ADR
    0011: the document service validates signed tokens, the worker can use per-tenant client credentials
-   (tested against a test double), and an optional exporter copies the audit stream into an append-only
-   database. Not built: writing refund and access-denial events straight to that database, and any run
-   against a production identity provider.
+   (tested against a test double), the worker writes refund events straight to an append-only audit
+   database, and an optional exporter copies the rest of the audit stream there. Not built: auditing
+   access denials, and any run against a production identity provider.
 3. Detection quality: harmless off-topic questions are refused, and location names and some
    structured identifiers slip through the PII scrubber.
 4. Reply quality and independent scoring: the local 1B model deflects most billing questions.
