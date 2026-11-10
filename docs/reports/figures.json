@@ -1,11 +1,11 @@
 {
-  "unit_tests": 240,
+  "unit_tests": 254,
   "integration_tests": 64,
   "durability_tests": 8,
   "frontend_tests": 16,
   "coverage": {
-    "percent": 91,
-    "statements": 1924,
-    "source": "Coverage at 882bb6a from CI run 41703727217 (unit + integration; scale, llm, durability and stack tests need special stacks):"
+    "percent": 95,
+    "statements": 1936,
+    "source": "Coverage at 3ee1cc6 from CI run 42291685564 (unit + integration; scale, llm, durability and stack tests need special stacks):"
   }
 }
