@@ -105,7 +105,7 @@ sequenceDiagram
   W->>W: billing node detects refund request (deterministic rule on scrubbed text)
   W->>W: interrupt() — graph state checkpointed, nothing applied
   W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S and audit refund_proposed (one fenced script)
-  W->>P: INSERT audit_log refund_proposed (event_key; repeat is a no-op)
+  W->>P: INSERT audit_log refund_proposed (by event_key, a repeat is a no-op)
   W->>R: XADD ApprovalRequiredEvent ⇒ stream closes
   C->>G: POST /approve/{thread}/{msg} {message_id: new, approved}
   G->>R: owner check (403), pending exists or decision already delivered (404 if neither)
