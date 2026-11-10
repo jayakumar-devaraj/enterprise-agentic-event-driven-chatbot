@@ -201,11 +201,14 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
 - **Address and obfuscated-identifier recognizers (2026-11-10, `docs/reports/pii-heldout-2026-11-10.md`):**
   on a held-out set pre-registered before the recognizers were written, addresses went from 3/19 to
   19/19. Obfuscated identifiers went from 1/14 to 11/14, which **fails** the 0.80 target. Controls
-  and negatives were unchanged. Still open: an email preceded by "me at" is cut short by the
-  pattern's leftmost match (`me at jane dot doe at example dot com` keeps the address), IPs written
-  with spaces only, cards spelled out in words, `NW`-style suffixes, non-English street forms and
-  non-English place names. The broad set's structured identifiers now score 12/14 and locations
-  22/30, which still miss its targets; that set is no longer held out.
+  and negatives were unchanged. The email defect that score found (`me at jane dot doe at example dot
+  com` was cut short and kept the address) is fixed and judged on fresh cases
+  (`docs/reports/pii-email-fresh-2026-11-10.md`): 8/8 redacted, but 1 false positive against a
+  target of 0. "Look at the dot at" reads as an email at `the.at`; that was true before the fix and
+  is not fixed. Still open: that false positive, IPs written with spaces only, cards spelled out in
+  words, `NW`-style suffixes, non-English street forms and non-English place names. The broad set's
+  structured identifiers now score 13/14 and locations 22/30, which still miss its targets; that set
+  is no longer held out.
 - **End-to-end safety evaluation (2026-10-25, `docs/reports/safety-final-2026-10-25.md`):** against
   targets pre-registered before the run, with the real model, no refund was applied or claimed, the
   system prompt did not leak, and no canary attack succeeded. Benign false refusals were 0/20.

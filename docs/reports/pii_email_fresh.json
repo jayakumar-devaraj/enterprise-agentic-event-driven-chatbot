@@ -1,0 +1,63 @@
+{
+  "sentences": 12,
+  "spacy_model": "en_core_web_lg",
+  "per_type": {
+    "EMAIL_ADDRESS": {
+      "labeled": 8,
+      "typed_recall": 1.0,
+      "redaction_recall": 1.0,
+      "redaction_recall_ci95": [
+        0.676,
+        1.0
+      ],
+      "detected_spans": 9,
+      "precision": 0.8889,
+      "precision_ci95": [
+        0.565,
+        0.98
+      ]
+    },
+    "LOCATION": {
+      "labeled": 0,
+      "typed_recall": null,
+      "redaction_recall": null,
+      "redaction_recall_ci95": null,
+      "detected_spans": 1,
+      "precision": 0.0,
+      "precision_ci95": [
+        0.0,
+        0.793
+      ]
+    },
+    "PERSON": {
+      "labeled": 0,
+      "typed_recall": null,
+      "redaction_recall": null,
+      "redaction_recall_ci95": null,
+      "detected_spans": 1,
+      "precision": 0.0,
+      "precision_ci95": [
+        0.0,
+        0.793
+      ]
+    }
+  },
+  "by_category": {
+    "email_after_at": {
+      "sentences": 8,
+      "labeled": 8,
+      "redacted": 8,
+      "false_positives": 2
+    },
+    "negative": {
+      "sentences": 4,
+      "false_positives": 1
+    }
+  },
+  "misses": [],
+  "false_positives": [
+    "email_after_at PERSON: tom dot reyes",
+    "email_after_at LOCATION: uk",
+    "negative EMAIL_ADDRESS: Look at the dot at"
+  ]
+}

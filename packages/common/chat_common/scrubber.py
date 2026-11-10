@@ -40,7 +40,10 @@ _DOT = r"(?:\s*[(\[{<]\s*dot\s*[)\]}>]\s*|\s+dot\s+|\.|\s+\.\s+)"
 _LOCAL_DOT = r"(?:\s*[(\[{<]\s*dot\s*[)\]}>]\s*|\s+dot\s+|\.)"
 _LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
 _LOCAL = rf"[a-z0-9_%+-]+(?:{_LOCAL_DOT}[a-z0-9_%+-]+)*"
-_EMAIL = rf"\b{_LOCAL}{_AT}{_LABEL}(?:{_DOT}{_LABEL})*{_DOT}[a-z]{{2,24}}\b"
+_DOMAIN = rf"{_LABEL}(?:{_DOT}{_LABEL})*{_DOT}[a-z]{{2,24}}\b"
+# Not followed by another `at <domain>`: in "me at jane dot doe at example dot com" the leftmost
+# match would be "me at jane dot doe", leaving the address itself (pii-heldout-2026-11-10.md).
+_EMAIL = rf"\b{_LOCAL}{_AT}{_DOMAIN}(?!{_AT}{_DOMAIN})"
 _OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
 _IP_DOT = (
     r"(?:\s*\[\s*\.\s*\]\s*|\s*\(\s*\.\s*\)\s*|\s*[(\[{]\s*dot\s*[)\]}]\s*|\s+dot\s+|\.|\s+\.\s+)"

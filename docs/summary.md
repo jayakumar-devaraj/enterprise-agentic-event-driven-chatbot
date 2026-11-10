@@ -14,7 +14,7 @@ request is traceable end to end, and key actions are written to an audit log.
 when they drift (`docs/reports/figures.json`).
 
 <!-- figures:start -->
-- **Tests collected:** 267 unit, 64 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 16 frontend.
+- **Tests collected:** 268 unit, 64 integration (real Kafka, Redis, Qdrant, Postgres), 8 durability, 16 frontend.
 - **Coverage:** 95 % of 1936 statements. Report header: "Coverage at 3ee1cc6 from CI run 42291685564 (unit + integration; scale, llm, durability and stack tests need special stacks)".
 <!-- figures:end -->
 

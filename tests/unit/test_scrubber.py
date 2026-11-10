@@ -59,6 +59,8 @@ async def test_ascrub_matches_scrub() -> None:
         ("My email is john[at]example[dot]org.", "john[at]example[dot]org"),
         ("The host was 192 . 168 . 1 . 20 last night.", "192 . 168 . 1 . 20"),
         ("Card 4111_1111_1111_1111 was declined.", "4111_1111_1111_1111"),
+        # The leftmost match once covered only "me at sara dot kim" (pii-heldout-2026-11-10.md).
+        ("Reach out to me at sara dot kim at example dot com.", "example dot com"),
     ],
 )
 def test_addresses_and_obfuscated_identifiers_are_removed(text: str, value: str) -> None:
