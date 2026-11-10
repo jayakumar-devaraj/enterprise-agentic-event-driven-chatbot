@@ -1,0 +1,156 @@
+{
+  "sentences": 50,
+  "spacy_model": "en_core_web_lg",
+  "per_type": {
+    "CREDIT_CARD": {
+      "labeled": 4,
+      "typed_recall": 0.5,
+      "redaction_recall": 0.5,
+      "redaction_recall_ci95": [
+        0.15,
+        0.85
+      ],
+      "detected_spans": 2,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.342,
+        1.0
+      ]
+    },
+    "EMAIL_ADDRESS": {
+      "labeled": 9,
+      "typed_recall": 0.1111,
+      "redaction_recall": 0.1111,
+      "redaction_recall_ci95": [
+        0.02,
+        0.435
+      ],
+      "detected_spans": 1,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.207,
+        1.0
+      ]
+    },
+    "IP_ADDRESS": {
+      "labeled": 4,
+      "typed_recall": 0.25,
+      "redaction_recall": 0.25,
+      "redaction_recall_ci95": [
+        0.046,
+        0.699
+      ],
+      "detected_spans": 1,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.207,
+        1.0
+      ]
+    },
+    "LOCATION": {
+      "labeled": 20,
+      "typed_recall": 0.2,
+      "redaction_recall": 0.2,
+      "redaction_recall_ci95": [
+        0.081,
+        0.416
+      ],
+      "detected_spans": 5,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.566,
+        1.0
+      ]
+    },
+    "PERSON": {
+      "labeled": 1,
+      "typed_recall": 1.0,
+      "redaction_recall": 1.0,
+      "redaction_recall_ci95": [
+        0.207,
+        1.0
+      ],
+      "detected_spans": 5,
+      "precision": 0.2,
+      "precision_ci95": [
+        0.036,
+        0.624
+      ]
+    },
+    "PHONE_NUMBER": {
+      "labeled": 1,
+      "typed_recall": 1.0,
+      "redaction_recall": 1.0,
+      "redaction_recall_ci95": [
+        0.207,
+        1.0
+      ],
+      "detected_spans": 1,
+      "precision": 1.0,
+      "precision_ci95": [
+        0.207,
+        1.0
+      ]
+    }
+  },
+  "by_category": {
+    "address": {
+      "sentences": 16,
+      "labeled": 19,
+      "redacted": 3,
+      "false_positives": 2
+    },
+    "control": {
+      "sentences": 6,
+      "labeled": 6,
+      "redacted": 6,
+      "false_positives": 1
+    },
+    "negative": {
+      "sentences": 14
+    },
+    "obfuscated": {
+      "sentences": 14,
+      "labeled": 14,
+      "redacted": 1,
+      "false_positives": 1
+    }
+  },
+  "misses": [
+    "address LOCATION: 1600 Larkspur Lane, Apt 4B",
+    "address LOCATION: 88 North Maple Avenue",
+    "address LOCATION: 4021 W. Cedar St.",
+    "address LOCATION: 17 Rosewood Court",
+    "address LOCATION: 350 Fifth Ave",
+    "address LOCATION: 9 Harbour Road",
+    "address LOCATION: 2210 Old Mill Blvd, Suite 300",
+    "address LOCATION: 55 elm drive",
+    "address LOCATION: 1208 Pinecrest Pkwy",
+    "address LOCATION: 76 Queen's Gate",
+    "address LOCATION: 3 Willow Way",
+    "address LOCATION: 640 Lakeshore Drive East",
+    "address LOCATION: 12A Station Road",
+    "address LOCATION: PO Box 4471",
+    "address LOCATION: 905 Highland Place",
+    "address LOCATION: 41 Grove Street",
+    "obfuscated EMAIL_ADDRESS: maria dot lopez at example dot com",
+    "obfuscated EMAIL_ADDRESS: sam(at)example(dot)net",
+    "obfuscated EMAIL_ADDRESS: k.tanaka [at] example [dot] org",
+    "obfuscated EMAIL_ADDRESS: b_okafor AT example DOT co DOT uk",
+    "obfuscated EMAIL_ADDRESS: lee{at}example{dot}com",
+    "obfuscated EMAIL_ADDRESS: priya at example.com",
+    "obfuscated EMAIL_ADDRESS: j.smith @ example . com",
+    "obfuscated EMAIL_ADDRESS: r-diaz at mail dot example dot io",
+    "obfuscated IP_ADDRESS: 198 dot 51 dot 100 dot 7",
+    "obfuscated IP_ADDRESS: 203[.]0[.]113[.]45",
+    "obfuscated IP_ADDRESS: 192 168 0 14",
+    "obfuscated CREDIT_CARD: four one one one, one one one one, one one one one, one one one one",
+    "obfuscated CREDIT_CARD: 4012_8888_8888_1881"
+  ],
+  "false_positives": [
+    "address PERSON: Larkspur Lane",
+    "address PERSON: Willow Way",
+    "obfuscated PERSON: maria dot lopez",
+    "control PERSON: Email"
+  ]
+}

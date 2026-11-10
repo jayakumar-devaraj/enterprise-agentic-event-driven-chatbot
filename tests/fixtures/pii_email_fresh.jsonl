@@ -1,0 +1,12 @@
+{"category": "email_after_at", "text": "You can reach me at tom dot reyes at example dot net.", "entities": [{"type": "EMAIL_ADDRESS", "value": "tom dot reyes at example dot net"}]}
+{"category": "email_after_at", "text": "Ping us at help dot desk at example dot org for access.", "entities": [{"type": "EMAIL_ADDRESS", "value": "help dot desk at example dot org"}]}
+{"category": "email_after_at", "text": "I'm reachable at a dot b at example dot com most days.", "entities": [{"type": "EMAIL_ADDRESS", "value": "a dot b at example dot com"}]}
+{"category": "email_after_at", "text": "Find me at chen dot wei [at] example [dot] cn.", "entities": [{"type": "EMAIL_ADDRESS", "value": "chen dot wei [at] example [dot] cn"}]}
+{"category": "email_after_at", "text": "Write to me at ana.silva at example dot pt.", "entities": [{"type": "EMAIL_ADDRESS", "value": "ana.silva at example dot pt"}]}
+{"category": "email_after_at", "text": "Reply at noah dot k at example dot co dot uk.", "entities": [{"type": "EMAIL_ADDRESS", "value": "noah dot k at example dot co dot uk"}]}
+{"category": "email_after_at", "text": "Contact me at first dot last AT example DOT com.", "entities": [{"type": "EMAIL_ADDRESS", "value": "first dot last AT example DOT com"}]}
+{"category": "email_after_at", "text": "my mail is at olu dot ade at example dot ng", "entities": [{"type": "EMAIL_ADDRESS", "value": "olu dot ade at example dot ng"}]}
+{"category": "negative", "text": "Look at the dot at the top of the page.", "entities": []}
+{"category": "negative", "text": "I'll be at work at nine.", "entities": []}
+{"category": "negative", "text": "Meet me at the cafe at noon.", "entities": []}
+{"category": "negative", "text": "Click at the top, then at the bottom.", "entities": []}
