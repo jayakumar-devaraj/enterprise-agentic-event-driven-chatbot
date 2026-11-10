@@ -46,3 +46,36 @@ def test_text_without_pii_unchanged_and_empty_ok() -> None:
 async def test_ascrub_matches_scrub() -> None:
     """The off-loop variant returns the same result."""
     assert await get_scrubber().ascrub(MESSAGE) == get_scrubber().scrub(MESSAGE)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("Ship it to 742 Evergreen Terrace please.", "742 Evergreen Terrace"),
+        ("I'm at 221B Baker Street now.", "221B Baker Street"),
+        ("Send it to 10 Downing St., Flat 2.", "10 Downing St., Flat 2"),
+        ("Mail goes to P.O. Box 120.", "P.O. Box 120"),
+        ("Write to jane dot doe at example dot com today.", "jane dot doe at example dot com"),
+        ("My email is john[at]example[dot]org.", "john[at]example[dot]org"),
+        ("The host was 192 . 168 . 1 . 20 last night.", "192 . 168 . 1 . 20"),
+        ("Card 4111_1111_1111_1111 was declined.", "4111_1111_1111_1111"),
+    ],
+)
+def test_addresses_and_obfuscated_identifiers_are_removed(text: str, value: str) -> None:
+    """The forms the broad set missed (pii-broad-2026-10-25.md) no longer reach the output."""
+    assert value not in get_scrubber().scrub(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I'm at home. Thanks for checking.",
+        "It is 15 minutes to walk to the station.",
+        "I have 2 dr appointments this week.",
+        "Version 4.2.1 is out.",
+        "Your order 1234 5678 9012 3456 is on its way.",  # not Luhn-valid
+    ],
+)
+def test_look_alikes_are_left_alone(text: str) -> None:
+    """Ordinary sentences the new patterns could misread pass through unchanged."""
+    assert get_scrubber().scrub(text) == text
