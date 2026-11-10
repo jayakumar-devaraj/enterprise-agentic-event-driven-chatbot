@@ -8,6 +8,8 @@ Broad set with negatives, precision and intervals, targets in pii-targets-2026-1
 `uv run python tests/eval/pii_recall.py broad` → docs/reports/pii_broad.json.
 Held-out set for the address and obfuscated-identifier fix, targets in pii-targets-2026-11-10.md:
 `uv run python tests/eval/pii_recall.py heldout` → docs/reports/pii_heldout.json.
+Fresh cases for the email leftmost-match fix, targets in pii-email-targets-2026-11-10.md:
+`uv run python tests/eval/pii_recall.py email-fresh` → docs/reports/pii_email_fresh.json.
 """
 
 import json
@@ -29,6 +31,8 @@ BROAD_FIXTURE = ROOT / "tests" / "fixtures" / "pii_broad.jsonl"
 BROAD_REPORT = ROOT / "docs" / "reports" / "pii_broad.json"
 HELDOUT_FIXTURE = ROOT / "tests" / "fixtures" / "pii_heldout.jsonl"
 HELDOUT_REPORT = ROOT / "docs" / "reports" / "pii_heldout.json"
+EMAIL_FRESH_FIXTURE = ROOT / "tests" / "fixtures" / "pii_email_fresh.jsonl"
+EMAIL_FRESH_REPORT = ROOT / "docs" / "reports" / "pii_email_fresh.json"
 
 
 def measure(fixture: Path = FIXTURE) -> dict[str, object]:
@@ -141,10 +145,14 @@ def measure_broad(fixture: Path = BROAD_FIXTURE) -> dict[str, object]:
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] in (["broad"], ["heldout"]):
-        heldout = sys.argv[1:] == ["heldout"]
-        report = measure_broad(HELDOUT_FIXTURE if heldout else BROAD_FIXTURE)
-        out = HELDOUT_REPORT if heldout else BROAD_REPORT
+    sets = {
+        "broad": (BROAD_FIXTURE, BROAD_REPORT),
+        "heldout": (HELDOUT_FIXTURE, HELDOUT_REPORT),
+        "email-fresh": (EMAIL_FRESH_FIXTURE, EMAIL_FRESH_REPORT),
+    }
+    if len(sys.argv) == 2 and sys.argv[1] in sets:
+        fixture, out = sets[sys.argv[1]]
+        report = measure_broad(fixture)
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         json.dump(report, sys.stdout, indent=2, ensure_ascii=False)
         sys.exit(0)
