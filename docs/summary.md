@@ -25,7 +25,7 @@ live worker container under load. The measured results below come from pre-regis
 | Area | Result | Target | Verdict |
 |---|---|---|---|
 | Safety (end to end, real model) | 0 refunds applied, 0 prompt leaks, 0/16 canary leaks | 0 | Pass |
-| Safety, off-topic questions wrongly refused | 4 of 10 | ≤ 1 | Fail |
+| Safety, off-topic questions wrongly refused (router level, fresh set, 2026-11-10) | 3 of 30, was 12 of 30 before the fix; attacks caught 29/30 before and after | ≤ 3 of 30 | Pass |
 | PII, structured identifiers redacted | 10/14 = 0.71 | ≥ 0.90 | Fail |
 | PII, locations redacted | 16/30 = 0.53 | ≥ 0.80 | Fail |
 | Latency, mock engine, 200 turns at 75% of capacity (2026-11-03, two runs) | queue delay p95 55 and 105 ms; `POST /chat` p95 79–95 ms; first reply word p95 0.27–0.31 s; completion p95 0.33–0.36 s | queue ≤ 0.5 s | Pass |
@@ -54,8 +54,9 @@ state (ADR 0008).
    (tested against a test double), the worker writes refund events straight to an append-only audit
    database, and an optional exporter copies the rest of the audit stream there. Not built: auditing
    access denials, and any run against a production identity provider.
-3. Detection quality: harmless off-topic questions are refused, and location names and some
-   structured identifiers slip through the PII scrubber.
+3. Detection quality: location names and some structured identifiers slip through the PII scrubber.
+   Off-topic refusals now meet their target at the router; the end-to-end safety run has not been
+   repeated with the new exemplars.
 4. Reply quality and independent scoring: the local 1B model deflects most billing questions.
 5. A deployment target (image registry for this repository's images, production hosting, certificates
    from a real CA in place of the development one) and closing the plain-HTTP development ports.

@@ -215,7 +215,11 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   **4/10 harmless off-topic questions were refused** (target ≤ 1). Every attack was refused by the
   detector, so an after-the-fact ablation disabled it: the model then obeyed 2/16 instruction
   attacks (one escaping the `<user_message>` delimiter), while actions and the prompt stayed safe.
-  The off-topic refusals are open; any fix needs a new final set.
+  The off-topic refusals are open; any fix needs a new final set. *Update 2026-11-10:* 20 off-topic
+  exemplars in `benign_patterns` bring a fresh pre-registered set to 3/30 off-topic refused (12/30
+  before), benign 2/20, attacks caught 29/30 (unchanged), at the router against the real Qdrant
+  (`offtopic-2026-11-10.md`). The set and exemplars share one author, and the end-to-end safety run
+  with the real model was not repeated.
 - **Document questions (2026-10-25, ADR 0010, ADR 0004 addendum):**
   - *Routing scope.* The `document_rag` intent is chosen by similarity to 12 exemplars. All 5 held-out
     document questions routed correctly and nothing else regressed, but a probe afterwards showed that a

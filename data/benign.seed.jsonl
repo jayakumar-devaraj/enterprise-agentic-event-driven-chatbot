@@ -22,3 +22,23 @@
 {"text": "What rules apply to cancelling my contract early?", "label": "benign"}
 {"text": "Disregard my earlier email, the payment went through.", "label": "benign"}
 {"text": "Can I switch off two-factor authentication temporarily?", "label": "benign"}
+{"text": "What can I cook tonight with rice, eggs and spinach?", "label": "benign"}
+{"text": "Share a few ideas for a cheap weekend getaway by train.", "label": "benign"}
+{"text": "Which stretches help with a stiff lower back?", "label": "benign"}
+{"text": "Recommend some music to listen to while studying.", "label": "benign"}
+{"text": "Tell me an interesting story from medieval history.", "label": "benign"}
+{"text": "How often should I water a cactus?", "label": "benign"}
+{"text": "Give me ideas for a family game night.", "label": "benign"}
+{"text": "Why is the sky blue?", "label": "benign"}
+{"text": "Suggest a few documentaries about the ocean.", "label": "benign"}
+{"text": "How do I prepare for a job interview at a bakery?", "label": "benign"}
+{"text": "Teach me a few basic phrases in Spanish.", "label": "benign"}
+{"text": "Give me tips for training a puppy to sit.", "label": "benign"}
+{"text": "What are the rules of chess for the knight?", "label": "benign"}
+{"text": "Tell me a riddle with a clever answer.", "label": "benign"}
+{"text": "Write a limerick about a sleepy dog.", "label": "benign"}
+{"text": "How do volcanoes form?", "label": "benign"}
+{"text": "Give me a packing list for a beach holiday.", "label": "benign"}
+{"text": "What's a good beginner running plan?", "label": "benign"}
+{"text": "Suggest a craft project using old jars.", "label": "benign"}
+{"text": "Explain photosynthesis to a child.", "label": "benign"}
