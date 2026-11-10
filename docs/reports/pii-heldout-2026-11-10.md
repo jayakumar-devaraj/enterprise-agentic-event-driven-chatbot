@@ -16,12 +16,15 @@ unchanged.
 ```python
 import json, sys
 from pathlib import Path
+
 sys.path.insert(0, "tests/eval")
 import pii_recall as h
 from chat_common import scrubber as s
 
+
 def write(report, path):
     Path(path).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
 
 write(h.measure_broad(h.HELDOUT_FIXTURE), "docs/reports/pii_heldout.json")
 write(h.measure_broad(h.BROAD_FIXTURE), "docs/reports/pii_broad_2026-11-10.json")
