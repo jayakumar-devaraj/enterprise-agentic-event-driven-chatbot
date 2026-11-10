@@ -14,11 +14,12 @@ import redis.asyncio as aioredis
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
-from conftest import REDIS_URL
+from conftest import AUDIT_WRITER_URL, REDIS_URL
 from gateway import auth
 from gateway.app import Deps, create_app
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
+from worker.audit_store import AuditStore
 from worker.graph import build_graph, make_processor
 from worker.lease import Lease
 from worker.llm import MockEngine
@@ -85,7 +86,10 @@ async def test_other_user_cannot_reach_live_thread_data() -> None:
         AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver,
     ):
         await saver.asetup()
-        graph = build_graph(Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis)
+        store = AuditStore(AUDIT_WRITER_URL)
+        graph = build_graph(
+            Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis, audit_store=store
+        )
         compiled = graph.compile(checkpointer=saver)
         ask = {"message": "I want a refund", "thread_id": thread, "message_id": str(uuid.uuid4())}
         assert (await client.post("/chat", json=ask, auth=ALICE)).status_code == 202
@@ -93,7 +97,7 @@ async def test_other_user_cannot_reach_live_thread_data() -> None:
         lease = Lease(f"dedupe:{env.message_id}")
         await redis.set(lease.key, lease.token, ex=60)
         writer = StreamWriter(redis, thread, env.message_id, lease=lease, maxlen=100, ttl_s=60)
-        await make_processor(compiled, redis=redis)(env, writer)
+        await make_processor(compiled, redis=redis, audit_store=store)(env, writer)
         mid = str(env.message_id)
         before = await _snapshot(redis, compiled, thread, mid)
         assert before[2] == ("await_approval",) and before[3] == "alice"

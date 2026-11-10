@@ -20,9 +20,10 @@ log = logging.getLogger("audit.export")
 
 GROUP = "audit-exporter"
 INSERT = (
-    "INSERT INTO audit_log (stream_id, ts, event, actor, thread_id, details) "
-    "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (stream_id) DO NOTHING"
+    "INSERT INTO audit_log (stream_id, ts, event, actor, thread_id, details, event_key) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
 )
+"""A repeat `stream_id`, or an `event_key` the worker already wrote synchronously, is a no-op."""
 
 
 def to_row(stream_id: str, fields: dict[str, str] | None) -> tuple[Any, ...]:
@@ -46,6 +47,7 @@ def to_row(stream_id: str, fields: dict[str, str] | None) -> tuple[Any, ...]:
         fields.get("actor", "unknown"),
         fields.get("thread_id", "unknown"),
         Jsonb(details),
+        fields.get("event_key"),
     )
 
 

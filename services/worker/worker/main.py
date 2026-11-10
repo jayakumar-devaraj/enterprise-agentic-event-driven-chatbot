@@ -14,6 +14,7 @@ from confluent_kafka.aio import AIOConsumer, AIOProducer
 from prometheus_client import start_http_server
 from qdrant_client import AsyncQdrantClient
 
+from worker.audit_store import AuditStore
 from worker.checkpoint import FencedRedisSaver
 from worker.consumer import Worker
 from worker.embedding import get_embedder
@@ -53,6 +54,7 @@ async def run(settings: Settings) -> None:
     tenant_tokens = parse_tenant_tokens(settings.rag_tenant_tokens.get_secret_value())  # fail first
     clients = parse_tenant_clients(settings.rag_tenant_clients.get_secret_value())
     token_provider = ClientCredentialsTokens(settings.rag_token_url, clients) if clients else None
+    audit_store = AuditStore(settings.audit_database_url.get_secret_value())
     setup_tracing("worker", settings.otel_exporter_otlp_endpoint)
     start_http_server(settings.metrics_port)
     scrubber = get_scrubber(settings.spacy_model)
@@ -99,6 +101,7 @@ async def run(settings: Settings) -> None:
     ttl = {"default_ttl": settings.checkpoint_ttl_min, "refresh_on_read": True}
     async with FencedRedisSaver.from_conn_string(settings.redis_url, ttl=ttl) as saver:
         await saver.asetup()
+        await audit_store.check()
         graph = build_graph(
             router,
             make_engine(settings),
@@ -110,9 +113,13 @@ async def run(settings: Settings) -> None:
             rag=rag,
             rag_max_tokens=settings.rag_max_tokens,
             rag_context_chars=settings.rag_context_chars,
+            audit_store=audit_store,
         )
         process = make_processor(
-            graph.compile(checkpointer=saver), redis=redis, approval_ttl_s=settings.approval_ttl_s
+            graph.compile(checkpointer=saver),
+            redis=redis,
+            approval_ttl_s=settings.approval_ttl_s,
+            audit_store=audit_store,
         )
         worker = Worker(settings, consumer=consumer, dlq_producer=dlq, redis=redis, process=process)
         try:

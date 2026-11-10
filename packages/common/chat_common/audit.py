@@ -26,15 +26,24 @@ class AuditLog:
         self._redis = redis
 
     @staticmethod
-    def entry(event: str, *, actor: str, thread_id: str, **details: Any) -> dict[str, str]:
-        """The stream fields of one audit entry (also written by atomic multi-key scripts)."""
-        return {
+    def entry(
+        event: str, *, actor: str, thread_id: str, key: str | None = None, **details: Any
+    ) -> dict[str, str]:
+        """The stream fields of one audit entry (also written by atomic multi-key scripts).
+
+        `key` names the event once however often it is recorded; entries that are also written
+        straight to Postgres carry it, so the exporter's copy is not stored twice (ADR 0011).
+        """
+        fields = {
             "event": event,
             "actor": actor,
             "thread_id": thread_id,
             "ts": datetime.now(UTC).isoformat(),
             "details": json.dumps(details, default=str, sort_keys=True),
         }
+        if key is not None:
+            fields["event_key"] = key
+        return fields
 
     async def record(self, event: str, *, actor: str, thread_id: str, **details: Any) -> str:
         """Append one audit entry and return its stream id."""

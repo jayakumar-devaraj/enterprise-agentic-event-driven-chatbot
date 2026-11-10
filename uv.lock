@@ -2340,6 +2340,7 @@ dependencies = [
     { name = "langgraph-checkpoint-redis" },
     { name = "openai" },
     { name = "prometheus-client" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "qdrant-client" },
 ]
 
@@ -2354,6 +2355,7 @@ requires-dist = [
     { name = "langgraph-checkpoint-redis", specifier = ">=0.5.2" },
     { name = "openai", specifier = ">=3.33.0" },
     { name = "prometheus-client", specifier = ">=0.26.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "qdrant-client", specifier = ">=1.19.1" },
 ]
 

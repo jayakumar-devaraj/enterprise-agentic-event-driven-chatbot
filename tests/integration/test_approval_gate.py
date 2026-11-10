@@ -4,13 +4,16 @@ import json
 import uuid
 from datetime import timedelta
 
+import psycopg
 import pytest
 import redis.asyncio as aioredis
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
-from conftest import REDIS_URL
+from conftest import AUDIT_ADMIN_URL, AUDIT_WRITER_URL, REDIS_URL
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
+from worker.audit_store import AuditStore
+from worker.consumer import TransientDependencyError
 from worker.graph import build_graph, make_processor
 from worker.lease import Lease
 from worker.llm import MockEngine
@@ -28,15 +31,19 @@ class _Billing:
         return Route(intent="billing", score=0.9, injection_score=0.0, injection=False)
 
 
-async def _process(redis, env: Envelope) -> list[dict]:
+async def _process(redis, env: Envelope, store: AuditStore | None = None) -> list[dict]:
     """Run one envelope through the compiled graph; return that message's stream events."""
+    store = store or AuditStore(AUDIT_WRITER_URL)
     lease = Lease(f"dedupe:{env.message_id}")
     await redis.set(lease.key, lease.token, ex=120)
     writer = StreamWriter(redis, env.thread_id, env.message_id, lease=lease, maxlen=100, ttl_s=120)
     async with AsyncRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
-        graph = build_graph(_Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis)
-        await make_processor(graph.compile(checkpointer=saver), redis=redis)(env, writer)
+        graph = build_graph(
+            _Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis, audit_store=store
+        )
+        process = make_processor(graph.compile(checkpointer=saver), redis=redis, audit_store=store)
+        await process(env, writer)
     return [json.loads(f["data"]) for _, f in await redis.xrange(writer.key)]
 
 
@@ -73,6 +80,15 @@ async def _audit_events(redis, thread: str) -> list[str]:
     return [f["event"] for _, f in rows if f["thread_id"] == thread]
 
 
+async def _stored_events(thread: str) -> list[str]:
+    """Event names in the Postgres audit table for one thread, oldest first."""
+    async with await psycopg.AsyncConnection.connect(AUDIT_ADMIN_URL) as conn:
+        cur = await conn.execute(
+            "SELECT event FROM audit_log WHERE thread_id = %s ORDER BY id", (thread,)
+        )
+        return [row[0] for row in await cur.fetchall()]
+
+
 async def test_refund_pauses_then_applies_once_on_approval() -> None:
     """No side effect before approval; exactly one refund after it, even if redelivered."""
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
@@ -100,6 +116,7 @@ async def test_refund_pauses_then_applies_once_on_approval() -> None:
     }
     assert await _refunds_for(redis, str(ask.message_id)) == 1
     assert await _audit_events(redis, thread) == ["refund_proposed", "refund_applied"]
+    assert await _stored_events(thread) == ["refund_proposed", "refund_applied"]
     await redis.aclose()
 
 
@@ -113,6 +130,28 @@ async def test_rejected_refund_applies_nothing() -> None:
     assert " ".join(e["token"] for e in follow if e["type"] == "token") == approval.REJECTED_TEXT
     assert await _refunds_for(redis, str(ask.message_id)) == 0
     assert await _audit_events(redis, thread) == ["refund_proposed", "refund_rejected"]
+    assert await _stored_events(thread) == ["refund_proposed", "refund_rejected"]
+    await redis.aclose()
+
+
+async def test_an_audit_database_outage_fails_the_step_and_a_retry_stores_it_once() -> None:
+    """ADR 0011 decision C: the user is not told a refund is pending until Postgres holds the
+    event. An unreachable database fails the record (retried, then DLQ); the retry stores one row.
+    """
+    redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+    thread = f"ao-{uuid.uuid4().hex[:8]}"
+    ask = _chat(thread, "I want a refund for last month")
+    down = AuditStore("postgresql://audit_writer@127.0.0.1:1/audit", connect_timeout_s=2)
+
+    with pytest.raises(TransientDependencyError):
+        await _process(redis, ask, down)
+    assert await _stored_events(thread) == []
+
+    events = await _process(redis, ask)
+    assert [e["type"] for e in events] == ["approval_required"]
+    assert await _stored_events(thread) == ["refund_proposed"]
+    await _process(redis, ask)  # a redelivery adds no second row
+    assert await _stored_events(thread) == ["refund_proposed"]
     await redis.aclose()
 
 

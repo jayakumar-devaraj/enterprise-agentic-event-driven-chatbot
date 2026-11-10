@@ -1,18 +1,20 @@
 #!/bin/sh
 # Runs once on first start of the audit database. The table is owned by the admin role; the exporter
-# connects as audit_writer, which can INSERT and SELECT but never UPDATE, DELETE or TRUNCATE.
+# and the worker connect as audit_writer, which can INSERT and SELECT but never UPDATE, DELETE or TRUNCATE.
 set -eu
 psql -v ON_ERROR_STOP=1 -v writer="$AUDIT_WRITER_USER" -v pw="$AUDIT_WRITER_PASSWORD" \
   -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
 CREATE TABLE audit_log (
     id          BIGSERIAL   PRIMARY KEY,
-    stream_id   TEXT        NOT NULL UNIQUE,
+    stream_id   TEXT        UNIQUE,  -- Redis entry id; NULL on rows the worker wrote directly
+    event_key   TEXT        UNIQUE,  -- set on refund events, which the worker writes directly
     ts          TIMESTAMPTZ NOT NULL,
     event       TEXT        NOT NULL,
     actor       TEXT        NOT NULL,
     thread_id   TEXT        NOT NULL,
     details     JSONB       NOT NULL,
-    exported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    exported_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (stream_id IS NOT NULL OR event_key IS NOT NULL)
 );
 CREATE INDEX audit_log_thread_ts ON audit_log (thread_id, ts DESC);
 CREATE INDEX audit_log_event_ts ON audit_log (event, ts DESC);

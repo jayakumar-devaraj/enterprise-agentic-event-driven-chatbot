@@ -12,6 +12,7 @@ pieces use them. Planned design as of 2026-10-17 10:55 CDT.
 | `chat_common.scrubber` | Presidio analyzer/anonymizer; `scrub()` sync, `ascrub()` via `asyncio.to_thread` |
 | `chat_common.logjson` | stdlib `logging` JSON formatter carrying `trace_id`, `thread_id`, `message_id` |
 | `chat_common.audit` | `audit:events` writer and reader |
+| `worker.audit_store` | Synchronous insert of refund events into Postgres `audit_log` (ADR 0011) |
 | `chat_common.tracing` | OpenTelemetry setup; W3C trace context carried in `Envelope.trace_id` (ADR 0003) |
 | `gateway.app` | FastAPI app, routes, exception → status mapping, owner binding, per-thread rate limit, idempotent enqueue |
 | `gateway.auth` | HTTP Basic verification (scrypt via `asyncio.to_thread`, accepted pairs cached per process by `Verifier`), thread ownership, `USER_TENANTS` parsing |
@@ -100,9 +101,11 @@ sequenceDiagram
   participant K as Kafka
   participant W as Worker
   participant R as Redis
+  participant P as Postgres audit_log
   W->>W: billing node detects refund request (deterministic rule on scrubbed text)
   W->>W: interrupt() — graph state checkpointed, nothing applied
   W->>R: SET pending_approval:{thread}:{msg} EX APPROVAL_TTL_S and audit refund_proposed (one fenced script)
+  W->>P: INSERT audit_log refund_proposed (by event_key, a repeat is a no-op)
   W->>R: XADD ApprovalRequiredEvent ⇒ stream closes
   C->>G: POST /approve/{thread}/{msg} {message_id: new, approved}
   G->>R: owner check (403), pending exists or decision already delivered (404 if neither)
@@ -111,8 +114,10 @@ sequenceDiagram
   W->>W: resume graph with decision
   alt approved
     W->>R: XADD refunds (idempotent on ref_message_id), then audit refund_applied
+    W->>P: INSERT audit_log refund_applied
   else rejected
     W->>R: audit refund_rejected
+    W->>P: INSERT audit_log refund_rejected
   end
   W->>R: DEL pending, then XADD tokens + DoneEvent on new stream
 ```

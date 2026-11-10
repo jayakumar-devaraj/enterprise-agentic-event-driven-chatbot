@@ -5,9 +5,10 @@ from typing import Any
 
 import pytest
 import redis.asyncio as aioredis
-from conftest import REDIS_URL
+from conftest import AUDIT_WRITER_URL, REDIS_URL
 from redis.exceptions import ConnectionError, ResponseError
 from worker import approval
+from worker.audit_store import AuditStore
 from worker.lease import Lease, LeaseLost
 
 pytestmark = pytest.mark.integration
@@ -59,7 +60,13 @@ async def test_failed_write_then_retry_records_exactly_once(n: int, after: bool)
     ref, thread = str(uuid.uuid4()), f"rf-{uuid.uuid4().hex[:8]}"
     lease = Lease(f"dedupe:rf-{uuid.uuid4()}")
     await redis.set(lease.key, lease.token, ex=60)
-    kwargs = {"thread_id": thread, "ref_message_id": ref, "user_id": "alice", "lease": lease}
+    kwargs = {
+        "thread_id": thread,
+        "ref_message_id": ref,
+        "user_id": "alice",
+        "lease": lease,
+        "store": AuditStore(AUDIT_WRITER_URL),
+    }
     try:
         try:
             await approval.apply_refund(FailNthWrite(redis, n, after), **kwargs)
@@ -125,7 +132,12 @@ async def test_worker_that_lost_its_lease_cannot_apply() -> None:
         await redis.set(stale.key, owner, ex=60)
         with pytest.raises(LeaseLost):
             await approval.apply_refund(
-                redis, thread_id=thread, ref_message_id=ref, user_id="alice", lease=stale
+                redis,
+                thread_id=thread,
+                ref_message_id=ref,
+                user_id="alice",
+                lease=stale,
+                store=AuditStore(AUDIT_WRITER_URL),
             )
         assert await _state(redis, ref) == (False, 0, 0)
         assert await redis.get(stale.key) == owner

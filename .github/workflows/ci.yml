@@ -88,6 +88,9 @@ jobs:
           echo "REDIS_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
           echo "QDRANT_API_KEY=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
           echo "KAFKA_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          # The worker writes refund audit events to audit-db, which needs both (ADR 0011).
+          echo "AUDIT_DB_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          echo "AUDIT_WRITER_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
       - name: Durability tests
         run: uv run pytest -m durability -v
 

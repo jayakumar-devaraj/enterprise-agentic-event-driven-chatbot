@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     oidc_discovery_url: str | None = None
 
     approval_ttl_s: int = 3600
+    # The worker writes refund audit events here synchronously and will not start without it.
+    audit_database_url: SecretStr = SecretStr("")
 
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
     metrics_port: int = 9100  # Prometheus /metrics; a port of its own, never published

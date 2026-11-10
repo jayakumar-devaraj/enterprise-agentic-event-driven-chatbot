@@ -188,7 +188,11 @@ are written together or not at all (arguments and key types are checked before t
 marker holds the id of its `refunds` entry, a marker without that entry is an error rather than a
 success, and the marker never expires. Applying means appending a
 request to the Redis stream `refunds`; no payment processor is called. Proposals, decisions and
-applications are written to the Redis stream `audit:events`.
+applications are written to the Redis stream `audit:events`, and each refund event (`refund_proposed`,
+`refund_applied`, `refund_rejected`, `refund_expired`, `refund_abandoned`) is also inserted into the
+Postgres `audit_log` table before its outcome reaches the user's stream. If that insert fails, the
+message fails like any dependency fault (§7): retried, then dead-lettered with
+`ErrorEvent{dependency_unavailable}`. A repeat of the same event stores no second row (ADR 0011).
 
 ## 11 · Config
 

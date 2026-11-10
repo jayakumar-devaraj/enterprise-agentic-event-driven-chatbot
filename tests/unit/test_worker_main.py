@@ -60,12 +60,20 @@ async def _noop(*_: Any, **__: Any) -> None:
     pass
 
 
+async def _checked(*_: Any) -> None:
+    """Stands in for `AuditStore.check`; counts startup checks."""
+    _checked.calls += 1  # type: ignore[attr-defined]
+
+
 @pytest.fixture
 def wired(monkeypatch: pytest.MonkeyPatch) -> Callable[[Callable[[], None]], list[str]]:
     """Replace everything `run` connects to; the Worker itself stays real. Returns closed names."""
 
     def wire(on_poll: Callable[[], None]) -> list[str]:
         closed: list[str] = []
+        monkeypatch.setenv("AUDIT_DATABASE_URL", "postgresql://audit_writer@audit-db/audit")
+        monkeypatch.setattr(worker_main.AuditStore, "check", _checked)
+        _checked.calls = 0
         for name in ("setup_tracing", "start_http_server", "get_scrubber", "get_embedder"):
             monkeypatch.setattr(worker_main, name, MagicMock())
         for name in ("build_graph", "make_processor"):
@@ -175,6 +183,36 @@ async def test_malformed_rag_tokens_fail_before_anything_connects(wired) -> None
     worker_main.setup_tracing.assert_not_called()
     worker_main.start_http_server.assert_not_called()
     assert closed == []
+
+
+async def test_a_missing_audit_database_url_fails_before_anything_connects(
+    wired, monkeypatch
+) -> None:
+    """ADR 0011: refund events are written to Postgres, so the worker never starts without it."""
+    closed = wired(lambda: None)
+    monkeypatch.delenv("AUDIT_DATABASE_URL")
+    with pytest.raises(ValueError, match="AUDIT_DATABASE_URL is required"):
+        await worker_main.run(Settings())
+    worker_main.setup_tracing.assert_not_called()
+    assert closed == []
+
+
+async def test_the_audit_store_is_checked_at_startup_and_reaches_the_refund_steps(
+    wired, monkeypatch
+) -> None:
+    """One startup check, and the same store goes to the graph and the processor."""
+
+    def lost() -> None:
+        raise LeaseLost("end the loop")
+
+    monkeypatch.setattr(asyncio.get_running_loop(), "add_signal_handler", lambda *_: None)
+    wired(lost)
+    with pytest.raises(LeaseLost):
+        await asyncio.wait_for(worker_main.run(Settings()), 5)
+    assert _checked.calls == 1  # type: ignore[attr-defined]
+    store = worker_main.build_graph.call_args.kwargs["audit_store"]
+    assert isinstance(store, worker_main.AuditStore)
+    assert worker_main.make_processor.call_args.kwargs["audit_store"] is store
 
 
 async def test_rag_clients_build_a_token_provider_that_is_closed_on_stop(

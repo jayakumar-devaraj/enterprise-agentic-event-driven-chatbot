@@ -17,6 +17,14 @@ def test_a_well_formed_entry_maps_field_for_field():
     assert row[1] == datetime.fromisoformat(fields["ts"])
     assert row[2:5] == ("refund_applied", "alice", "t-1")
     assert _details(row) == {"amount": 12}
+    assert row[6] is None
+
+
+def test_a_keyed_entry_carries_its_key_so_a_synchronous_copy_is_not_stored_twice():
+    fields = AuditLog.entry(
+        "refund_applied", actor="alice", thread_id="t-1", key="refund_applied:m"
+    )
+    assert to_row("1700000000000-0", fields)[6] == "refund_applied:m"
 
 
 def test_a_missing_or_bad_timestamp_falls_back_to_the_stream_id_time():

@@ -16,9 +16,10 @@ import redis.asyncio as aioredis
 from chat_common.schemas import Envelope
 from chat_common.scrubber import get_scrubber
 from chat_common.settings import Settings
-from conftest import REDIS_URL
+from conftest import AUDIT_WRITER_URL, REDIS_URL
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from worker import approval
+from worker.audit_store import AuditStore
 from worker.checkpoint import FencedRedisSaver
 from worker.consumer import Worker
 from worker.graph import build_graph, make_processor
@@ -91,8 +92,11 @@ async def stack() -> AsyncIterator[tuple[Any, Worker, Consumer]]:
     redis = aioredis.from_url(REDIS_URL, decode_responses=True)
     async with FencedRedisSaver.from_conn_string(REDIS_URL, ttl={"default_ttl": 5}) as saver:
         await saver.asetup()
-        graph = build_graph(Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis)
-        process = make_processor(graph.compile(checkpointer=saver), redis=redis)
+        store = AuditStore(AUDIT_WRITER_URL)
+        graph = build_graph(
+            Billing(), MockEngine(), get_scrubber().ascrub, 256, redis=redis, audit_store=store
+        )
+        process = make_processor(graph.compile(checkpointer=saver), redis=redis, audit_store=store)
         consumer = Consumer()
         worker = Worker(
             SETTINGS, consumer=consumer, dlq_producer=NoDLQ(), redis=redis, process=process
@@ -380,7 +384,7 @@ async def test_stale_worker_cannot_open_close_or_audit_an_approval(
         consumer=Consumer(),
         dlq_producer=NoDLQ(),
         redis=redis,
-        process=make_processor(stealing, redis=redis),
+        process=make_processor(stealing, redis=redis, audit_store=AuditStore(AUDIT_WRITER_URL)),
     )
     pending_before = await redis.get(approval.pending_key(thread, str(ask.message_id)))
 
