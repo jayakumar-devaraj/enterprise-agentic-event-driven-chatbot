@@ -6,6 +6,8 @@ Harder set (international formats, no separators, lowercase names, obfuscation):
 `uv run python tests/eval/pii_recall.py hard` → docs/reports/pii_recall_hard.json.
 Broad set with negatives, precision and intervals, targets in pii-targets-2026-10-25.md:
 `uv run python tests/eval/pii_recall.py broad` → docs/reports/pii_broad.json.
+Held-out set for the address and obfuscated-identifier fix, targets in pii-targets-2026-11-10.md:
+`uv run python tests/eval/pii_recall.py heldout` → docs/reports/pii_heldout.json.
 """
 
 import json
@@ -25,6 +27,8 @@ HARD_FIXTURE = ROOT / "tests" / "fixtures" / "pii_hard.jsonl"
 HARD_REPORT = ROOT / "docs" / "reports" / "pii_recall_hard.json"
 BROAD_FIXTURE = ROOT / "tests" / "fixtures" / "pii_broad.jsonl"
 BROAD_REPORT = ROOT / "docs" / "reports" / "pii_broad.json"
+HELDOUT_FIXTURE = ROOT / "tests" / "fixtures" / "pii_heldout.jsonl"
+HELDOUT_REPORT = ROOT / "docs" / "reports" / "pii_heldout.json"
 
 
 def measure(fixture: Path = FIXTURE) -> dict[str, object]:
@@ -137,8 +141,10 @@ def measure_broad(fixture: Path = BROAD_FIXTURE) -> dict[str, object]:
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["broad"]:
-        report, out = measure_broad(), BROAD_REPORT
+    if sys.argv[1:] in (["broad"], ["heldout"]):
+        heldout = sys.argv[1:] == ["heldout"]
+        report = measure_broad(HELDOUT_FIXTURE if heldout else BROAD_FIXTURE)
+        out = HELDOUT_REPORT if heldout else BROAD_REPORT
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         json.dump(report, sys.stdout, indent=2, ensure_ascii=False)
         sys.exit(0)

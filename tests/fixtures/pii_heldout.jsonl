@@ -1,0 +1,50 @@
+{"category": "address", "text": "Ship the replacement to 1600 Larkspur Lane, Apt 4B, Denver.", "entities": [{"type": "LOCATION", "value": "1600 Larkspur Lane, Apt 4B"}, {"type": "LOCATION", "value": "Denver"}]}
+{"category": "address", "text": "My billing address is 88 North Maple Avenue.", "entities": [{"type": "LOCATION", "value": "88 North Maple Avenue"}]}
+{"category": "address", "text": "Please deliver to 4021 W. Cedar St. before Friday.", "entities": [{"type": "LOCATION", "value": "4021 W. Cedar St."}]}
+{"category": "address", "text": "We moved to 17 Rosewood Court last month.", "entities": [{"type": "LOCATION", "value": "17 Rosewood Court"}]}
+{"category": "address", "text": "The package went to 350 Fifth Ave instead of my place.", "entities": [{"type": "LOCATION", "value": "350 Fifth Ave"}]}
+{"category": "address", "text": "I live at 9 Harbour Road, Bristol.", "entities": [{"type": "LOCATION", "value": "9 Harbour Road"}, {"type": "LOCATION", "value": "Bristol"}]}
+{"category": "address", "text": "Return address: 2210 Old Mill Blvd, Suite 300.", "entities": [{"type": "LOCATION", "value": "2210 Old Mill Blvd, Suite 300"}]}
+{"category": "address", "text": "can you send it to 55 elm drive", "entities": [{"type": "LOCATION", "value": "55 elm drive"}]}
+{"category": "address", "text": "The invoice lists 1208 Pinecrest Pkwy as my home.", "entities": [{"type": "LOCATION", "value": "1208 Pinecrest Pkwy"}]}
+{"category": "address", "text": "Mail the form to 76 Queen's Gate.", "entities": [{"type": "LOCATION", "value": "76 Queen's Gate"}]}
+{"category": "address", "text": "I'm at 3 Willow Way now, not the old place.", "entities": [{"type": "LOCATION", "value": "3 Willow Way"}]}
+{"category": "address", "text": "Change my address to 640 Lakeshore Drive East.", "entities": [{"type": "LOCATION", "value": "640 Lakeshore Drive East"}]}
+{"category": "address", "text": "Her flat is at 12A Station Road.", "entities": [{"type": "LOCATION", "value": "12A Station Road"}]}
+{"category": "address", "text": "Deliver to PO Box 4471 please.", "entities": [{"type": "LOCATION", "value": "PO Box 4471"}]}
+{"category": "address", "text": "The technician visited 905 Highland Place on Tuesday.", "entities": [{"type": "LOCATION", "value": "905 Highland Place"}]}
+{"category": "address", "text": "Our office moved from 41 Grove Street to Seattle.", "entities": [{"type": "LOCATION", "value": "41 Grove Street"}, {"type": "LOCATION", "value": "Seattle"}]}
+{"category": "obfuscated", "text": "Reach me at maria dot lopez at example dot com.", "entities": [{"type": "EMAIL_ADDRESS", "value": "maria dot lopez at example dot com"}]}
+{"category": "obfuscated", "text": "My email is sam(at)example(dot)net.", "entities": [{"type": "EMAIL_ADDRESS", "value": "sam(at)example(dot)net"}]}
+{"category": "obfuscated", "text": "Write to k.tanaka [at] example [dot] org.", "entities": [{"type": "EMAIL_ADDRESS", "value": "k.tanaka [at] example [dot] org"}]}
+{"category": "obfuscated", "text": "contact: b_okafor AT example DOT co DOT uk", "entities": [{"type": "EMAIL_ADDRESS", "value": "b_okafor AT example DOT co DOT uk"}]}
+{"category": "obfuscated", "text": "Send it to lee{at}example{dot}com.", "entities": [{"type": "EMAIL_ADDRESS", "value": "lee{at}example{dot}com"}]}
+{"category": "obfuscated", "text": "email me: priya at example.com", "entities": [{"type": "EMAIL_ADDRESS", "value": "priya at example.com"}]}
+{"category": "obfuscated", "text": "My address is j.smith @ example . com", "entities": [{"type": "EMAIL_ADDRESS", "value": "j.smith @ example . com"}]}
+{"category": "obfuscated", "text": "Use r-diaz at mail dot example dot io for receipts.", "entities": [{"type": "EMAIL_ADDRESS", "value": "r-diaz at mail dot example dot io"}]}
+{"category": "obfuscated", "text": "The login came from 198 dot 51 dot 100 dot 7.", "entities": [{"type": "IP_ADDRESS", "value": "198 dot 51 dot 100 dot 7"}]}
+{"category": "obfuscated", "text": "Block 203[.]0[.]113[.]45 on the firewall.", "entities": [{"type": "IP_ADDRESS", "value": "203[.]0[.]113[.]45"}]}
+{"category": "obfuscated", "text": "My IP is 192 168 0 14 if that helps.", "entities": [{"type": "IP_ADDRESS", "value": "192 168 0 14"}]}
+{"category": "obfuscated", "text": "Card: four one one one, one one one one, one one one one, one one one one.", "entities": [{"type": "CREDIT_CARD", "value": "four one one one, one one one one, one one one one, one one one one"}]}
+{"category": "obfuscated", "text": "Card number 4012_8888_8888_1881 expires soon.", "entities": [{"type": "CREDIT_CARD", "value": "4012_8888_8888_1881"}]}
+{"category": "obfuscated", "text": "The card is 3782 822463 10005, an Amex.", "entities": [{"type": "CREDIT_CARD", "value": "3782 822463 10005"}]}
+{"category": "control", "text": "Email me at nora.berg@example.com.", "entities": [{"type": "EMAIL_ADDRESS", "value": "nora.berg@example.com"}]}
+{"category": "control", "text": "Call 415-555-0134 after five.", "entities": [{"type": "PHONE_NUMBER", "value": "415-555-0134"}]}
+{"category": "control", "text": "Server 192.0.2.44 is down.", "entities": [{"type": "IP_ADDRESS", "value": "192.0.2.44"}]}
+{"category": "control", "text": "Card 4111 1111 1111 1111 was declined.", "entities": [{"type": "CREDIT_CARD", "value": "4111 1111 1111 1111"}]}
+{"category": "control", "text": "Ask Daniel Okoye about the refund.", "entities": [{"type": "PERSON", "value": "Daniel Okoye"}]}
+{"category": "control", "text": "We have a warehouse in Chicago.", "entities": [{"type": "LOCATION", "value": "Chicago"}]}
+{"category": "negative", "text": "Is the price 20 dollars at the store or at checkout?", "entities": []}
+{"category": "negative", "text": "Pick the dot com template, not the dot org one.", "entities": []}
+{"category": "negative", "text": "Upgrade from 3.11.4 to 3.12.0 tonight.", "entities": []}
+{"category": "negative", "text": "Version 10 dot 2 dot 1 fixed the crash.", "entities": []}
+{"category": "negative", "text": "Your tracking number is 1Z 999 AA1 01 2345 6784.", "entities": []}
+{"category": "negative", "text": "Meet me at 5 at the main entrance.", "entities": []}
+{"category": "negative", "text": "The error code is 0x80070005.", "entities": []}
+{"category": "negative", "text": "Table 4 at the cafe is free now.", "entities": []}
+{"category": "negative", "text": "Room 12 on floor 3 has the printer.", "entities": []}
+{"category": "negative", "text": "Order 7741 Elm Edition shipped yesterday.", "entities": []}
+{"category": "negative", "text": "It takes 15 minutes to walk there.", "entities": []}
+{"category": "negative", "text": "Press 1 at the prompt, then 2.", "entities": []}
+{"category": "negative", "text": "I rated it 4 out of 5 stars at checkout.", "entities": []}
+{"category": "negative", "text": "We ship 300 units a week to 12 stores.", "entities": []}
