@@ -65,3 +65,22 @@ any run:
 - **Stack**: as above (2 gateways at 1 CPU, 2 workers at 2 CPU, `WORKER_CONCURRENCY` 4), current `main`,
   no other compose project running, LangFuse keys not set (LLM traces off; Jaeger on, as queue delay is
   read from it).
+
+## Addendum 2026-11-11: a clean rerun of the real-model load (written before any measurement)
+Item 1.5 of `audit-followups-2026-11-06.md`. The 2026-10-24 real-model "after" run (completion p95
+63.4 s against ≤ 60 s) is confounded: switching the workers to Ollama restarted them cold just before
+it (`latency-2026-10-24.md`). This rerun keeps the real-model targets above unchanged: errors 0 of 20,
+first token p95 ≤ 10 s, completion p95 ≤ 60 s, and `POST /chat` p95 ≤ 1 s. Queue delay is reported.
+The only changes are what makes the run clean:
+
+- **Stack:** the `chatbot` compose project rebuilt from `main` (`1ce514f`), workers with
+  `MOCK_LLM=false`, `--profile llm` (Ollama `llama3.2:1b`, 4 CPU, 3 GB), 2 gateways, 2 workers,
+  `WORKER_CONCURRENCY` 4, LangFuse keys unset, and no other compose project running.
+- **Warm-up, discarded:** after the workers and Ollama report healthy, 6 turns (2 in flight) through
+  the same script, written to a separate file and not judged. They load the model into memory and pay
+  each worker's and gateway's first-request cost.
+- **Measured:** then 20 turns, 2 in flight, fresh threads, as in the original load:
+  `uv run python tests/load/latency_a11.py --requests 20 --concurrency 2 --engine ollama`.
+  One run, judged as first measured.
+- **Reported, not judged:** empty replies (`done` with no token; the original runs had 2 and 3 that
+  were never investigated), queue delay and throughput.
