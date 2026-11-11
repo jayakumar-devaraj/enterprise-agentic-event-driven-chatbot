@@ -65,3 +65,29 @@ any run:
 - **Stack**: as above (2 gateways at 1 CPU, 2 workers at 2 CPU, `WORKER_CONCURRENCY` 4), current `main`,
   no other compose project running, LangFuse keys not set (LLM traces off; Jaeger on, as queue delay is
   read from it).
+
+## Addendum 2026-11-11: a five-minute open loop for the backlog check (written before any measurement)
+Item 1.5 of `audit-followups-2026-11-06.md`. The 2026-11-03 open-loop runs failed "no growing backlog"
+as written (last 50 traced turns' p95 3.6× and 4.7× the first 50). They lasted 14 seconds, and seed 0
+offered about 64% of capacity in the first 50 turns and about 92% in the last 50, so a burst could not
+be told from growth (`latency-2026-11-03-queue-delay.md`). No code changes before this run. Everything
+in the 2026-11-03 addendum holds, except:
+
+- **Duration:** each open-loop run sends `round(300 × R)` turns, about five minutes at `R = 0.75 × X`.
+  On the seed-0 schedule at that size, the offered rate per tenth of the run varies by at most about
+  17% (checked offline: 14.3–16.1 turns/s at R = 15, 17.5–20.2 at R = 19).
+- **No growing backlog, judged:** the queue-delay p95 of the last tenth of the traced turns, in arrival
+  order, is at most twice the p95 of the first tenth. The script reports the p95 of every tenth
+  (`queue_delay_p95_by_tenth_ms`) and the rate the schedule offered in each (`offered_rate_by_tenth`).
+  Both are published in full, but only the first-to-last comparison is the verdict.
+- **Unchanged and judged:** overall queue-delay p95 ≤ 500 ms; errors, `POST /chat`, first token and
+  completion against the mock targets above.
+- **Runs:** a 20-turn warm-up, then closed loop (200 turns, 20 in flight), five-minute open loop,
+  closed loop, five-minute open loop. Each open loop takes `R` from the closed loop just before it.
+  The target passes only if both open-loop runs pass.
+- **Stack:** the `chatbot` compose project rebuilt from `main` at `1ce514f` (which adds `audit-db`).
+  2 gateways at 1 CPU, 2 workers at 2 CPU, `WORKER_CONCURRENCY` 4, `MOCK_LLM=true`, LangFuse keys
+  unset, Jaeger on, and no other compose project running. The `chatbot` project also runs the
+  frontend and Caddy, which serve no traffic during the runs.
+- **If a run cannot be traced** (Jaeger loses traces at this volume), the run is reported as not
+  judged. Fewer than 90% of successful turns traced counts as a loss.

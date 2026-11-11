@@ -178,6 +178,21 @@ async def main(
         # In arrival order: a growing backlog shows as a later p95 well above an earlier one.
         "queue_delay_first50_ms": pct(ordered[:50]) if len(ordered) >= 100 else None,
         "queue_delay_last50_ms": pct(ordered[-50:]) if len(ordered) >= 100 else None,
+        # Long runs (latency-targets addendum 2026-11-11): p95 per tenth of the traced turns in
+        # arrival order, and the arrival rate the schedule offered in each tenth.
+        "queue_delay_p95_by_tenth_ms": [
+            pct(ordered[k * len(ordered) // 10 : (k + 1) * len(ordered) // 10])["p95"]
+            for k in range(10)
+        ]
+        if len(ordered) >= 200
+        else None,
+        "offered_rate_by_tenth": [
+            round(len(chunk) / (chunk[-1] - chunk[0]), 2)
+            for k in range(10)
+            if len(chunk := offsets[k * requests // 10 : (k + 1) * requests // 10]) > 1
+        ]
+        if rate and requests >= 200
+        else None,
         "empty_replies": sum(1 for r in ok if "ttft" not in r),  # `done` with no token
         "ttft_ms": pct([r["ttft"] for r in ok if "ttft" in r]),
         "completion_ms": pct([r["done"] for r in ok]),
