@@ -174,6 +174,10 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   (cold start, cause unknown), so POST p95 over the whole run still fails. Worker-side queue delay
   (p95 8.8 s) and real-model first-token latency still fail. The report's percentiles were
   recomputed with the inclusive method, since the exclusive default extrapolated small samples.
+  **Update 2026-11-11:** a clean real-model rerun (`docs/reports/latency-2026-11-11-real-model.md`,
+  6-turn warm-up discarded, targets unchanged) had no errors, POST p95 127 ms and completion p95
+  12.7 s (pass). First-token p95 was 10.78 s against ≤ 10 s (fail), and 3 of 20 replies were empty
+  (cause not investigated).
 - **Output guard leaked at its hard limit (2026-10-24, section 3 of
   `docs/reports/full-score-recommendations.md`):** with 1000 buffered characters, no sentence end and
   no gap between two lowercase words, the guard flushed the whole buffer. If the latest model delta
