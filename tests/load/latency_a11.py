@@ -96,9 +96,12 @@ def queue_delays(
         "query.operation_name": "worker.process",
         "query.start_time_min": since,
         "query.start_time_max": until,
-        "query.search_depth": str(len(message_ids) * 2),  # newest first: keep the window tight
+        # Newest first: keep the window tight. Jaeger rejects a depth above 10000 with a 400.
+        "query.search_depth": str(min(len(message_ids) * 2, 10000)),
     }
-    found = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60).json()
+    response = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60)
+    response.raise_for_status()  # an error body once read as "no traces" (2026-11-11 open1)
+    found = response.json()
     trace_ids = {
         span["traceId"]: a["value"]["stringValue"]
         for rs in found.get("result", {}).get("resourceSpans", [])

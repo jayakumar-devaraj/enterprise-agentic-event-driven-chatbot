@@ -30,6 +30,7 @@ live worker container under load. The measured results below come from pre-regis
 | PII, locations redacted | 16/30 = 0.53 | ≥ 0.80 | Fail |
 | Latency, mock engine, 200 turns at 75% of capacity (2026-11-03, two runs) | queue delay p95 55 and 105 ms; `POST /chat` p95 79–95 ms; first reply word p95 0.27–0.31 s; completion p95 0.33–0.36 s | queue ≤ 0.5 s | Pass |
 | Latency, same runs, no growing backlog | queue delay p95 of the last 50 turns 3.6–4.7× the first 50, under 0.2 s | ≤ 2× | Fail as written |
+| Latency, mock engine, five-minute open loop at 75% of capacity (2026-11-11) | queue delay p95 1.46 s, in multi-second stall episodes; last tenth 2.11× the first; first reply word p95 2.2 s; one of two runs not traced (harness fault) | queue ≤ 0.5 s; ≤ 2×; first word ≤ 2 s | Fail |
 | Latency, mock engine at saturation, 20 users with no pauses (same session) | queue delay p95 0.87–0.99 s; completion p95 1.2–1.5 s; 20.1–25.4 turns/s | reported | n/a |
 | Latency, real model, 20 turns | accept request p95 0.7 s passes; full reply p95 63 s | ≤ 60 s | Fail (confounded run) |
 | Throughput, real model on 4 CPUs, 16 turns per setting (2026-11-02) | 0.18–0.24 turns/s at every worker and model-server concurrency tried | reported | n/a |
@@ -43,9 +44,9 @@ single web server. Data survives restarts; a whole-machine crash can lose up to 
 state (ADR 0008).
 
 **Remaining work, in priority order.**
-1. Latency: below capacity queue delay meets its target, but the pre-registered backlog check fails
-   during a burst near capacity, and these 14-second runs cannot tell a burst from growth; a longer run
-   would (`latency-2026-11-03-queue-delay.md`). With the real model the model server is the bottleneck:
+1. Latency: five-minute runs at 75% of capacity show the queue stalling for seconds in episodes and then
+   draining, so queue delay fails its target over a longer run (`latency-2026-11-11-backlog.md`); the
+   cause of the stalls is not yet measured. With the real model the model server is the bottleneck:
    more worker concurrency only moves the wait into it (`latency-2026-11-02-real-model.md`).
 2. Tenant security: the gateway accepts signed tokens from any OIDC issuer and the chat window signs in
    with PKCE, tested against a local Keycloak (ADR 0016); HTTP Basic remains when no issuer is set. Static
