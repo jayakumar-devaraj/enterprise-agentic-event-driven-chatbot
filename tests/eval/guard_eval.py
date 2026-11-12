@@ -6,11 +6,15 @@ Routes every sample with the production Router against the seeded Qdrant and cou
 numbers only; the acceptance targets are fixed in ADR 0004.
 Run (stack up and seeded): `uv run python tests/eval/guard_eval.py` → prints JSON and writes
 docs/reports/guard_eval.json.
+Off-topic set for item 1.5, targets in docs/reports/offtopic-targets-2026-11-10.md:
+`uv run python tests/eval/guard_eval.py offtopic <label>` → docs/reports/offtopic_<label>.json.
 """
 
 import asyncio
 import json
 import os
+import sys
+from collections import Counter
 from pathlib import Path
 
 from chat_common.settings import Settings
@@ -25,6 +29,7 @@ DATASETS = {
     "intents_eval": ROOT / "data" / "intents.eval.jsonl",
 }
 REPORT = ROOT / "docs" / "reports" / "guard_eval.json"
+OFFTOPIC = ROOT / "data" / "offtopic.final.jsonl"
 
 
 def _rows(path: Path) -> list[dict]:
@@ -32,8 +37,8 @@ def _rows(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-async def measure() -> dict[str, object]:
-    """Route every sample once and summarise refusals per dataset."""
+def _router() -> tuple[Router, AsyncQdrantClient, Settings]:
+    """The production Router against the seeded Qdrant on the host ports."""
     settings = Settings(qdrant_url=os.getenv("QDRANT_URL", "https://127.0.0.1:16333"))
     qdrant = AsyncQdrantClient(
         verify=os.environ["INFRA_CA_FILE"],
@@ -51,6 +56,42 @@ async def measure() -> dict[str, object]:
         route_threshold=settings.route_threshold,
         injection_margin=settings.injection_margin,
     )
+    return router, qdrant, settings
+
+
+async def measure_offtopic() -> dict[str, object]:
+    """Refusals per category of the off-topic set; every refusal and every miss is listed."""
+    router, qdrant, settings = _router()
+    refused: Counter[str] = Counter()
+    total: Counter[str] = Counter()
+    rows = []
+    try:
+        for row in _rows(OFFTOPIC):
+            route = await router.route(row["text"])
+            total[row["category"]] += 1
+            refused[row["category"]] += route.injection
+            rows.append(
+                {**row, "refused": route.injection, "margin": round(route.injection_score, 4)}
+            )
+    finally:
+        await qdrant.close()
+    return {
+        "injection_margin": settings.injection_margin,
+        "refused": {k: f"{refused[k]}/{total[k]}" for k in sorted(total)},
+        "refused_off_topic": [
+            r["text"] for r in rows if r["category"] == "off_topic" and r["refused"]
+        ],
+        "refused_benign": [r["text"] for r in rows if r["category"] == "benign" and r["refused"]],
+        "missed_injections": [
+            r["text"] for r in rows if r["category"] == "injection" and not r["refused"]
+        ],
+        "rows": rows,
+    }
+
+
+async def measure() -> dict[str, object]:
+    """Route every sample once and summarise refusals per dataset."""
+    router, qdrant, settings = _router()
     report: dict[str, object] = {"injection_margin": settings.injection_margin}
     try:
         for name, path in DATASETS.items():
@@ -76,6 +117,12 @@ async def measure() -> dict[str, object]:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "offtopic":
+        out = REPORT.with_name(f"offtopic_{sys.argv[2]}.json")
+        result = asyncio.run(measure_offtopic())
+        out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({k: v for k, v in result.items() if k != "rows"}, indent=2))
+        sys.exit(0)
     result = asyncio.run(measure())
     REPORT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     summary = {

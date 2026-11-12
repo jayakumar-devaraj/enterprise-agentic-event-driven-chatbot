@@ -96,9 +96,12 @@ def queue_delays(
         "query.operation_name": "worker.process",
         "query.start_time_min": since,
         "query.start_time_max": until,
-        "query.search_depth": str(len(message_ids) * 2),  # newest first: keep the window tight
+        # Newest first: keep the window tight. Jaeger rejects a depth above 10000 with a 400.
+        "query.search_depth": str(min(len(message_ids) * 2, 10000)),
     }
-    found = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60).json()
+    response = httpx.get(f"{JAEGER}/api/v3/traces", params=params, timeout=60)
+    response.raise_for_status()  # an error body once read as "no traces" (2026-11-11 open1)
+    found = response.json()
     trace_ids = {
         span["traceId"]: a["value"]["stringValue"]
         for rs in found.get("result", {}).get("resourceSpans", [])
@@ -178,6 +181,21 @@ async def main(
         # In arrival order: a growing backlog shows as a later p95 well above an earlier one.
         "queue_delay_first50_ms": pct(ordered[:50]) if len(ordered) >= 100 else None,
         "queue_delay_last50_ms": pct(ordered[-50:]) if len(ordered) >= 100 else None,
+        # Long runs (latency-targets addendum 2026-11-11): p95 per tenth of the traced turns in
+        # arrival order, and the arrival rate the schedule offered in each tenth.
+        "queue_delay_p95_by_tenth_ms": [
+            pct(ordered[k * len(ordered) // 10 : (k + 1) * len(ordered) // 10])["p95"]
+            for k in range(10)
+        ]
+        if len(ordered) >= 200
+        else None,
+        "offered_rate_by_tenth": [
+            round(len(chunk) / (chunk[-1] - chunk[0]), 2)
+            for k in range(10)
+            if len(chunk := offsets[k * requests // 10 : (k + 1) * requests // 10]) > 1
+        ]
+        if rate and requests >= 200
+        else None,
         "empty_replies": sum(1 for r in ok if "ttft" not in r),  # `done` with no token
         "ttft_ms": pct([r["ttft"] for r in ok if "ttft" in r]),
         "completion_ms": pct([r["done"] for r in ok]),
