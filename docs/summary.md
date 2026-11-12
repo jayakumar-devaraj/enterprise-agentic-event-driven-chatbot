@@ -32,7 +32,7 @@ live worker container under load. The measured results below come from pre-regis
 | Latency, same runs, no growing backlog | queue delay p95 of the last 50 turns 3.6–4.7× the first 50, under 0.2 s | ≤ 2× | Fail as written |
 | Latency, mock engine, five-minute open loop at 75% of capacity (2026-11-11) | queue delay p95 1.46 s, in multi-second stall episodes; last tenth 2.11× the first; first reply word p95 2.2 s; one of two runs not traced (harness fault) | queue ≤ 0.5 s; ≤ 2×; first word ≤ 2 s | Fail |
 | Latency, mock engine at saturation, 20 users with no pauses (same session) | queue delay p95 0.87–0.99 s; completion p95 1.2–1.5 s; 20.1–25.4 turns/s | reported | n/a |
-| Latency, real model, 20 turns | accept request p95 0.7 s passes; full reply p95 63 s | ≤ 60 s | Fail (confounded run) |
+| Latency, real model, 20 turns, clean rerun with warm-up (2026-11-11) | accept request p95 0.13 s; full reply p95 12.7 s; first reply word p95 10.8 s; 3 empty replies | full reply ≤ 60 s; first word ≤ 10 s | Full reply passes; first word fails |
 | Throughput, real model on 4 CPUs, 16 turns per setting (2026-11-02) | 0.18–0.24 turns/s at every worker and model-server concurrency tried | reported | n/a |
 | Reply quality, real model, 20 questions | mean 3.4 of 5; 16/20 without invented specifics | ≥ 3.5; ≥ 18/20 | Fail (scored by the build agent, not independent) |
 

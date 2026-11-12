@@ -1,0 +1,74 @@
+{
+  "requests": 6,
+  "concurrency": 2,
+  "rate_per_s": null,
+  "seed": null,
+  "gateways": 2,
+  "engine": "ollama",
+  "wall_s": 78.02,
+  "throughput_turns_per_s": 0.08,
+  "errors": 0,
+  "error_kinds": [],
+  "post_ms": {
+    "p50": 205.0,
+    "p95": 749.1,
+    "p99": 765.7
+  },
+  "queue_delay_ms": {
+    "p50": 32.9,
+    "p95": 131.8,
+    "p99": 154.5,
+    "traced": 6
+  },
+  "queue_delay_first50_ms": null,
+  "queue_delay_last50_ms": null,
+  "empty_replies": 0,
+  "ttft_ms": {
+    "p50": 16777.7,
+    "p95": 34988.2,
+    "p99": 36174.2
+  },
+  "completion_ms": {
+    "p50": 29378.5,
+    "p95": 37539.0,
+    "p99": 38659.4
+  },
+  "samples_s": [
+    {
+      "message_id": "22b21e16-d407-4ada-8180-0ab71d3d776c",
+      "post": 0.6868474000075366,
+      "ttft": 30.540781999996398,
+      "done": 33.3375961999991
+    },
+    {
+      "message_id": "4e0a9494-9406-4988-9bbd-f8e75c75d4a1",
+      "post": 0.28110320000268985,
+      "ttft": 36.47066150000319,
+      "done": 38.93948180000007
+    },
+    {
+      "message_id": "444c2faf-847f-4dd9-9854-6a1c147107d2",
+      "post": 0.7698658000008436,
+      "ttft": 8.26424109999789,
+      "done": 10.893992099998286
+    },
+    {
+      "message_id": "96be0737-c0f4-474a-930b-e35f8aa640dd",
+      "post": 0.12884430000849534,
+      "ttft": 5.753962400005548,
+      "done": 28.868142599996645
+    },
+    {
+      "message_id": "6b5ddd77-8e15-4e57-84e8-ba6f9ecd87f9",
+      "post": 0.08933019998949021,
+      "ttft": 25.2912573999929,
+      "done": 29.888917099990067
+    },
+    {
+      "message_id": "b77faca6-e671-4672-b763-e76ba41b3c8b",
+      "post": 0.04972249999991618,
+      "ttft": 7.2898844000010286,
+      "done": 9.809604900001432
+    }
+  ]
+}
