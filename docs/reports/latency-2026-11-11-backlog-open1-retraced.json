@@ -1,0 +1,22 @@
+{
+  "note": "Informational, retrieved after the run with the search depth capped at 10000; the run itself is not judged (latency-2026-11-11-backlog.md).",
+  "traced": 5382,
+  "of": 5382,
+  "queue_delay_ms": {
+    "p50": 31.8,
+    "p95": 1427.6,
+    "p99": 2384.2
+  },
+  "p95_by_tenth": [
+    330.7,
+    1480.5,
+    2727.6,
+    226.4,
+    274.9,
+    336.7,
+    427.7,
+    1350.4,
+    2214.3,
+    823.4
+  ]
+}
