@@ -2,69 +2,74 @@
 
 Appended whenever scope is cut, a shortcut is taken, or something is left unverified.
 
-- **Cut at Step B (time):** Tier 3 (Caddy TLS/HTTP2, A11 latency), A10 horizontal-scale test, React
+Each entry starts with its status as of 2026-11-12: *Open*, *Fixed* (naming the PR found from the
+commit that added the fix or its test), or *Superseded* (naming the later entry that replaces it).
+Every status was checked against the code, git history or a rerun on that date. Entries are
+otherwise unchanged.
+
+- *[Superseded by "Previously cut, now built", "A4 live Qdrant outage automated" and "Answer quality was measured without DeepEval".]* **Cut at Step B (time):** Tier 3 (Caddy TLS/HTTP2, A11 latency), A10 horizontal-scale test, React
   client + A8, DeepEval answer-quality eval + A9 real Ollama round trip, service container images +
   full-compose end-to-end + A4 Qdrant-stopped case. Recorded in `docs/master_plan.md`.
-- **Access control over plain HTTP:** HTTP Basic credentials travel in cleartext on the direct
+- *[Superseded by "Loopback is the trust boundary".]* **Access control over plain HTTP:** HTTP Basic credentials travel in cleartext on the direct
   development ports. The Caddy TLS path (Tier 3, first cut, built later) is described below.
-- **LangFuse Cloud egress:** scrubbed prompts and outputs leave the machine to US LangFuse Cloud;
+- *[Open: `LANGFUSE_BASE_URL` still defaults to US LangFuse Cloud.]* **LangFuse Cloud egress:** scrubbed prompts and outputs leave the machine to US LangFuse Cloud;
   runtime is no longer fully offline.
-- **Restored (10:58 CDT, lead):** React client + A8 (Task 14); deadline moved to 17:40 CDT. Node is
+- *[Open: the frontend still builds and tests in a Node image, now `node:24.22.2-slim`.]* **Restored (10:58 CDT, lead):** React client + A8 (Task 14); deadline moved to 17:40 CDT. Node is
   not installed on the build machine, so the frontend builds and tests inside `node:24.22.0-slim`.
-- **A1b fixture is easy (Task 3):** `tests/fixtures/pii_labeled.jsonl` was written by the agent with
+- *[Superseded by "Broad PII set misses its recall targets" and "Address and obfuscated-identifier recognizers".]* **A1b fixture is easy (Task 3):** `tests/fixtures/pii_labeled.jsonl` was written by the agent with
   common Western names and well-known cities; measured recall 1.0 PERSON (32/32) and 1.0 LOCATION
   (36/36), scrub p95 5.72 ms on the build machine (`docs/reports/pii_recall.json`). This overstates
   real-world recall; no recall floor has been set (the lead sets it).
-- **Presidio sample-SSN rule (Task 3):** Presidio deliberately ignores published sample SSNs
+- *[Open: rechecked 2026-11-12, `123-45-6789` passes through and `078-05-1120` becomes `<PHONE_NUMBER>`.]* **Presidio sample-SSN rule (Task 3):** Presidio deliberately ignores published sample SSNs
   (`123-45-6789`, `987-65-4320`, `078-05-1120`); `123-45-6789` passes through unscrubbed, and
   `078-05-1120` is caught only as `PHONE_NUMBER`.
-- **Scrubber false positive (Task 3):** a sentence-initial "Email" was tagged `PERSON` and replaced.
-- **Injection-detection false positive (Task 5):** with `INJECTION_THRESHOLD=0.6113` (ADR 0004) the
+- *[Open: rechecked 2026-11-12, a sentence-initial "Email" still becomes `<PERSON>`.]* **Scrubber false positive (Task 3):** a sentence-initial "Email" was tagged `PERSON` and replaced.
+- *[Superseded by "Contrastive injection detector adopted below its targets".]* **Injection-detection false positive (Task 5):** with `INJECTION_THRESHOLD=0.6113` (ADR 0004) the
   benign eval sentence "How do I get my money back for this charge?" scores 0.658 and would be
   routed to the refusal node. Detection is heuristic; structural prompt separation remains the
   primary defence. Not tuned away.
-- **Unexplained slow run (Task 9):** one local unit-suite run reported 2081 s (13:40–14:12 CDT); an
+- *[Open: not reproduced, cause unknown.]* **Unexplained slow run (Task 9):** one local unit-suite run reported 2081 s (13:40–14:12 CDT); an
   immediate rerun took 13.5 s and no test exceeded 2.2 s. Cause not identified (host stall
   suspected); about 30 minutes of the budget were lost.
-- **Approval gate edge (Task 10):** sending a new chat message on a thread while a refund awaits
+- *[Superseded by "Audit remediation (2026-10-17)".]* **Approval gate edge (Task 10):** sending a new chat message on a thread while a refund awaits
   approval starts a new graph run and abandons the paused one; a later approve then gets
   `ErrorEvent{approval_not_pending}` and no refund is applied (fails safe, but the user must ask
   again). The refund rule is a keyword match on "refund(s)" in billing-routed text.
-- **Previously cut, now built (17:07–19:20):** container images + one-command stack (Task 12), A9,
+- *[Fixed: the A4 case it lists as not automated, PR #46.]* **Previously cut, now built (17:07–19:20):** container images + one-command stack (Task 12), A9,
   A10, Caddy TLS and A11 — see the reports in `docs/reports/`. Still not automated: A4's live
   "Qdrant stopped after startup" case (the dependency-failure path is covered with test doubles).
-- **Phase 2.5 cut short:** items 3–5 (extra criterion tests, plan/spec reconciliation, fixing
+- *[Open: no line-by-line reconciliation has been done since.]* **Phase 2.5 cut short:** items 3–5 (extra criterion tests, plan/spec reconciliation, fixing
   limitations) were not done; time reached the Phase 3 floor after a CI wait of about 1h50m
   (15:05–16:55 CDT) while merging PR #17. `docs/master_plan.md` and `docs/specs/` were not
   reconciled line by line after the design changes recorded in ADRs 0002–0007.
-- **CLAUDE.md §9 "Open risk" still present:** spike (a) resolved it (ADR 0002), but deleting the
+- *[Fixed: PR #30.]* **CLAUDE.md §9 "Open risk" still present:** spike (a) resolved it (ADR 0002), but deleting the
   block needs the lead's permission (asked, not yet answered).
-- **`worker.main` is unit-tested over doubles** (`tests/unit/test_worker_main.py`): startup failures,
+- *[Open: unit coverage extended in PR #126.]* **`worker.main` is unit-tested over doubles** (`tests/unit/test_worker_main.py`): startup failures,
   engine and observer choice, stop signals and client cleanup. Its wiring against real services is
   exercised only by the containerized runs (`docs/reports/e2e-containers.md`, A9, A10).
-- **Single-turn prompts to the real LLM** include only the last 6 history turns.
-- **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
+- *[Open: `history[-6:]` in `services/worker/worker/llm.py`.]* **Single-turn prompts to the real LLM** include only the last 6 history turns.
+- *[Fixed: PR #28.]* **Small-model echo (A9):** `llama3.2:1b` repeats the `<user_message>…</user_message>` block (the
   user's own, already scrubbed text) at the start of its reply. Harmless for privacy, poor UX; a
   larger model or stripping echoed delimiters in the output guard would fix it.
-- **TLS (Tier 3, done 19:06):** Caddy now serves https://localhost:8443 with an internal CA. Basic
+- *[Superseded by "Loopback is the trust boundary".]* **TLS (Tier 3, done 19:06):** Caddy now serves https://localhost:8443 with an internal CA. Basic
   credentials are still cleartext on the direct dev ports (gateway 8000–8003, Vite 5173), which remain
   published on 127.0.0.1 for development; browsers must trust Caddy's local CA or accept the warning.
-- **Latency (review, 20:07):** worker CPU is the bottleneck (both replicas at their 2-CPU cap under
+- *[Superseded by "Latency rerun fails every latency target" and "Worker concurrency".]* **Latency (review, 20:07):** worker CPU is the bottleneck (both replicas at their 2-CPU cap under
   20 concurrent users) and the async Kafka producer adds up to ~1 s per POST through its default
   1 s Python-side buffer. One fix attempt broke delivery and was reverted; next steps are in
   `docs/reports/a11-latency.md`.
-- **Review items not done before the 20:30 stop:** an automated A4 "Qdrant stopped while running" test; publishing only Caddy by
+- *[Partly superseded: A4 fixed in PR #46, and the injection decision by "Contrastive injection detector adopted below its targets". Open: gateway ports 8000-8003 and Vite 5173 are still published by default.]* **Review items not done before the 20:30 stop:** an automated A4 "Qdrant stopped while running" test; publishing only Caddy by
   default (moving dev ports 8000–8003 / 5173 to an opt-in override). The injection false positive
   needs a lead decision (the rules forbid tuning the threshold or seed data to pass a case).
-- **Small-model echo — fixed (20:11):** the output guard now drops echoed `<user_message>` /
+- *[Fixed: PR #28.]* **Small-model echo — fixed (20:11):** the output guard now drops echoed `<user_message>` /
   `<history>` blocks before scrubbing (`tests/unit/test_llm_guards.py`); not re-run against Ollama.
-- **Resolved after the 20:30 stop (21:16, PR #30):** the CLAUDE.md §9 "Open risk" block was deleted
+- *[Fixed: PR #30.]* **Resolved after the 20:30 stop (21:16, PR #30):** the CLAUDE.md §9 "Open risk" block was deleted
   with the lead's permission; the entry above about it is superseded.
-- **Demo script (`scripts/end_to_end_demo.py`, post-deadline):** verified on Windows 11 only (CMD,
+- *[Open.]* **Demo script (`scripts/end_to_end_demo.py`, post-deadline):** verified on Windows 11 only (CMD,
   PowerShell, Git Bash); macOS not run. The Ctrl+C path (exit 130) was not exercised. Python on
   Windows reports `NUL` as a terminal, so with `< NUL` the prompt text prints before the EOF fallback
   picks the default.
-- **Audit remediation (2026-10-17, `docs/reports/project-audit-2026-10-17.md`):** thread ownership
+- *[Fixed: the P1 items it lists; residuals open.]* **Audit remediation (2026-10-17, `docs/reports/project-audit-2026-10-17.md`):** thread ownership
   no longer expires (P1); `thread_owner:*` keys now grow by one short string per thread. 202 is
   returned only after the broker ack, and an unacknowledged claim is re-produced on retry (P1);
   concurrent repeats may produce twice (the worker dedupes) and so may audit `chat_accepted` twice.
@@ -79,41 +84,41 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   Redis now persists (AOF `everysec`) and Kafka writes to a named volume instead of `/tmp` (P1,
   ADR 0008); a host crash can still lose ≤ 1 s of Redis writes, Kafka has no replica and is not
   backed up. Restore was tested on a disposable compose project, not on a production host.
-- **Injection detector measured on a held-out set (2026-10-17, ADR 0004 addendum):** the current
+- *[Superseded by "Contrastive injection detector adopted below its targets".]* **Injection detector measured on a held-out set (2026-10-17, ADR 0004 addendum):** the current
   rule refuses 10/20 benign held-out messages (mostly refund and money-back phrasings) and detects
   12/20 novel injections. The pre-registered margin rule (2/20 refused, 9/20 detected) missed its
   targets and was not adopted. The structural defence and the human refund gate are unaffected.
-- **Answer quality was measured without DeepEval (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):** the DeepEval harness on `feat/deepeval-answer-quality` was never merged, because each local-judge call exceeded DeepEval's 88.5 s per-attempt limit on CPU (ADR 0009). The build agent scored 20 replies against a pre-registered rubric instead: mean 68/100 = 3.4 against a 3.5 target (fail) and 16/20 on no invented specifics against 18 (fail). That is not an independent judge.
-- **Contrastive injection detector adopted below its targets (2026-10-18, ADR 0004/0006):** on the
+- *[Superseded by "Answer quality fails its targets".]* **Answer quality was measured without DeepEval (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):** the DeepEval harness on `feat/deepeval-answer-quality` was never merged, because each local-judge call exceeded DeepEval's 88.5 s per-attempt limit on CPU (ADR 0009). The build agent scored 20 replies against a pre-registered rubric instead: mean 68/100 = 3.4 against a 3.5 target (fail) and 16/20 on no invented specifics against 18 (fail). That is not an independent judge.
+- *[Open: adopted in PR #44; the held-out set still refuses 4/20 benign messages (rechecked 2026-11-10), and off-topic refusals were addressed at the router in PR #130.]* **Contrastive injection detector adopted below its targets (2026-10-18, ADR 0004/0006):** on the
   fresh holdout it refuses 4/20 benign messages and detects 20/20 injections; it also refuses 3
   off-topic `intents.eval` requests (no in-scope one). The seeds and holdout were written by the same
   agent, so the holdout measures generalisation across phrasings by one author only. Supersedes the
   Task 5 false-positive entry and the 2026-10-17 detector entry above.
-- **A4 live Qdrant outage automated (2026-10-18):** `tests/durability/test_dependency_outage.py` stops
+- *[Fixed: PR #46.]* **A4 live Qdrant outage automated (2026-10-18):** `tests/durability/test_dependency_outage.py` stops
   the real Qdrant container under the production worker, graph and router; supersedes the "not
   automated" A4 entries above.
-- **A5 live worker kill automated (2026-10-18):** `tests/durability/test_worker_kill.py` SIGKILLs the
+- *[Fixed: PR #47.]* **A5 live worker kill automated (2026-10-18):** `tests/durability/test_worker_kill.py` SIGKILLs the
   real worker container 3 times while 300 messages on 6 threads are in flight and checks one `done`
   per message and one history turn per message per thread. Kill points are timing-based, not
   targeted at a specific boundary; the targeted boundaries are covered in-process by
   `tests/integration/test_replay_recovery.py`.
-- **Output-guard chunk leak fixed (2026-10-18):** the guard flushed at any `.`, so an email, dotted
+- *[Fixed: PR #49; residual risk in LLD §10.]* **Output-guard chunk leak fixed (2026-10-18):** the guard flushed at any `.`, so an email, dotted
   phone or IP streamed in pieces reached the client unscrubbed, and the 200-char forced flush could
   split a card number. Sentence ends now need trailing whitespace and forced cuts fall between
   lowercase words (`tests/unit/test_llm_guards.py`). Residual risk is described in LLD §10.
-- **Refund script partial write (2026-10-18, R1 of `docs/reports/full-score-recommendations.md`):**
+- *[Fixed: PR #53; residual open.]* **Refund script partial write (2026-10-18, R1 of `docs/reports/full-score-recommendations.md`):**
   Redis does not roll back a Lua script on a runtime error. A wrong-type `audit:events` key left the
   marker and the refund record written with no audit entry. The script now checks argument and key
   types before its first write and sets the marker last, holding its `refunds` entry id
   (`tests/integration/test_refund_atomicity.py`). Residual risk: the audit stream is trimmed by
   `MAXLEN`, so an old marker can be checked against its `refunds` entry but not its audit entry.
   Markers written before this change hold `1` and are trusted without that check.
-- **Harder PII set measured (2026-10-18):** `tests/fixtures/pii_hard.jsonl` (30 sentences, all seven
+- *[Superseded by "Broad PII set misses its recall targets" and "Address and obfuscated-identifier recognizers"; spelled-out cards are still missed.]* **Harder PII set measured (2026-10-18):** `tests/fixtures/pii_hard.jsonl` (30 sentences, all seven
   entity types; written by the agent) recalls 33/38 (86.8 %): IP, phone and SSN 100 %, card 3/4,
   email 4/5, location 6/7, person 8/10. Misses: obfuscated email and spelled-out card, a lowercase
   name, a name of common words ("Hope Summers"), "Kraków" (`docs/reports/pii_recall_hard.json`). No
   recall floor is set; the lead sets one.
-- **Stale worker after a lost lease (2026-10-18, R3 of `docs/reports/full-score-recommendations.md`):**
+- *[Fixed: PR #55; the writes it lists as unfenced were fenced later (ADR 0009).]* **Stale worker after a lost lease (2026-10-18, R3 of `docs/reports/full-score-recommendations.md`):**
   a worker that stalled past `DEDUPE_LEASE_S` while another took the message over still wrote when
   it resumed. Observed on real Redis: it appended a second copy of the reply after the new owner's
   `done` and committed. Stream, `done`/release and refund writes are now fenced by the lease token
@@ -123,14 +128,14 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   entry or replace a checkpoint. The DLQ produce is preceded by a non-atomic lease check. (Checkpoints
   since 2026-10-30 and approval windows with their audit entries since 2026-11-01 are fenced; see the
   later entries and ADR 0009.)
-- **Expired streams (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):** opening or
+- *[Fixed: PR #57; residual open.]* **Expired streams (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):** opening or
   resuming a stream that had expired used to wait silently for up to `STREAM_TTL_S` (1 h) and then
   close with no terminal event. A finished message now gets an immediate `stream_expired` error
   event, and a message that was never accepted gets 404 (SPEC §6). Residual: a message that failed
   (DLQ, dedupe key deleted) and whose stream has also expired cannot be told apart from a queued
   one, so it still waits out the window. The finished reply itself is not retrievable once its
   stream expires; no history endpoint exists.
-- **Rebalance under load automated (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):**
+- *[Fixed: PR #58.]* **Rebalance under load automated (2026-10-19, R3 of `docs/reports/full-score-recommendations.md`):**
   `test_rebalance_while_processing_loses_and_duplicates_nothing` in
   `tests/durability/test_worker_kill.py` produces 600 messages on 12 threads in four batches, one
   right before each step: scale the worker 1 → 3, SIGKILL one replica, scale to 2, back to 1. At
@@ -142,7 +147,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   whether a fenced write was rejected during the run (the project's logs are removed with it), or
   that the test fails on the code before ADR 0009. Step timing is wall-clock based, like the kill
   test.
-- **Approval rules enforced where applied (2026-10-23, R4 of
+- *[Fixed: PR #59; residuals open.]* **Approval rules enforced where applied (2026-10-23, R4 of
   `docs/reports/full-score-recommendations.md`):** before this change, the gateway alone checked the
   approval window and the decider's identity. On real Redis, the worker applied a refund for a
   decision accepted an hour after the window, and for a decision carrying another user's id. The
@@ -152,7 +157,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   audits it as `refund_abandoned`. A refund paused before `proposed_at` existed counts as expired.
   The check compares the gateway's and the worker's clocks, which are the same host clock under
   compose but would need synchronised clocks on separate hosts.
-- **DLQ replay tool (2026-10-23, section 2 of `docs/reports/full-score-recommendations.md`):**
+- *[Fixed: PR #63, and since PR #125 also for `internal_error`; caveats open.]* **DLQ replay tool (2026-10-23, section 2 of `docs/reports/full-score-recommendations.md`):**
   `python -m worker.dlq` lists and replays dead-lettered envelopes. A naive re-produce was shown on
   real Kafka and Redis to be dead-lettered again without processing, because the failed attempt's
   `dependency_unavailable` stream read as an outcome already recorded. Replay therefore deletes that
@@ -160,7 +165,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   turns. A replayed approval keeps its original acceptance time, so one replayed after the approval
   window gets `approval_expired`. DLQ offsets are unambiguous only while the DLQ has one partition
   (as `kafka-init` creates it).
-- **Latency rerun fails every latency target (2026-10-24, `docs/reports/latency-2026-10-24.md`):**
+- *[Open: the produce fix is PR #65; real-model first token still fails (2026-11-11).]* **Latency rerun fails every latency target (2026-10-24, `docs/reports/latency-2026-10-24.md`):**
   against targets pre-registered before the run (proposals for the lead), the mock run of record
   (200 turns, 20 in flight) had 9 `POST 503`s, POST p95 6.3 s, queue delay p95 44.7 s and
   completion p95 46.8 s at 1.8 turns/s. The real model (20 turns, 2 in flight) had no errors and a
@@ -178,7 +183,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   6-turn warm-up discarded, targets unchanged) had no errors, POST p95 127 ms and completion p95
   12.7 s (pass). First-token p95 was 10.78 s against ≤ 10 s (fail), and 3 of 20 replies were empty
   (cause not investigated).
-- **Output guard leaked at its hard limit (2026-10-24, section 3 of
+- *[Fixed: PR #66.]* **Output guard leaked at its hard limit (2026-10-24, section 3 of
   `docs/reports/full-score-recommendations.md`):** with 1000 buffered characters, no sentence end and
   no gap between two lowercase words, the guard flushed the whole buffer. If the latest model delta
   stopped mid-entity, each half was scrubbed alone and neither was recognised. In tests an email,
@@ -187,7 +192,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   of digits or capitals is cut off. Tested and not a leak: an entity separated from its context by a
   newline chunk boundary (SSN, phone, card, email, IP, person, location). Not covered: an echo of a
   system prompt that omits its first 40 characters (the prompts hold no secrets).
-- **Raw PII in DLQ records and logs (2026-10-25, section 3 of
+- *[Fixed: PR #67; the sinks it lists as not covered are open.]* **Raw PII in DLQ records and logs (2026-10-25, section 3 of
   `docs/reports/full-score-recommendations.md`):** a scan of the running stack
   (`tests/stack/test_sensitive_data.py`, `-m stack`) found the gateway path clean in every sink:
   SSE stream, container logs, `chat-requests`, the DLQ, Redis and the Jaeger trace. A malformed record
@@ -196,13 +201,13 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   only a SHA-256, the length and the error types and field locations. Not covered: names and
   locations, because a random name cannot be relied on to be recognised; LangFuse, which was
   stopped; host-level logs outside Docker.
-- **Broad PII set misses its recall targets (2026-10-25, `docs/reports/pii-broad-2026-10-25.md`):**
+- *[Open: improved by PR #128 and still below its targets.]* **Broad PII set misses its recall targets (2026-10-25, `docs/reports/pii-broad-2026-10-25.md`):**
   on 60 agent-written sentences with targets pre-registered before scoring, structured identifiers
   were redacted 10/14 (target 0.90) and locations 16/30 (target 0.80). Persons passed at 16/18.
   Precision failed for PERSON (0.72) and IP (2 spans). No street address was redacted, obfuscated
   emails, cards and IPs leaked, and place names in non-English sentences were missed. No fix has
   been tuned on this set; candidate recognizers need a fresh held-out set.
-- **Address and obfuscated-identifier recognizers (2026-11-10, `docs/reports/pii-heldout-2026-11-10.md`):**
+- *[Open: PR #128.]* **Address and obfuscated-identifier recognizers (2026-11-10, `docs/reports/pii-heldout-2026-11-10.md`):**
   on a held-out set pre-registered before the recognizers were written, addresses went from 3/19 to
   19/19. Obfuscated identifiers went from 1/14 to 11/14, which **fails** the 0.80 target. Controls
   and negatives were unchanged. The email defect that score found (`me at jane dot doe at example dot
@@ -213,7 +218,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   words, `NW`-style suffixes, non-English street forms and non-English place names. The broad set's
   structured identifiers now score 13/14 and locations 22/30, which still miss its targets; that set
   is no longer held out.
-- **End-to-end safety evaluation (2026-10-25, `docs/reports/safety-final-2026-10-25.md`):** against
+- *[Open: off-topic refusals addressed at the router in PR #130; the end-to-end run was not repeated.]* **End-to-end safety evaluation (2026-10-25, `docs/reports/safety-final-2026-10-25.md`):** against
   targets pre-registered before the run, with the real model, no refund was applied or claimed, the
   system prompt did not leak, and no canary attack succeeded. Benign false refusals were 0/20.
   **4/10 harmless off-topic questions were refused** (target ≤ 1). Every attack was refused by the
@@ -224,7 +229,7 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
   before), benign 2/20, attacks caught 29/30 (unchanged), at the router against the real Qdrant
   (`offtopic-2026-11-10.md`). The set and exemplars share one author, and the end-to-end safety run
   with the real model was not repeated.
-- **Document questions (2026-10-25, ADR 0010, ADR 0004 addendum):**
+- *[Open.]* **Document questions (2026-10-25, ADR 0010, ADR 0004 addendum):**
   - *Routing scope.* The `document_rag` intent is chosen by similarity to 12 exemplars. All 5 held-out
     document questions routed correctly and nothing else regressed, but a probe afterwards showed that a
     question naming no document and far from the exemplars ("What is the parental leave policy?", 0.566,
@@ -246,32 +251,32 @@ Appended whenever scope is cut, a shortcut is taken, or something is left unveri
     verifies that a figure is in the sources, not that it answers the question. A later run took 80 s to the
     first token with the model cold.
   - *No tenant.* A message routed to `document_rag` from a user with no tenant is answered as `general`.
-- **Answer quality fails its targets (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):**
+- *[Open: the independent re-score is pending in PR #131.]* **Answer quality fails its targets (2026-10-25, `docs/reports/answer-quality-2026-10-25.md`):**
   on 20 pre-registered support questions with the real 1B model, the mean rubric score was 3.4/5
   (target 3.5) and 4 replies invented specifics such as hours, a discount and a URL (target ≤ 2). No
   reply falsely claimed an action. Billing answers mostly deflect to "a human will review it", which
   echoes the system prompt's refund rule. Scored by the build agent against a published rubric; not
   an independent judge, and DeepEval is not used.
-- **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
+- *[Open.]* **Loopback is the trust boundary (2026-10-25, `docs/reports/security-path-2026-10-25.md`):**
   every published port binds to 127.0.0.1, and the Caddy path is TLS 1.3 / HTTP/2 with 401s for
   missing or wrong credentials. Jaeger and Ollama have no authentication (Redis, Qdrant and Kafka
   have authentication and TLS since 2026-11-01, ADR 0015, with a development CA), and
   the direct gateway ports carry Basic credentials in clear, so any local process can read or write
   all state. Not suitable beyond one trusted host as configured.
-- **RAG client credentials (ADR 0011, 2026-10-29).** `RAG_TENANT_CLIENTS` is implemented and unit-tested against a test double of the token endpoint only; no real identity provider was run. Secrets come from the environment, not a secrets manager. Static `RAG_TENANT_TOKENS` remain the default until the deployment sets the client variables.
-- **Audit export (ADR 0011, 2026-10-29).** The exporter is opt-in (`--profile audit`) and runs as a single consumer; the audit table has no partitioning or retention job; the schema is created by an init script, not migrations; no lag alarm. Events are exported after the Redis write, so an event lost from Redis (AOF `everysec`, about one second) before export is not in Postgres. Since 2026-11-10 refund events are written to Postgres synchronously and are not exposed to that loss; every other event still is. Access denials (401, 403, `rag_unauthorized`) are not audited at all. Postgres is written after the Redis script, so a Redis loss after the insert leaves a row for refund state Redis no longer holds.
-- **Stale worker rolled back history (2026-10-29, ADR 0009 addendum):** the CI rebalance test on `65894ba` lost one history turn. A worker that loaded a thread and then stalled in routing past its lease wrote its next checkpoint, built on the history it had loaded, after another worker answered later turns; that checkpoint became the latest and dropped them. Checkpoint writes are now preceded by a lease check (`test_stale_worker_cannot_roll_back_history_after_another_took_over`, real Redis). The check is not atomic with the write; see the head-pointer entry below for what closes that gap.
-- **Gateway credential cache (2026-10-29, ADR 0007 addendum):** a gateway now runs scrypt once per accepted username/password pair and remembers it until it restarts, keyed by an HMAC under a per-process key. Under the A11 mock load this took `POST /chat` p95 from 3276 ms to 823 ms and throughput from 8.31 to 14.55 turns/s (`docs/reports/latency-2026-10-29-gateway-auth-cache.md`, measured with the one-thread worker embedder). Wrong passwords are never cached. Residual: removing a user or changing a password takes effect only at restart, as before. Queue delay (p95 2010 ms) and first token (p95 2200 ms) still fail their targets; workers process one record at a time.
-- **Worker queue delay explained and fixed (2026-10-29, `docs/reports/latency-2026-10-29-embedder-threads.md`):** fastembed's ONNX Runtime started one spinning thread per host core (12) inside 2-CPU workers, taking CPU from the scrubber and the event loop. With `threads=1`, under the same load, queue delay p95 fell from 5654 ms to 211 ms (target met) and throughput rose from 4.79 to 8.17 turns/s. `POST /chat` p50 rose from 76 ms to 1644 ms, so the gateways are now the bottleneck; their cause is not yet measured. First-token and completion targets still fail. One run each.
-- **Rescaling workers reran the seed (2026-10-29):** the durability tests restarted and rescaled workers with `docker compose up … worker`, which also reruns the one-shot `seed` dependency; seed drops and recreates the Qdrant collections, so routing on live workers failed with "Collection doesn't exist" and a message could exhaust its retries into the DLQ (CI on PR #86). The tests now pass `--no-deps`. The same applies to an operator: rescale workers with `docker compose up -d --no-deps --scale worker=N worker`, or routing fails until seed finishes. With this fixed, CI on PR #88 still failed the rebalance test once: thread `rb-93a0ee-8` lost turn 29 while every message got exactly one `done`, consistent with the non-atomic lease check above (not confirmed; that run kept no worker logs). Since 2026-11-02 the seed no longer drops anything a search can see: each collection name is an alias moved atomically to a versioned collection, and unchanged data rewrites nothing (`test_reseeding_never_leaves_a_search_without_its_collection`, real Qdrant: 18 failed searches before, none after). The first run after upgrading replaces a pre-alias collection once, the one moment the name is missing.
-- **Stale checkpoint after a passed lease check (2026-10-30, ADR 0009 addendum):** CI on PR #88 lost a history turn in the rebalance test after the seed fix. A thread's state is now read from a head pointer that only a lease holder moves, atomically with the lease check, so such a checkpoint is never read as history (`test_stale_checkpoint_that_passed_the_lease_check_does_not_become_history`, real Redis). Orphan checkpoints stay in Redis until their TTL (`CHECKPOINT_TTL_MIN`, 24 h by default) and are never read. They are deliberately not deleted: langgraph-checkpoint-redis 0.5.2 has no single-checkpoint delete, its `aprune` keeps the newest checkpoint, which can be the orphan rather than the head, and deleting raw keys risks a thread's real history. Their number is not measured. `pending_approval:*` and its audit entries are fenced in one script since 2026-11-01 (ADR 0009).
-- **Worker concurrency (2026-10-30, ADR 0012, `docs/reports/latency-2026-10-30-worker-concurrency.md`):** a worker runs up to `WORKER_CONCURRENCY` (4) records at once, one per thread. Against a fake model that takes about 1.8 s per reply, throughput rose from about 1.0 to 3.8–4.1 turns/s; on the CPU-bound mock engine it only moved queue delay into the worker, and the queue-delay target (p95 ≤ 500 ms) still fails (765–811 ms). That load is a saturating closed loop (about 19 turns in flight for 8 worker slots); since 2026-11-03 the target is judged under an open-loop load at 75% of measured capacity (`docs/reports/latency-2026-11-03-queue-delay.md`), where queue delay p95 is 55 and 105 ms (pass), but the pre-registered no-growing-backlog check fails as written (last-50 p95 3.6–4.7× the first 50, under 200 ms, during the schedule's late burst near capacity); a longer run is needed to tell burst from growth. *Update 2026-11-11:* five-minute open loops (`docs/reports/latency-2026-11-11-backlog.md`) fail: queue delay p95 1459 ms, last tenth 2.11× the first, first-token p95 2182 ms, driven by multi-second stall episodes after which the queue drains; the cause is not measured. Against the real model (2026-11-02, `docs/reports/latency-2026-11-02-real-model.md`; Ollama `llama3.2:1b` on 4 CPUs, 16 turns per run) throughput stayed about 0.2 turns/s at every setting: with Ollama's default of one request at a time, concurrency only moved the wait into Ollama (first-token p95 20.6 → 36.9 s), and `OLLAMA_NUM_PARALLEL=4` lowered the median first token to 4.6 s but not throughput or the tail. Compose leaves `OLLAMA_NUM_PARALLEL` at Ollama's default; a model server must be sized for `WORKER_CONCURRENCY` × replicas concurrent calls.
-- **Finished reply reported as expired (2026-10-30):** a `GET /stream` that found no stream, then saw the message `done`, answered `stream_expired` although the worker had written the stream in between (2 and 3 of 200 turns in the 2026-10-30 latency runs). The gateway now checks the stream again after seeing `done` (`test_a_message_that_finishes_while_the_stream_is_opened_is_not_reported_expired`, real Redis; it fails without the recheck).
-- **OIDC (2026-11-01, ADR 0016):** the gateway validates bearer tokens from any issuer, tested against a
+- *[Open.]* **RAG client credentials (ADR 0011, 2026-10-29).** `RAG_TENANT_CLIENTS` is implemented and unit-tested against a test double of the token endpoint only; no real identity provider was run. Secrets come from the environment, not a secrets manager. Static `RAG_TENANT_TOKENS` remain the default until the deployment sets the client variables.
+- *[Open: refund events have been written synchronously since PR #129.]* **Audit export (ADR 0011, 2026-10-29).** The exporter is opt-in (`--profile audit`) and runs as a single consumer; the audit table has no partitioning or retention job; the schema is created by an init script, not migrations; no lag alarm. Events are exported after the Redis write, so an event lost from Redis (AOF `everysec`, about one second) before export is not in Postgres. Since 2026-11-10 refund events are written to Postgres synchronously and are not exposed to that loss; every other event still is. Access denials (401, 403, `rag_unauthorized`) are not audited at all. Postgres is written after the Redis script, so a Redis loss after the insert leaves a row for refund state Redis no longer holds.
+- *[Fixed: PR #84, completed by PR #89.]* **Stale worker rolled back history (2026-10-29, ADR 0009 addendum):** the CI rebalance test on `65894ba` lost one history turn. A worker that loaded a thread and then stalled in routing past its lease wrote its next checkpoint, built on the history it had loaded, after another worker answered later turns; that checkpoint became the latest and dropped them. Checkpoint writes are now preceded by a lease check (`test_stale_worker_cannot_roll_back_history_after_another_took_over`, real Redis). The check is not atomic with the write; see the head-pointer entry below for what closes that gap.
+- *[Fixed: PR #87; residual open.]* **Gateway credential cache (2026-10-29, ADR 0007 addendum):** a gateway now runs scrypt once per accepted username/password pair and remembers it until it restarts, keyed by an HMAC under a per-process key. Under the A11 mock load this took `POST /chat` p95 from 3276 ms to 823 ms and throughput from 8.31 to 14.55 turns/s (`docs/reports/latency-2026-10-29-gateway-auth-cache.md`, measured with the one-thread worker embedder). Wrong passwords are never cached. Residual: removing a user or changing a password takes effect only at restart, as before. Queue delay (p95 2010 ms) and first token (p95 2200 ms) still fail their targets; workers process one record at a time.
+- *[Fixed: PR #86; its queue-delay figures are superseded by "Worker concurrency".]* **Worker queue delay explained and fixed (2026-10-29, `docs/reports/latency-2026-10-29-embedder-threads.md`):** fastembed's ONNX Runtime started one spinning thread per host core (12) inside 2-CPU workers, taking CPU from the scrubber and the event loop. With `threads=1`, under the same load, queue delay p95 fell from 5654 ms to 211 ms (target met) and throughput rose from 4.79 to 8.17 turns/s. `POST /chat` p50 rose from 76 ms to 1644 ms, so the gateways are now the bottleneck; their cause is not yet measured. First-token and completion targets still fail. One run each.
+- *[Fixed: PR #88 and PR #113.]* **Rescaling workers reran the seed (2026-10-29):** the durability tests restarted and rescaled workers with `docker compose up … worker`, which also reruns the one-shot `seed` dependency; seed drops and recreates the Qdrant collections, so routing on live workers failed with "Collection doesn't exist" and a message could exhaust its retries into the DLQ (CI on PR #86). The tests now pass `--no-deps`. The same applies to an operator: rescale workers with `docker compose up -d --no-deps --scale worker=N worker`, or routing fails until seed finishes. With this fixed, CI on PR #88 still failed the rebalance test once: thread `rb-93a0ee-8` lost turn 29 while every message got exactly one `done`, consistent with the non-atomic lease check above (not confirmed; that run kept no worker logs). Since 2026-11-02 the seed no longer drops anything a search can see: each collection name is an alias moved atomically to a versioned collection, and unchanged data rewrites nothing (`test_reseeding_never_leaves_a_search_without_its_collection`, real Qdrant: 18 failed searches before, none after). The first run after upgrading replaces a pre-alias collection once, the one moment the name is missing.
+- *[Fixed: PR #89; orphan checkpoints are open.]* **Stale checkpoint after a passed lease check (2026-10-30, ADR 0009 addendum):** CI on PR #88 lost a history turn in the rebalance test after the seed fix. A thread's state is now read from a head pointer that only a lease holder moves, atomically with the lease check, so such a checkpoint is never read as history (`test_stale_checkpoint_that_passed_the_lease_check_does_not_become_history`, real Redis). Orphan checkpoints stay in Redis until their TTL (`CHECKPOINT_TTL_MIN`, 24 h by default) and are never read. They are deliberately not deleted: langgraph-checkpoint-redis 0.5.2 has no single-checkpoint delete, its `aprune` keeps the newest checkpoint, which can be the orphan rather than the head, and deleting raw keys risks a thread's real history. Their number is not measured. `pending_approval:*` and its audit entries are fenced in one script since 2026-11-01 (ADR 0009).
+- *[Open.]* **Worker concurrency (2026-10-30, ADR 0012, `docs/reports/latency-2026-10-30-worker-concurrency.md`):** a worker runs up to `WORKER_CONCURRENCY` (4) records at once, one per thread. Against a fake model that takes about 1.8 s per reply, throughput rose from about 1.0 to 3.8–4.1 turns/s; on the CPU-bound mock engine it only moved queue delay into the worker, and the queue-delay target (p95 ≤ 500 ms) still fails (765–811 ms). That load is a saturating closed loop (about 19 turns in flight for 8 worker slots); since 2026-11-03 the target is judged under an open-loop load at 75% of measured capacity (`docs/reports/latency-2026-11-03-queue-delay.md`), where queue delay p95 is 55 and 105 ms (pass), but the pre-registered no-growing-backlog check fails as written (last-50 p95 3.6–4.7× the first 50, under 200 ms, during the schedule's late burst near capacity); a longer run is needed to tell burst from growth. *Update 2026-11-11:* five-minute open loops (`docs/reports/latency-2026-11-11-backlog.md`) fail: queue delay p95 1459 ms, last tenth 2.11× the first, first-token p95 2182 ms, driven by multi-second stall episodes after which the queue drains; the cause is not measured. Against the real model (2026-11-02, `docs/reports/latency-2026-11-02-real-model.md`; Ollama `llama3.2:1b` on 4 CPUs, 16 turns per run) throughput stayed about 0.2 turns/s at every setting: with Ollama's default of one request at a time, concurrency only moved the wait into Ollama (first-token p95 20.6 → 36.9 s), and `OLLAMA_NUM_PARALLEL=4` lowered the median first token to 4.6 s but not throughput or the tail. Compose leaves `OLLAMA_NUM_PARALLEL` at Ollama's default; a model server must be sized for `WORKER_CONCURRENCY` × replicas concurrent calls.
+- *[Fixed: PR #91.]* **Finished reply reported as expired (2026-10-30):** a `GET /stream` that found no stream, then saw the message `done`, answered `stream_expired` although the worker had written the stream in between (2 and 3 of 200 turns in the 2026-10-30 latency runs). The gateway now checks the stream again after seeing `done` (`test_a_message_that_finishes_while_the_stream_is_opened_is_not_reported_expired`, real Redis; it fails without the recheck).
+- *[Open.]* **OIDC (2026-11-01, ADR 0016):** the gateway validates bearer tokens from any issuer, tested against a
   local issuer and Keycloak's development realm only, not against Entra ID, Okta or Auth0. Revocation is
   bounded by token lifetime (realm default 5 minutes). Roles and groups in tokens are not used. The
   browser signs in with authorization code + PKCE and keeps tokens in memory, so a reload signs in again;
   there is no logout button, and a refresh failure asks the user to sign in again.
-- **Metrics and alerts (2026-10-30, ADR 0013):** Prometheus and the alert rules run only with the compose profile `ops`. Since 2026-11-02 Alertmanager delivers firing alerts to one webhook (`ALERT_WEBHOOK_URL`); there is no per-team routing, silencing policy or on-call schedule, and it was tested against a local webhook only. Before that, no Alertmanager was configured, so a firing alert notifies nobody; it shows on the Prometheus alerts page. Since 2026-11-03 the RAG service is scraped (with profiles `rag` and `ops`; `RagErrorRateHigh` on its 5xx ratio), and so are Redis (exporter), Qdrant (its `/metrics`) and the model server from the worker's side (`RedisDown`, `QdrantDown`, `ModelErrorsHigh`, `ModelFirstTokenSlow`). The Redis exporter logs in as the one ACL user `chatbot`, which has every permission; a read-only exporter user would need a second Redis secret. With `MOCK_LLM=true` there are no model-call metrics, so the two model alerts cannot fire. The worker's counters reset when it restarts, so lag and dead letters are read from the broker instead. The metrics port has no authentication; it is reachable only on the compose network.
-- **Reply dropped after a crash between its writes and its checkpoint (2026-10-31, ADR 0009 addendum):** the rebalance durability test lost one history turn on `main` at `8aa6657` and on PR #95 while every message still got one `done`. A worker killed after the reply node's writes were saved, but before the checkpoint that applies them, left a state whose read showed the reply; the redelivery re-sent it without checkpointing, and the next turn's run started from the older checkpoint. The replay path now applies the pending writes first (`test_crash_between_the_reply_writes_and_their_checkpoint`, real Redis). The approval resume had the same gap (an approved refund answered `approval_not_pending` and was never applied); since 2026-11-01 every envelope first finishes such a step (`test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome`).
-- **Security scanning (2026-10-31, ADR 0014):** Trivy gates only fixable HIGH/CRITICAL vulnerabilities in the four service images and, since 2026-11-03, the frontend dev-server image; unfixed CVEs and MEDIUM and below are not gated. CodeQL alerts do not fail the build; since 2026-11-03 `SECURITY.md` names the maintainer as triage owner with response times (7 days for high and critical, 30 for medium), which nothing enforces automatically.
+- *[Open.]* **Metrics and alerts (2026-10-30, ADR 0013):** Prometheus and the alert rules run only with the compose profile `ops`. Since 2026-11-02 Alertmanager delivers firing alerts to one webhook (`ALERT_WEBHOOK_URL`); there is no per-team routing, silencing policy or on-call schedule, and it was tested against a local webhook only. Before that, no Alertmanager was configured, so a firing alert notifies nobody; it shows on the Prometheus alerts page. Since 2026-11-03 the RAG service is scraped (with profiles `rag` and `ops`; `RagErrorRateHigh` on its 5xx ratio), and so are Redis (exporter), Qdrant (its `/metrics`) and the model server from the worker's side (`RedisDown`, `QdrantDown`, `ModelErrorsHigh`, `ModelFirstTokenSlow`). The Redis exporter logs in as the one ACL user `chatbot`, which has every permission; a read-only exporter user would need a second Redis secret. With `MOCK_LLM=true` there are no model-call metrics, so the two model alerts cannot fire. The worker's counters reset when it restarts, so lag and dead letters are read from the broker instead. The metrics port has no authentication; it is reachable only on the compose network.
+- *[Fixed: PR #97 and PR #101.]* **Reply dropped after a crash between its writes and its checkpoint (2026-10-31, ADR 0009 addendum):** the rebalance durability test lost one history turn on `main` at `8aa6657` and on PR #95 while every message still got one `done`. A worker killed after the reply node's writes were saved, but before the checkpoint that applies them, left a state whose read showed the reply; the redelivery re-sent it without checkpointing, and the next turn's run started from the older checkpoint. The replay path now applies the pending writes first (`test_crash_between_the_reply_writes_and_their_checkpoint`, real Redis). The approval resume had the same gap (an approved refund answered `approval_not_pending` and was never applied); since 2026-11-01 every envelope first finishes such a step (`test_refund_crash_at_any_checkpoint_write_leaves_the_clean_outcome`).
+- *[Open.]* **Security scanning (2026-10-31, ADR 0014):** Trivy gates only fixable HIGH/CRITICAL vulnerabilities in the four service images and, since 2026-11-03, the frontend dev-server image; unfixed CVEs and MEDIUM and below are not gated. CodeQL alerts do not fail the build; since 2026-11-03 `SECURITY.md` names the maintainer as triage owner with response times (7 days for high and critical, 30 for medium), which nothing enforces automatically.
