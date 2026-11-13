@@ -229,6 +229,10 @@ Required for the gateway producer, worker consumer/dedupe/DLQ, Redis checkpointe
 SSE, routing against Qdrant, and the approval gate.
 
 **Contracts:** [`SPEC.md`](SPEC.md) — §5 idempotency, §6 token stream resume semantics, §3 ownership.
+**Provenance (ADR 0017).** After a PR an agent session created is merged, add its line to
+`docs/provenance/manifest.jsonl` with `scripts/provenance.py add --pr N --transcript <session.jsonl>`
+in the next log commit. Never write a line by hand or for a PR the transcript did not create.
+
 **Rationale:** `docs/adr/`, `docs/architecture/HLD.md`, `docs/architecture/LLD.md`,
 `docs/master_plan.md`. ADRs and design docs live on `main`. When code and a document disagree, the
 code is right and the document is the bug.
