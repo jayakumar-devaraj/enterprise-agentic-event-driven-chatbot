@@ -130,7 +130,9 @@ recorded. Later sessions: session 9d3720f9 (audit remediation, #36–#51), 2d000
 call produced the pull request, checked against the local Claude Code transcripts; `unrecorded` means
 no creating call was found or the ID was never recorded, and none is inferred. The lead (Jayakumar Devaraj) made every gate decision; the agent proposed, implemented,
 verified and recorded. Commits carry no AI trailers by rule (CLAUDE.md §5); authorship evidence is
-this file and `docs/design_dialogue.md`.
+this file and `docs/design_dialogue.md`. From 2026-11-13, each merged agent PR also gets a
+line with its transcript's hash in `docs/provenance/manifest.jsonl` (ADR 0017), which a holder
+of the transcript can verify.
 
 **Design (10:20–10:58).** Preflight found no git repo; the lead supplied the remote and confirmed
 the author identity, then the prompt was committed verbatim (`13f2d01`). Step A proposed three
