@@ -1,5 +1,9 @@
 # Project audit, score, and hiring recommendation
 
+> **Superseded** by the independent audit of 2026-11-03 (at `b4814dc`, 85/100), whose open items
+> are in [`audit-followups-2026-11-06.md`](audit-followups-2026-11-06.md). Kept unchanged as a record;
+> statements below may no longer hold.
+
 **Total: 59/100 (provisional, evidence-based).**
 
 **Recommendation: NO HIRE on this submission as it stands for the principal backend/ML platform role described in the brief.** This is a recommendation based on this work sample, not a judgment about the candidate's overall ability. The architecture and delivery discipline are promising, but reproduced acceptance, refund, and replay defects are material for a role responsible for distributed-system correctness. A focused remediation exercise could justify reassessment.

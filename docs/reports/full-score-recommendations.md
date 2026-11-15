@@ -1,5 +1,9 @@
 # Recommendations for a full-score reassessment
 
+> **Superseded** by the independent audit of 2026-11-03 (at `b4814dc`, 85/100), whose open items
+> are in [`audit-followups-2026-11-06.md`](audit-followups-2026-11-06.md). Kept unchanged as a record;
+> statements below may no longer hold.
+
 Prepared 2026-10-18. Reviewed baseline: `3c63545c8cfd1d04bd0f6bade6d75d6e250cfaaf`.
 
 ## Answer and scope
