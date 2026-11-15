@@ -4,11 +4,14 @@ Checks, over every tracked Markdown file:
 - relative links resolve to a tracked file or directory (links inside code fences are examples and
   are skipped);
 - every commit hash and `#N` pull request number cited in docs/AI_ORCHESTRATION.md exists: hashes in
-  this history, pull requests as merged on GitHub (merge-commit subjects when `gh` is unavailable).
+  this history, pull requests as merged on GitHub (merge-commit subjects when `gh` is unavailable);
+- every line of docs/provenance/manifest.jsonl (ADR 0017) is complete JSON naming a merged pull
+  request and a merge commit in this history.
 
 Standard library only; needs the full git history (`fetch-depth: 0` in CI). Exit 1 lists problems.
 """
 
+import json
 import posixpath
 import re
 import shutil
@@ -22,6 +25,10 @@ FENCE = re.compile(r"^(```|~~~).*?^\1", re.DOTALL | re.MULTILINE)
 HASH = re.compile(r"`([0-9a-f]{7,40})`")
 PR = re.compile(r"#(\d{1,4})\b")
 ORCHESTRATION = "docs/AI_ORCHESTRATION.md"
+MANIFEST = "docs/provenance/manifest.jsonl"
+MANIFEST_FIELDS = (
+    "pr", "merge_commit", "session", "transcript_sha256", "transcript_bytes", "recorded"
+)  # fmt: skip
 
 
 def git(*args: str) -> str:
@@ -74,11 +81,38 @@ def unknown_references() -> list[str]:
     return problems
 
 
+def manifest_problems(text: str) -> list[str]:
+    """Manifest lines that are not complete JSON, or name a PR or commit that does not exist."""
+    problems = []
+    for i, line in enumerate(text.splitlines(), 1):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            problems.append(f"{MANIFEST}:{i}: not JSON")
+            continue
+        missing = [f for f in MANIFEST_FIELDS if f not in entry]
+        if missing:
+            problems.append(f"{MANIFEST}:{i}: missing {', '.join(missing)}")
+            continue
+        found = subprocess.run(
+            ["git", "cat-file", "-e", f"{entry['merge_commit']}^{{commit}}"],
+            cwd=ROOT,
+            capture_output=True,
+        )
+        if found.returncode != 0:
+            problems.append(f"{MANIFEST}:{i}: unknown merge commit {entry['merge_commit']}")
+        if not pr_is_merged(str(entry["pr"])):
+            problems.append(f"{MANIFEST}:{i}: PR #{entry['pr']} is not a merged pull request")
+    return problems
+
+
 def main() -> int:
     """Print every problem found and return a process exit code."""
     tracked = set(git("ls-files").splitlines())
     md_files = sorted(f for f in tracked if f.endswith(".md"))
     problems = broken_links(tracked, md_files) + unknown_references()
+    if MANIFEST in tracked:
+        problems += manifest_problems((ROOT / MANIFEST).read_text(encoding="utf-8"))
     for p in problems:
         print(p)
     print(f"{len(md_files)} Markdown files checked, {len(problems)} problem(s)")
