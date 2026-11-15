@@ -118,6 +118,19 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Judge queue delay under a pre-registered open-loop load | files changed (by path): docs 4, other 4, tests 1 | perf/queue-delay | #117 | b045e33f |
 | Metrics for Redis, Qdrant and the model server | files changed (by path): code 2, docs 4, other 6, tests 1 | ops/infra-metrics | #118 | b045e33f |
 | Scan the frontend image and name the CodeQL triage owner | files changed (by path): docs 4, other 3 | security/frontend-scan-triage | #119 | b045e33f |
+| Freeze the docs at 882bb6a: CI coverage, summary and the log through #119 | files changed (by path): docs 3, other 2 | docs/freeze-2026-11-03 | #120 | b045e33f |
+| Pin the RAG service to v0.2.2 | files changed (by path): docs 2, other 1 | chore/pin-rag-0.2.2 | #121 | b045e33f |
+| Make the time limit an input to the build prompt and the rubric | files changed (by path): docs 2 | docs/time-limit-as-input | #122 | 8c17210e |
+| Trim docs/prompts to three files and name them by role | files changed (by path): docs 7 | docs/prompts-cleanup | #123 | 8c17210e |
+| Add the audit follow-ups for the chatbot | files changed (by path): docs 1 | docs/audit-followups | #124 | 8c17210e |
+| Dead-letter unexpected pipeline errors as internal_error | files changed (by path): code 4, docs 4, other 1, tests 5 | fix/worker-internal-error | #125 | 1a556519 |
+| Test the worker entry point | files changed (by path): docs 2, other 2, tests 1 | test/worker-main | #126 | 1a556519 |
+| Upgrade zlib1g in the Python images to clear two new HIGH CVEs | files changed (by path): docs 1, other 4 | security/zlib1g-cves | #127 | 1a556519 |
+| Recognize street addresses and obfuscated identifiers in the scrubber | files changed (by path): code 1, docs 6, other 7, tests 4 | fix/pii-recall | #128 | 1a556519 |
+| Write refund audit events straight to Postgres (item 1.4) | files changed (by path): code 7, docs 6, other 7, tests 9 | feat/audit-sync-refunds | #129 | 1a556519 |
+| Off-topic refusals: fresh pre-registered set, benign exemplars (item 1.5) | files changed (by path): docs 4, other 5, tests 1 | eval/offtopic-refusals | #130 | 1a556519 |
+| Backlog check over five-minute open loops: fails (item 1.5) | files changed (by path): docs 4, other 5, tests 1 | eval/backlog-long-run | #132 | 1a556519 |
+| Clean real-model latency rerun (item 1.5) | files changed (by path): docs 4, other 2 | eval/real-model-latency-rerun | #133 | 1a556519 |
 
 
 
