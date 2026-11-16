@@ -131,6 +131,10 @@ sessions listed per row. Lead: Jayakumar Devaraj (gates and decisions).
 | Off-topic refusals: fresh pre-registered set, benign exemplars (item 1.5) | files changed (by path): docs 4, other 5, tests 1 | eval/offtopic-refusals | #130 | 1a556519 |
 | Backlog check over five-minute open loops: fails (item 1.5) | files changed (by path): docs 4, other 5, tests 1 | eval/backlog-long-run | #132 | 1a556519 |
 | Clean real-model latency rerun (item 1.5) | files changed (by path): docs 4, other 2 | eval/real-model-latency-rerun | #133 | 1a556519 |
+| Known limitations: status on every entry (item 2.1) | files changed (by path): docs 1 | docs/limitations-status | #134 | 1a556519 |
+| Mark two old audit documents as superseded (item 2.2) | files changed (by path): docs 2 | docs/superseded-notes | #135 | 1a556519 |
+| Orchestration log: PRs #120-#133 (item 2.3) | files changed (by path): docs 1 | docs/orchestration-log-120-133 | #136 | 1a556519 |
+| Provenance manifest from now on (item 2.4) | files changed (by path): docs 4, other 3, tests 2 | docs/provenance-manifest | #137 | 1a556519 |
 
 
 
